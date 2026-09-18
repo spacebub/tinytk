@@ -1,6 +1,6 @@
 # tinytk
 
-The system and interface layer based on Blend2D and SDL3.
+Tiny ui toolkit on Blend2D and SDL3. Provides several premade controls and system utilities.
 
 ## Layout
 
