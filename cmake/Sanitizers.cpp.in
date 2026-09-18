@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/*
+ * Part of tinytk
+ *
+ * Copyright (c) 2026
+ * Authors:
+ *	spacebub <spacebubs@proton.me>
+ */
+// Generated from lsan.supp. Edit that instead. The runtimes read these while
+// starting up, so everything here must be a literal.
+
+// Beside the binaries. The runtime appends the process id.
+#ifndef TTK_SANITIZER_LOG
+#define TTK_SANITIZER_LOG "@CMAKE_RUNTIME_OUTPUT_DIRECTORY@/sanitizer"
+#endif
+
+extern "C" const char *__lsan_default_suppressions();
+extern "C" const char *__asan_default_options();
+extern "C" const char *__ubsan_default_options();
+
+extern "C" const char *__lsan_default_suppressions() {
+    return R"lsan(
+@SANITIZER_SUPPRESSIONS@
+)lsan";
+}
+
+extern "C" const char *__asan_default_options() {
+    return "log_path=" TTK_SANITIZER_LOG ".san";
+}
+
+// A line number alone finds nothing, and halting would stop before the interesting part.
+extern "C" const char *__ubsan_default_options() {
+    return "log_path=" TTK_SANITIZER_LOG ".san"
+           ":print_stacktrace=1"
+           ":halt_on_error=0";
+}
