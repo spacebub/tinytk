@@ -1,7 +1,6 @@
 # tinytk
 
-The system and interface layer shared by spacebub's desktop tools, under the
-`ttk` namespace.
+The system and interface layer based on Blend2D and SDL3.
 
 ## Layout
 
