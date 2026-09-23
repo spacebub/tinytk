@@ -10,6 +10,7 @@
 #define TTK_TOOLKIT_WIDGET_H
 
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -30,7 +31,7 @@ namespace ttk {
     public:
         using Ptr = std::unique_ptr<Widget>;
 
-        Widget() = default;
+        Widget();
         virtual ~Widget() = default;
 
         Widget(const Widget &) = delete;
@@ -180,6 +181,9 @@ namespace ttk {
         // Called after place() has set the box, before arrange().
         virtual void moved() {}
 
+        // Called when the palette on screen has changed since the widget last saw it.
+        virtual void restyle() {}
+
         // A leaf that answers the pointer says so once, in its constructor. A plain
         // container lets what is under it through.
         bool _takesPointer = false;
@@ -192,6 +196,7 @@ namespace ttk {
         std::vector<Ptr> _children;
         Widget *_parent = nullptr;
         Root *_root = nullptr;
+        std::uint32_t _revision;
 
         bool _visible = true;
         bool _enabled = true;

@@ -102,7 +102,7 @@ namespace ttk {
     }
 
     void MultistateSwitch::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const double radius = _box.h / 2.0;
 
         painter.round(_box, radius, palette.sunken);

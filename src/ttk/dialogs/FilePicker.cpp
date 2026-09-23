@@ -111,7 +111,7 @@ namespace ttk {
 
     }
 
-        FilePicker::FilePicker(Notifier *notifier) : _notifier(notifier) {}
+    FilePicker::FilePicker(Notifier *notifier) : _notifier(notifier) {}
 
     void FilePicker::touch() {
         if (changed) {
@@ -119,7 +119,7 @@ namespace ttk {
         }
     }
 
-        void FilePicker::open(const std::string &title, const std::vector<std::string> &filters, const bool directories,
+    void FilePicker::open(const std::string &title, const std::vector<std::string> &filters, const bool directories,
                           const bool folders, const bool multiple, const std::string &remember, Chosen chosen,
                           const std::string &option, const std::string &optionHint) {
         _saving = false;
@@ -127,7 +127,7 @@ namespace ttk {
         suggest("");
     }
 
-        void FilePicker::open_save(const std::string &title, const std::vector<std::string> &filters,
+    void FilePicker::open_save(const std::string &title, const std::vector<std::string> &filters,
                                const std::string &remember, const std::string &name, Chosen chosen) {
         _saving = true;
         start(title, filters, false, false, false, remember, std::move(chosen), "", "");
@@ -170,9 +170,15 @@ namespace ttk {
         choose(_marked);
     }
 
-        std::string FilePicker::start_directory(const std::string &key) const {
-        const auto found = _remembered.find(key);
-        const std::string remembered = found == _remembered.end() ? std::string() : found->second;
+    std::string FilePicker::start_directory(const std::string &key) const {
+        std::string remembered;
+
+        if (_memory.directory) {
+            remembered = _memory.directory(key);
+        } else if (const auto found = _remembered.find(key); found != _remembered.end()) {
+            remembered = found->second;
+        }
+
         std::error_code code;
 
         if (!remembered.empty() && std::filesystem::is_directory(remembered, code)) {
@@ -184,22 +190,31 @@ namespace ttk {
         return Format::from_path(home.empty() ? std::filesystem::current_path(code) : home);
     }
 
-        void FilePicker::remember_directory(const std::string &key, const std::string &path) {
-        if (!path.empty()) {
+    void FilePicker::remember_directory(const std::string &key, const std::string &path) {
+        if (path.empty()) {
+            return;
+        }
+
+        if (_memory.remember) {
+            _memory.remember(key, path);
+        } else {
             _remembered[key] = path;
         }
     }
 
-        void FilePicker::start(const std::string &title, const std::vector<std::string> &filters, const bool directories,
+    void FilePicker::start(const std::string &title, const std::vector<std::string> &filters, const bool directories,
                            const bool folders, const bool multiple, const std::string &remember, Chosen chosen,
                            const std::string &option, const std::string &optionHint) {
         _chosen = std::move(chosen);
         _remember = remember;
         _filters = filters.empty() ? std::vector<std::string>{"*"} : filters;
         _suffixes.clear();
+        _patterns.clear();
         _anything = false;
 
         for (const std::string &filter : _filters) {
+            _patterns.push_back(Text::lower(filter));
+
             if (filter == "*" || filter == "*.*") {
                 _anything = true;
             } else if (filter.starts_with("*")) {
@@ -242,8 +257,12 @@ namespace ttk {
         show_target();
     }
 
-        void FilePicker::show_hidden(const bool value) {
-        _hidden = value;
+    void FilePicker::show_hidden(const bool value) {
+        if (_memory.showHidden) {
+            _memory.showHidden(value);
+        } else {
+            _hidden = value;
+        }
 
         _state.hiddenShown = value;
 
@@ -296,15 +315,13 @@ namespace ttk {
         return at == pattern.size();
     }
 
-    bool FilePicker::wanted(const std::filesystem::path &path) const {
+    bool FilePicker::wanted(const std::string &name) const {
         if (_anything) {
             return true;
         }
 
-        const std::string name = Text::lower(path.filename().string());
-
-        return std::ranges::any_of(_filters, [&name](const std::string &filter) {
-            return matches(Text::lower(filter), name);
+        return std::ranges::any_of(_patterns, [&name](const std::string &pattern) {
+            return matches(pattern, name);
         });
     }
 
@@ -314,6 +331,7 @@ namespace ttk {
         std::vector<Entry> directories;
         std::vector<Entry> files;
         std::error_code code;
+        const bool showHidden = hidden();
 
         for (std::filesystem::directory_iterator step(_path, code), end;
              step != end && !code; step.increment(code)) {
@@ -321,7 +339,7 @@ namespace ttk {
             const std::filesystem::path &path = step->path();
             const bool aside = concealed(*step);
 
-            if (aside && !hidden()) {
+            if (aside && !showHidden) {
                 continue;
             }
 
@@ -338,7 +356,7 @@ namespace ttk {
 
             if (entry.directory) {
                 directories.push_back(std::move(entry));
-            } else if (!_directories && wanted(path)) {
+            } else if (!_directories && wanted(entry.key)) {
                 files.push_back(std::move(entry));
             }
         }

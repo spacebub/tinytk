@@ -18,7 +18,7 @@ namespace ttk {
         _caption->section();
 
         _value = append(std::make_unique<Label>(std::move(value)));
-        _value->font(600, Theme::fontBody)->tone(Theme::of().text);
+        _value->font(600, Theme::fontBody)->tone(&Theme::Palette::text);
     }
 
     void Fact::set_value(std::string value) const {

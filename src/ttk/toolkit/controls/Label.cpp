@@ -53,10 +53,8 @@ namespace ttk {
         return this;
     }
 
-    Label *Label::tone(const BLRgba32 tone) {
+    Label *Label::tone(const Theme::Tone tone) {
         _tone = tone;
-        _toneDark = Theme::dark();
-        _toneSet = true;
 
         return this;
     }
@@ -78,9 +76,7 @@ namespace ttk {
         _size = Theme::fontTiny;
         _tracked = true;
         _upper = Text::upper(_text);
-        _tone = Theme::of().faint;
-        _toneDark = Theme::dark();
-        _toneSet = true;
+        _tone = Theme::Tone(&Theme::Palette::faint);
 
         return this;
     }
@@ -196,9 +192,7 @@ namespace ttk {
         }
 
         const BLFont &face = painter.font(face_weight(), _size);
-        const BLRgba32 ink = _clicked && hovered() ? Theme::of().accent
-                           : _toneSet              ? Theme::restated(_tone, _toneDark)
-                                                   : Theme::of().text;
+        const BLRgba32 ink = _clicked && hovered() ? Theme::palette().accent : _tone.colour();
 
         if (_path) {
             // A fixed width face, so what fits is a division.

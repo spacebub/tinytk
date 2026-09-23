@@ -71,9 +71,9 @@ if (SANITIZE)
     # Runtime options and suppressions are compiled in. ASAN_OPTIONS still overrides.
     # It defines symbols, so it is a source of the binary rather than part of the interface target.
     file(READ ${CMAKE_CURRENT_SOURCE_DIR}/lsan.supp SANITIZER_SUPPRESSIONS)
-    configure_file(cmake/Sanitizers.cpp.in ${CMAKE_BINARY_DIR}/Sanitizers.cpp @ONLY)
+    configure_file(cmake/Sanitizers.cpp.in ${PROJECT_BINARY_DIR}/Sanitizers.cpp @ONLY)
 
-    set(TTK_SANITIZER_SOURCES ${CMAKE_BINARY_DIR}/Sanitizers.cpp CACHE INTERNAL "")
+    set(TTK_SANITIZER_SOURCES ${PROJECT_BINARY_DIR}/Sanitizers.cpp CACHE INTERNAL "")
 endif ()
 
 # One self-contained binary. This keeps every fetched library static.

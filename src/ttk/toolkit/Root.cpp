@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "ttk/draw/Theme.h"
 #include "ttk/toolkit/Root.h"
 
 namespace ttk {
@@ -131,6 +132,11 @@ namespace ttk {
     }
 
     bool Root::settle() {
+        if (_revision != Theme::revision()) {
+            _revision = Theme::revision();
+            _relayout = true;
+        }
+
         if (!_relayout) {
             return false;
         }

@@ -30,7 +30,7 @@ int main() {
     page->pad(ttk::Theme::pad)->spacing(ttk::Theme::gap);
 
     page->append(std::make_unique<ttk::Label>("Hello from tinytk"))
-        ->font(ttk::Theme::of().headingWeight, ttk::Theme::fontTitle);
+        ->font(ttk::Theme::palette().headingWeight, ttk::Theme::fontTitle);
 
     page->append(std::make_unique<ttk::Button>("Say hello", [&notifier] {
         notifier.success("Hello", "tinytk");

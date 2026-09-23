@@ -46,7 +46,7 @@ namespace ttk {
             _pill->fixedHeight = 22.0;
 
             _said = _head->append(std::make_unique<Label>());
-            _said->font(400, Theme::fontSmall)->tone(Theme::of().faint);
+            _said->font(400, Theme::fontSmall)->tone(&Theme::Palette::faint);
             _said->stretch = 1.0;
 
             // The whole band, so it centres in the row exactly as the drawn title does
@@ -93,7 +93,7 @@ namespace ttk {
 
         void set_said(std::string text, const bool warning) const {
             _said->set_text(std::move(text));
-            _said->tone(warning ? Theme::of().warning : Theme::of().faint);
+            _said->tone(warning ? &Theme::Palette::warning : &Theme::Palette::faint);
         }
 
         double natural_height(Typeface &type, const double width) override {
@@ -127,7 +127,7 @@ namespace ttk {
         void paint(const Painter &painter) override {
             Panel::paint(painter);
 
-            const Theme::Palette &palette = Theme::of();
+            const Theme::Palette &palette = Theme::palette();
             const BLRect head{_box.x + 16.0, _box.y + 16.0, _box.w - 32.0, Theme::control};
             const double side = Glyphs::span(1.0F);
 
@@ -193,7 +193,7 @@ namespace ttk {
         // Where the heading's title ends, so the pill sits after it.
         double title_width(Typeface &type) const {
             return Glyphs::span(1.0F) + 10.0
-                + type.width(type.at(Theme::of().headingWeight, Theme::fontMedium), _title);
+                + type.width(type.at(Theme::palette().headingWeight, Theme::fontMedium), _title);
         }
 
     private:
@@ -239,7 +239,7 @@ namespace ttk {
             _name->section();
 
             _said = _head->append(std::make_unique<Label>());
-            _said->font(400, Theme::fontTiny)->tone(Theme::of().faint);
+            _said->font(400, Theme::fontTiny)->tone(&Theme::Palette::faint);
 
             _head->append(std::make_unique<Spacer>());
 
@@ -304,7 +304,7 @@ namespace ttk {
 
             Glyphs::draw(painter.context(), Glyphs::Glyph::Down,
                          BLPoint{_box.x, _box.y + ((HEAD - side) / 2.0)}, WEIGHT,
-                         _over ? Theme::of().text : Theme::of().faint, _turn.value());
+                         _over ? Theme::palette().text : Theme::palette().faint, _turn.value());
         }
 
         bool press(const Pointer &at) override { return on_head(at.y); }
@@ -328,7 +328,7 @@ namespace ttk {
 
             _over = over;
 
-            _name->tone(over ? Theme::of().text : Theme::of().faint);
+            _name->tone(over ? &Theme::Palette::text : &Theme::Palette::faint);
 
             invalidate();
         }
@@ -338,7 +338,7 @@ namespace ttk {
 
             _over = false;
 
-            _name->tone(Theme::of().faint);
+            _name->tone(&Theme::Palette::faint);
         }
 
         bool advance(const double now) override {

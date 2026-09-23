@@ -21,7 +21,7 @@ namespace ttk {
         Rule() { fixedHeight = 1.0; }
 
         void paint(const Painter &painter) override {
-            painter.fill(BLRect{_box.x, _box.y, _box.w, 1.0}, Theme::of().border);
+            painter.fill(BLRect{_box.x, _box.y, _box.w, 1.0}, Theme::palette().border);
         }
     };
 }

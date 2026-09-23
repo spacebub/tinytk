@@ -93,10 +93,10 @@ namespace {
         const BLFont &font = type.at(ttk::Typeface::regular, ttk::Theme::fontBody);
         const std::string run = "Knee Deep in the Dead";
 
-        type.draw(canvas.context(), font, BLPoint{8.0, 8.0}, run, ttk::Theme::of().text);
+        type.draw(canvas.context(), font, BLPoint{8.0, 8.0}, run, ttk::Theme::palette().text);
 
         for ([[maybe_unused]] auto step : state) {
-            type.draw(canvas.context(), font, BLPoint{8.0, 8.0}, run, ttk::Theme::of().text);
+            type.draw(canvas.context(), font, BLPoint{8.0, 8.0}, run, ttk::Theme::palette().text);
         }
 
         canvas.context().flush(BL_CONTEXT_FLUSH_SYNC);
@@ -114,7 +114,7 @@ namespace {
 
         for ([[maybe_unused]] auto step : state) {
             type.draw(canvas.context(), font, BLPoint{8.0, 8.0}, runs[at++ % runs.size()],
-                      ttk::Theme::of().text);
+                      ttk::Theme::palette().text);
         }
 
         canvas.context().flush(BL_CONTEXT_FLUSH_SYNC);
@@ -130,7 +130,7 @@ namespace {
         const std::string run = "LIBRARY";
 
         for ([[maybe_unused]] auto step : state) {
-            type.draw_tracked(canvas.context(), font, BLPoint{8.0, 8.0}, run, ttk::Theme::of().muted, 1.2F);
+            type.draw_tracked(canvas.context(), font, BLPoint{8.0, 8.0}, run, ttk::Theme::palette().muted, 1.2F);
         }
 
         canvas.context().flush(BL_CONTEXT_FLUSH_SYNC);
@@ -161,14 +161,14 @@ namespace {
 
         for (int at = 0; at < count; ++at) {
             type.draw(canvas.context(), font, BLPoint{8.0, 8.0}, runs[static_cast<size_t>(at)],
-                      ttk::Theme::of().text);
+                      ttk::Theme::palette().text);
         }
 
         for ([[maybe_unused]] auto step : state) {
             for (int at = 0; at < count; ++at) {
                 type.draw(canvas.context(), font,
                           BLPoint{8.0, static_cast<double>((at % 40) * 20)},
-                          runs[static_cast<size_t>(at)], ttk::Theme::of().text);
+                          runs[static_cast<size_t>(at)], ttk::Theme::palette().text);
             }
 
             canvas.context().flush(BL_CONTEXT_FLUSH_SYNC);

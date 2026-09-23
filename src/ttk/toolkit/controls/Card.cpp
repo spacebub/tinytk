@@ -34,7 +34,7 @@ namespace ttk {
 
         Panel::paint(painter);
 
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const BLFont &face = painter.font(600, Theme::fontMedium);
         double right = _box.x + _box.w - 16.0;
 

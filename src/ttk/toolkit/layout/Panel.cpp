@@ -11,7 +11,7 @@
 
 namespace ttk {
     void Panel::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
 
         painter.round(_box, rounding, inset ? palette.sunken : palette.surface);
 

@@ -33,7 +33,7 @@ namespace ttk {
             context.clip_to_rect(region);
             context.fill_rect(BLRect{static_cast<double>(region.x), static_cast<double>(region.y),
                                      static_cast<double>(region.w), static_cast<double>(region.h)},
-                              Theme::of().background);
+                              Theme::palette().background);
 
             root.paint(context, region);
 

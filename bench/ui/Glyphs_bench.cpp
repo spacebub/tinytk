@@ -40,7 +40,7 @@ namespace {
         const auto which = static_cast<ttk::Glyphs::Glyph>(state.range(0));
 
         for ([[maybe_unused]] auto step : state) {
-            ttk::Glyphs::draw(canvas.context(), which, BLPoint{32, 32}, 1.4F, ttk::Theme::of().text);
+            ttk::Glyphs::draw(canvas.context(), which, BLPoint{32, 32}, 1.4F, ttk::Theme::palette().text);
         }
 
         canvas.context().flush(BL_CONTEXT_FLUSH_SYNC);
@@ -57,7 +57,7 @@ namespace {
 
         for ([[maybe_unused]] auto step : state) {
             ttk::Glyphs::draw(canvas.context(), ttk::Glyphs::Glyph::Down, BLPoint{32, 32}, 1.4F,
-                         ttk::Theme::of().muted, 90.0F);
+                         ttk::Theme::palette().muted, 90.0F);
         }
 
         canvas.context().flush(BL_CONTEXT_FLUSH_SYNC);
@@ -94,11 +94,11 @@ namespace {
 
     // Cached by size and tint. A card's shadow is asked for every frame it moves.
     void Paint_shadow_cached(benchmark::State &state) {
-        benchmark::DoNotOptimize(&ttk::Paint::shadow(244, 232, ttk::Theme::radius, 24.0, ttk::Theme::of().shadow));
+        benchmark::DoNotOptimize(&ttk::Paint::shadow(244, 232, ttk::Theme::radius, 24.0, ttk::Theme::palette().shadow));
 
         for ([[maybe_unused]] auto step : state) {
             benchmark::DoNotOptimize(&ttk::Paint::shadow(244, 232, ttk::Theme::radius, 24.0,
-                                                    ttk::Theme::of().shadow));
+                                                    ttk::Theme::palette().shadow));
         }
     }
 
@@ -116,7 +116,7 @@ namespace {
             wide = wide > 400 ? 200 : wide + 1;
 
             benchmark::DoNotOptimize(&ttk::Paint::shadow(wide, 232, ttk::Theme::radius, blur,
-                                                    ttk::Theme::of().shadow));
+                                                    ttk::Theme::palette().shadow));
         }
     }
 

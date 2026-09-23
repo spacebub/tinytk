@@ -42,7 +42,7 @@ namespace {
         Sheet sheet;
 
         for ([[maybe_unused]] auto step : state) {
-            sheet.painter().fill(BLRect{10, 10, 240, 42}, ttk::Theme::of().surface);
+            sheet.painter().fill(BLRect{10, 10, 240, 42}, ttk::Theme::palette().surface);
         }
 
         sheet.flush();
@@ -54,7 +54,7 @@ namespace {
         Sheet sheet;
 
         for ([[maybe_unused]] auto step : state) {
-            sheet.painter().round(BLRect{10, 10, 240, 42}, ttk::Theme::radius, ttk::Theme::of().surface);
+            sheet.painter().round(BLRect{10, 10, 240, 42}, ttk::Theme::radius, ttk::Theme::palette().surface);
         }
 
         sheet.flush();
@@ -66,7 +66,7 @@ namespace {
         Sheet sheet;
 
         for ([[maybe_unused]] auto step : state) {
-            sheet.painter().outline(BLRect{10, 10, 240, 42}, ttk::Theme::radius, 1.0, ttk::Theme::of().border);
+            sheet.painter().outline(BLRect{10, 10, 240, 42}, ttk::Theme::radius, 1.0, ttk::Theme::palette().border);
         }
 
         sheet.flush();
@@ -78,7 +78,7 @@ namespace {
         Sheet sheet;
 
         for ([[maybe_unused]] auto step : state) {
-            sheet.painter().circle(BLPoint{64, 64}, 9.0, ttk::Theme::of().accent);
+            sheet.painter().circle(BLPoint{64, 64}, 9.0, ttk::Theme::palette().accent);
         }
 
         sheet.flush();
@@ -129,7 +129,7 @@ namespace {
         const std::string run = "Knee Deep in the Dead";
 
         for ([[maybe_unused]] auto step : state) {
-            sheet.painter().text(font, BLPoint{10, 10}, run, ttk::Theme::of().text);
+            sheet.painter().text(font, BLPoint{10, 10}, run, ttk::Theme::palette().text);
         }
 
         sheet.flush();
@@ -146,7 +146,7 @@ namespace {
 
         for ([[maybe_unused]] auto step : state) {
             sheet.painter().label(font, BLRect{10, 10, 240, 24}, ttk::Align::Start, run,
-                                  ttk::Theme::of().text);
+                                  ttk::Theme::palette().text);
         }
 
         sheet.flush();
@@ -160,7 +160,7 @@ namespace {
         const BLFont &font = sheet.painter().font(ttk::Typeface::semibold, ttk::Theme::fontTiny);
 
         for ([[maybe_unused]] auto step : state) {
-            sheet.painter().tracked(font, BLPoint{10, 10}, "ENGINES", ttk::Theme::of().muted, 1.2);
+            sheet.painter().tracked(font, BLPoint{10, 10}, "ENGINES", ttk::Theme::palette().muted, 1.2);
         }
 
         sheet.flush();
@@ -175,7 +175,7 @@ namespace {
 
         for ([[maybe_unused]] auto step : state) {
             benchmark::DoNotOptimize(
-                sheet.painter().paragraph(font, BLRect{10, 10, 420, 600}, prose(), ttk::Theme::of().text));
+                sheet.painter().paragraph(font, BLRect{10, 10, 420, 600}, prose(), ttk::Theme::palette().text));
         }
 
         sheet.flush();
@@ -245,10 +245,10 @@ namespace {
         const BLFont &font = sheet.painter().font(ttk::Typeface::semibold, ttk::Theme::fontMedium);
 
         for ([[maybe_unused]] auto step : state) {
-            sheet.painter().round(BLRect{10, 10, 560, 180}, ttk::Theme::radius, ttk::Theme::of().surface);
-            sheet.painter().outline(BLRect{10, 10, 560, 180}, ttk::Theme::radius, 1.0, ttk::Theme::of().border);
+            sheet.painter().round(BLRect{10, 10, 560, 180}, ttk::Theme::radius, ttk::Theme::palette().surface);
+            sheet.painter().outline(BLRect{10, 10, 560, 180}, ttk::Theme::radius, 1.0, ttk::Theme::palette().border);
             sheet.painter().label(font, BLRect{26, 22, 300, 24}, ttk::Align::Start, "Multiplayer",
-                                  ttk::Theme::of().text);
+                                  ttk::Theme::palette().text);
         }
 
         sheet.flush();

@@ -25,8 +25,10 @@ namespace ttk {
 
         GlyphButton *glyph(Glyphs::Glyph glyph);
         GlyphButton *size(double value);
-        GlyphButton *tone(BLRgba32 rest, BLRgba32 lit);
-        GlyphButton *wash(BLRgba32 tone);
+        GlyphButton *tone(Theme::Tone rest, Theme::Tone lit);
+
+        // A transparent wash falls back to the palette's hover.
+        GlyphButton *wash(Theme::Tone tone);
         GlyphButton *outlined(bool value = true);
         GlyphButton *turn(double degrees);
         GlyphButton *spin(double degrees = 45.0);
@@ -48,6 +50,9 @@ namespace ttk {
 
         bool advance(double now) override;
 
+    protected:
+        void restyle() override;
+
     private:
         Glyphs::Glyph _glyph{};
         std::function<void()> _clicked;
@@ -56,10 +61,9 @@ namespace ttk {
         double _turn = 0.0;
         double _spinBy = 0.0;
 
-        BLRgba32 _rest = Theme::of().muted;
-        BLRgba32 _hot = Theme::of().text;
-        BLRgba32 _wash{};
-        bool _toneDark = Theme::dark();
+        Theme::Tone _rest{&Theme::Palette::muted};
+        Theme::Tone _hot{&Theme::Palette::text};
+        Theme::Tone _wash{&Theme::Palette::hover};
 
         bool _outlined = false;
 

@@ -59,7 +59,7 @@ namespace ttk {
         };
 
         _note = append(std::make_unique<Label>());
-        _note->font(400, Theme::fontSmall)->tone(Theme::of().faint)->wrap();
+        _note->font(400, Theme::fontSmall)->tone(&Theme::Palette::faint)->wrap();
         _note->set_visible(false);
     }
 
@@ -201,7 +201,7 @@ namespace ttk {
     }
 
     void Field::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
 
         painter.round(_frame, Theme::radiusSmall, palette.field);
         painter.outline(_frame, Theme::radiusSmall, 1.0,

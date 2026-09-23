@@ -70,21 +70,27 @@ namespace ttk {
         return this;
     }
 
-    std::string TextBox::shown(const size_t from, const size_t to) const {
+    std::string_view TextBox::shown(const size_t from, const size_t to) const {
         const size_t start = std::min(from, _text.size());
         const size_t end = std::min(to, _text.size());
 
         if (!_secret) {
-            return _text.substr(start, end - start);
+            return std::string_view(_text).substr(start, end - start);
         }
 
-        std::string dots;
+        constexpr std::string_view DOT = "\u2022";
+
+        while (_dots.size() < _text.size() * DOT.size()) {
+            _dots += DOT;
+        }
+
+        size_t count = 0;
 
         for (size_t at = start; at < end; at = after(at)) {
-            dots += "\u2022";
+            ++count;
         }
 
-        return dots;
+        return std::string_view(_dots).substr(0, count * DOT.size());
     }
 
     void TextBox::select_all() {
@@ -257,7 +263,7 @@ namespace ttk {
     }
 
     void TextBox::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const BLFont &face = painter.font(Typeface::pick(400, _mono), Theme::fontBody);
 
         painter.push(_box);
@@ -284,32 +290,25 @@ namespace ttk {
 
         const double left = _box.x - _shift;
 
-        const std::string head = shown(0, from);
-        const std::string marked = shown(from, to);
-        const std::string tail = shown(to, _text.size());
-
+        // Drawn in three runs so the selected part takes the accent's ink. Its edges are
+        // measured from the start of the text so kerning across them is kept.
         if (from != to && focused()) {
+            const std::string_view head = shown(0, from);
+            const std::string_view marked = shown(from, to);
             const double start = painter.width(face, head);
-            const double end = start + painter.width(face, marked);
+            const double end = painter.width(face, shown(0, to));
 
             painter.fill(BLRect{left + start, _box.y + 2.0, end - start, _box.h - 4.0},
                          palette.accent);
-        }
 
-        // Drawn in two runs so the selected part takes the accent's ink.
-        if (from != to && focused()) {
-            painter.label(face, BLRect{left, _box.y, painter.width(face, head) + 1.0, _box.h},
-                          Align::Start, head, palette.text);
+            painter.label(face, BLRect{left, _box.y, start + 1.0, _box.h}, Align::Start, head,
+                          palette.text);
 
-            const double startX = left + painter.width(face, head);
-
-            painter.label(face, BLRect{startX, _box.y, painter.width(face, marked) + 1.0, _box.h},
+            painter.label(face, BLRect{left + start, _box.y, painter.width(face, marked) + 1.0, _box.h},
                           Align::Start, marked, palette.accentText);
 
-            const double endX = startX + painter.width(face, marked);
-
-            painter.label(face, BLRect{endX, _box.y, _box.w + _shift, _box.h}, Align::Start, tail,
-                          palette.text);
+            painter.label(face, BLRect{left + end, _box.y, _box.w + _shift, _box.h}, Align::Start,
+                          shown(to, _text.size()), palette.text);
         } else {
             painter.label(face, BLRect{left, _box.y, _box.w + _shift + 4.0, _box.h}, Align::Start,
                           shown(0, _text.size()), palette.text);

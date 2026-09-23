@@ -40,25 +40,28 @@ namespace ttk {
         Pill *kind(Kind value);
         Pill *dot(bool value);
         Pill *glyph(Glyphs::Glyph glyph);
-        Pill *tones(BLRgba32 tone, BLRgba32 wash);
+        Pill *tones(Theme::Tone tone, Theme::Tone wash);
 
         double natural_width(Typeface &type) override;
         double natural_height(Typeface & /*type*/, double /*width*/) override { return 26.0; }
 
         void paint(const Painter &painter) override;
 
+    protected:
+        void restyle() override;
+
     private:
-        [[nodiscard]] BLRgba32 tone() const;
-        [[nodiscard]] BLRgba32 wash() const;
+        [[nodiscard]] static BLRgba32 Theme::Palette::*tone_slot(Kind kind);
+        [[nodiscard]] static BLRgba32 Theme::Palette::*wash_slot(Kind kind);
+
+        void resolve();
 
         std::string _text;
-        Kind _kind{};
         Glyphs::Glyph _glyph{};
 
-        BLRgba32 _tone{};
-        BLRgba32 _wash{};
-        bool _set = false;
-        bool _toneDark = Theme::dark();
+        Theme::Tone _tone{&Theme::Palette::accent};
+        Theme::Tone _wash{&Theme::Palette::accentSoft};
+        BLRgba32 _ink{};
 
         bool _dot = true;
     };

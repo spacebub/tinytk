@@ -26,22 +26,22 @@ namespace ttk {
         constexpr double TEXT = PAD + (DOT * 2.0) + GAP;
 
         BLRgba32 tone_of(const StatusIndicator::Status status) {
-            const Theme::Palette &palette = Theme::of();
+            const Theme::Palette &palette = Theme::palette();
 
             switch (status) {
                 case StatusIndicator::Status::Launching:
-                    return palette.accentHover;
+                    return palette.statusLaunching;
                 case StatusIndicator::Status::Running:
-                    return palette.success;
+                    return palette.statusRunning;
                 case StatusIndicator::Status::Stopping:
                 case StatusIndicator::Status::Failed:
-                    return palette.danger;
+                    return palette.statusFailing;
                 case StatusIndicator::Status::Empty:
                 case StatusIndicator::Status::Closed:
                     break;
             }
 
-            return palette.muted;
+            return palette.statusIdle;
         }
 
         std::string_view label_of(const StatusIndicator::Status status) {

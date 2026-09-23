@@ -131,7 +131,7 @@ namespace ttk {
             return;
         }
 
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const BLFont &face = painter.font(400, Theme::fontSmall);
         const double fade = _fade.value();
 

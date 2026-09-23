@@ -83,7 +83,7 @@ namespace ttk {
     }
 
     BLRgba32 Button::ink() const {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
 
         switch (_kind) {
             case Kind::Primary:
@@ -117,7 +117,7 @@ namespace ttk {
     }
 
     void Button::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const double lit = _lit.value();
         const bool down = pressed();
 

@@ -80,7 +80,8 @@ namespace ttk {
             }
 
 #ifdef _WIN32
-            return Text::iequals(left, right);
+            return Text::iequals(std::filesystem::path(left).generic_string(),
+                                 std::filesystem::path(right).generic_string());
 #else
             return left == right;
 #endif

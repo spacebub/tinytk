@@ -202,8 +202,8 @@ namespace ttk {
 
         _where = BLRect{box.x + 18.0, box.y + 56.0, box.w - 36.0, Theme::control};
 
-        _whereSlab->fill = Theme::of().field;
-        _whereSlab->edge = pick.editing ? Theme::of().accent : Theme::of().borderStrong;
+        _whereSlab->fill = Theme::palette().field;
+        _whereSlab->edge = pick.editing ? Theme::palette().accent : Theme::palette().borderStrong;
         _whereSlab->place(_where, type);
 
         _up->place(BLRect{_where.x + 4.0, _where.y + ((_where.h - 30.0) / 2.0), 30.0, 30.0}, type);
@@ -220,10 +220,10 @@ namespace ttk {
         _naming = BLRect{box.x + 18.0, _where.y + _where.h + (pick.saving ? 10.0 : 0.0),
                          box.w - 36.0, pick.saving ? Theme::control : 0.0};
 
-        _nameSlab->fill = Theme::of().field;
-        _nameSlab->edge = pick.replacing      ? Theme::of().danger
-                        : _named->focused()   ? Theme::of().accent
-                                              : Theme::of().borderStrong;
+        _nameSlab->fill = Theme::palette().field;
+        _nameSlab->edge = pick.replacing      ? Theme::palette().danger
+                        : _named->focused()   ? Theme::palette().accent
+                                              : Theme::palette().borderStrong;
         _nameSlab->place(_naming, type);
 
         _named->place(BLRect{_naming.x + 58.0, _naming.y + 6.0, _naming.w - 70.0,
@@ -233,8 +233,8 @@ namespace ttk {
         _panel = BLRect{box.x + 18.0, _naming.y + _naming.h + 12.0, box.w - 36.0, 0.0};
         _panel.h = box.y + box.h - 18.0 - Theme::controlSmall - 12.0 - _panel.y;
 
-        _listSlab->fill = Theme::of().sunken;
-        _listSlab->edge = Theme::of().border;
+        _listSlab->fill = Theme::palette().sunken;
+        _listSlab->edge = Theme::palette().border;
         _listSlab->place(_panel, type);
 
         _rows->place(BLRect{_panel.x + 6.0, _panel.y + 6.0, _panel.w - 12.0, _panel.h - 12.0},
@@ -271,7 +271,7 @@ namespace ttk {
     }
 
     void FilePickerDialog::paint_over(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const FilePicker::State &pick = _picker.state();
         const BLRect box = card()->box();
 
@@ -378,7 +378,7 @@ namespace ttk {
     }
 
     void FilePickerDialog::paint_crumbs(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const FilePicker::State &pick = _picker.state();
         const BLFont &face = painter.font(Typeface::mono, Theme::fontSmall);
 
@@ -450,7 +450,7 @@ namespace ttk {
     void FilePickerDialog::paint_crumb(const Painter &painter, const BLRect &box, const bool lit) {
         if (lit) {
             painter.round(BLRect{box.x, box.y + 3.0, box.w, box.h - 6.0},
-                          Theme::radiusSmall - 2.0, Theme::of().hover);
+                          Theme::radiusSmall - 2.0, Theme::palette().hover);
         }
     }
 

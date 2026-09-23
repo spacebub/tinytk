@@ -9,10 +9,13 @@
 #include <algorithm>
 #include <ranges>
 
+#include "ttk/draw/Theme.h"
 #include "ttk/toolkit/Root.h"
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
+    Widget::Widget() : _revision(Theme::revision()) {}
+
     Widget *Widget::add(Ptr child) {
         Widget *raw = child.get();
 
@@ -55,6 +58,12 @@ namespace ttk {
 
     void Widget::attach(Root *root) {
         _root = root;
+
+        if (_revision != Theme::revision()) {
+            _revision = Theme::revision();
+
+            restyle();
+        }
 
         for (const Ptr &child : _children) {
             child->attach(root);

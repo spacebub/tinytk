@@ -147,7 +147,7 @@ namespace {
 
         for (int at = 0; at < count; ++at) {
             ttk::Glyphs::draw(context, static_cast<ttk::Glyphs::Glyph>(at + 1),
-                              BLPoint{(at * CELL) + inset, inset}, WEIGHT, ttk::Theme::of().text);
+                              BLPoint{(at * CELL) + inset, inset}, WEIGHT, ttk::Theme::palette().text);
         }
 
         context.end();
@@ -161,7 +161,7 @@ namespace {
 
         made->spacing(ttk::Theme::gap)->cross(ttk::Box::Place::Centre);
         made->append(std::make_unique<ttk::Label>(name))
-            ->font(ttk::Theme::of().headingWeight, ttk::Theme::fontSmall)->tone(ttk::Theme::of().muted)
+            ->font(ttk::Theme::palette().headingWeight, ttk::Theme::fontSmall)->tone(&ttk::Theme::Palette::muted)
             ->fixedWidth = 180.0;
 
         return made;
@@ -170,24 +170,24 @@ namespace {
     // A line that opens something when clicked.
     ttk::Label *link(ttk::Box *row, const std::string &text, std::function<void()> clicked) {
         return row->append(std::make_unique<ttk::Label>(text))
-            ->tone(ttk::Theme::of().accent)->on_click(std::move(clicked));
+            ->tone(&ttk::Theme::Palette::accent)->on_click(std::move(clicked));
     }
 
     void restyle(Gallery &gallery) {
         ttk::Label *label = gallery.label;
 
-        label->font(400, ttk::Theme::fontBody)->tone(ttk::Theme::of().text)->mono(false)->path(false)->wrap(false);
+        label->font(400, ttk::Theme::fontBody)->tone(&ttk::Theme::Palette::text)->mono(false)->path(false)->wrap(false);
 
         switch (gallery.style) {
             case 0:
                 label->set_text("Body text. Click to see the next style.");
                 break;
             case 1:
-                label->font(ttk::Theme::of().headingWeight, ttk::Theme::fontTitle);
+                label->font(ttk::Theme::palette().headingWeight, ttk::Theme::fontTitle);
                 label->set_text("A title, in the heading weight.");
                 break;
             case 2:
-                label->font(400, ttk::Theme::fontSmall)->tone(ttk::Theme::of().muted);
+                label->font(400, ttk::Theme::fontSmall)->tone(&ttk::Theme::Palette::muted);
                 label->set_text("Small and muted, for a note.");
                 break;
             case 3:
@@ -376,7 +376,7 @@ namespace {
         }
 
         view->face(ttk::Typeface::mono, ttk::Theme::fontSmall);
-        view->ink([](const size_t index) { return index == 3 ? ttk::Theme::of().warning : ttk::Theme::of().text; });
+        view->ink([](const size_t index) { return index == 3 ? ttk::Theme::palette().warning : ttk::Theme::palette().text; });
         view->set_rows(std::move(rows));
         view->hint = "Rows with a tone each, selectable";
         entry(page, "Text view")->append(std::move(view))->stretch = 1.0;
@@ -484,14 +484,14 @@ namespace {
         gallery.bar->fixedHeight = ttk::Theme::barHeight;
 
         gallery.bar->append(std::make_unique<ttk::Label>("tinytk gallery"))
-            ->font(ttk::Theme::of().headingWeight, ttk::Theme::fontTitle);
+            ->font(ttk::Theme::palette().headingWeight, ttk::Theme::fontTitle);
         gallery.bar->append(std::make_unique<ttk::Spacer>());
 
         gallery.shade = gallery.bar->append(std::make_unique<ttk::MultistateSwitch>([&gallery](const int value) {
             constexpr ttk::Theme::Mode MODES[] = {ttk::Theme::Mode::System, ttk::Theme::Mode::Light, ttk::Theme::Mode::Dark};
 
             ttk::Theme::set_mode(MODES[value]);
-            ttk::Shell::set_outline(ttk::Theme::of().borderStrong);
+            ttk::Shell::set_outline(ttk::Theme::palette().borderStrong);
             gallery.shade->set_current(value);
             gallery.shell.ui().damage_all();
         }));
@@ -508,7 +508,7 @@ namespace {
         gallery.cog->size(34.0)->tooltip("Spins a turn when pressed, the way a settings cog does");
 
         gallery.bar->append(std::make_unique<ttk::GlyphButton>(ttk::Glyphs::Glyph::Close, [&gallery] { gallery.shell.stop(); }))
-            ->size(34.0)->tone(ttk::Theme::of().text, ttk::Theme::of().danger)->tooltip("Close the window");
+            ->size(34.0)->tone(&ttk::Theme::Palette::text, &ttk::Theme::Palette::danger)->tooltip("Close the window");
     }
 
     void build(Gallery &gallery) {
@@ -598,7 +598,7 @@ namespace {
         };
 
         shell.shadeChanged = [&gallery] {
-            ttk::Shell::set_outline(ttk::Theme::of().borderStrong);
+            ttk::Shell::set_outline(ttk::Theme::palette().borderStrong);
             gallery.shell.ui().damage_all();
         };
 
@@ -627,7 +627,7 @@ int main() {
         return 1;
     }
 
-    ttk::Shell::set_outline(ttk::Theme::of().borderStrong);
+    ttk::Shell::set_outline(ttk::Theme::palette().borderStrong);
 
     build(gallery);
     wire(gallery);

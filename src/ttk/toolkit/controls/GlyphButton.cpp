@@ -33,18 +33,23 @@ namespace ttk {
         return this;
     }
 
-    GlyphButton *GlyphButton::tone(const BLRgba32 rest, const BLRgba32 lit) {
+    GlyphButton *GlyphButton::tone(const Theme::Tone rest, const Theme::Tone lit) {
         _rest = rest;
         _hot = lit;
-        _toneDark = Theme::dark();
 
         return this;
     }
 
-    GlyphButton *GlyphButton::wash(const BLRgba32 tone) {
-        _wash = tone;
+    GlyphButton *GlyphButton::wash(const Theme::Tone tone) {
+        _wash = tone.colour().a() > 0 ? tone : Theme::Tone(&Theme::Palette::hover);
 
         return this;
+    }
+
+    void GlyphButton::restyle() {
+        _rest.restyle();
+        _hot.restyle();
+        _wash.restyle();
     }
 
     GlyphButton *GlyphButton::outlined(const bool value) {
@@ -80,7 +85,7 @@ namespace ttk {
     }
 
     void GlyphButton::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const double lit = _lit.value();
 
         const BLRect body{_box.x + ((_box.w - _size) / 2.0), _box.y + ((_box.h - _size) / 2.0), _size,
@@ -92,18 +97,17 @@ namespace ttk {
 
         if (lit > 0.0) {
             painter.round(body, Theme::radiusSmall,
-                          Theme::alpha(_wash.a() > 0 ? _wash : palette.hover, lit));
+                          Theme::alpha(_wash.colour(), lit));
         }
 
         if (_outlined) {
             painter.outline(body, Theme::radiusSmall, 1.0,
-                            Theme::mix(palette.borderStrong, Theme::restated(_hot, _toneDark), lit));
+                            Theme::mix(palette.borderStrong, _hot.colour(), lit));
         }
 
         constexpr float weight = 1.2F;
         const double side = Glyphs::span(weight);
-        const BLRgba32 ink = Theme::mix(Theme::restated(_rest, _toneDark),
-                                        Theme::restated(_hot, _toneDark), lit);
+        const BLRgba32 ink = Theme::mix(_rest.colour(), _hot.colour(), lit);
 
         Glyphs::draw(painter.context(), _glyph,
                      BLPoint{body.x + ((body.w - side) / 2.0), body.y + ((body.h - side) / 2.0)}, weight,

@@ -86,7 +86,7 @@ namespace ttk {
             }
 
             void paint(const ttk::Painter &painter) override {
-                const Theme::Palette &palette = Theme::of();
+                const Theme::Palette &palette = Theme::palette();
                 const FilePicker::State &pick = _sheet->_picker.state();
 
                 painter.push(_box);

@@ -10,6 +10,7 @@
 #define TTK_TOOLKIT_ROOT_H
 
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <unordered_set>
@@ -205,6 +206,7 @@ namespace ttk {
         double _now = 0.0;
 
         bool _relayout = true;
+        std::uint32_t _revision = 0;
     };
 }
 

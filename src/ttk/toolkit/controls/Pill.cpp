@@ -12,7 +12,9 @@
 #include "ttk/toolkit/controls/Pill.h"
 
 namespace ttk {
-    Pill::Pill(std::string text) : _text(std::move(text)) {}
+    Pill::Pill(std::string text) : _text(std::move(text)) {
+        resolve();
+    }
 
     void Pill::set_text(std::string text) {
         if (_text == text) {
@@ -25,7 +27,10 @@ namespace ttk {
     }
 
     Pill *Pill::kind(const Kind value) {
-        _kind = value;
+        _tone = Theme::Tone(tone_slot(value));
+        _wash = Theme::Tone(wash_slot(value));
+
+        resolve();
 
         return this;
     }
@@ -42,59 +47,66 @@ namespace ttk {
         return this;
     }
 
-    Pill *Pill::tones(const BLRgba32 tone, const BLRgba32 wash) {
+    Pill *Pill::tones(const Theme::Tone tone, const Theme::Tone wash) {
         _tone = tone;
         _wash = wash;
-        _toneDark = Theme::dark();
-        _set = true;
+
+        resolve();
 
         return this;
     }
 
-    BLRgba32 Pill::tone_of(const Kind kind) {
-        const Theme::Palette &palette = Theme::of();
+    void Pill::restyle() {
+        _tone.restyle();
+        _wash.restyle();
 
+        resolve();
+    }
+
+    void Pill::resolve() {
+        _ink = Theme::palette().dark ? _tone.colour() : Theme::darker(_tone.colour(), 0.35);
+    }
+
+    BLRgba32 Theme::Palette::*Pill::tone_slot(const Kind kind) {
         switch (kind) {
             case Kind::Success:
-                return palette.success;
+                return &Theme::Palette::success;
             case Kind::Warning:
-                return palette.warning;
+                return &Theme::Palette::warning;
             case Kind::Danger:
-                return palette.danger;
+                return &Theme::Palette::danger;
             case Kind::Muted:
-                return palette.muted;
+                return &Theme::Palette::muted;
             case Kind::None:
                 break;
         }
 
-        return palette.accent;
+        return &Theme::Palette::accent;
+    }
+
+    BLRgba32 Theme::Palette::*Pill::wash_slot(const Kind kind) {
+        switch (kind) {
+            case Kind::Success:
+                return &Theme::Palette::successSoft;
+            case Kind::Warning:
+                return &Theme::Palette::warningSoft;
+            case Kind::Danger:
+                return &Theme::Palette::dangerSoft;
+            case Kind::Muted:
+                return &Theme::Palette::mutedSoft;
+            case Kind::None:
+                break;
+        }
+
+        return &Theme::Palette::accentSoft;
+    }
+
+    BLRgba32 Pill::tone_of(const Kind kind) {
+        return Theme::palette().*tone_slot(kind);
     }
 
     BLRgba32 Pill::wash_of(const Kind kind) {
-        const Theme::Palette &palette = Theme::of();
-
-        switch (kind) {
-            case Kind::Success:
-                return palette.successSoft;
-            case Kind::Warning:
-                return palette.warningSoft;
-            case Kind::Danger:
-                return palette.dangerSoft;
-            case Kind::Muted:
-                return palette.mutedSoft;
-            case Kind::None:
-                break;
-        }
-
-        return palette.accentSoft;
-    }
-
-    BLRgba32 Pill::tone() const {
-        return _set ? Theme::restated(_tone, _toneDark) : tone_of(_kind);
-    }
-
-    BLRgba32 Pill::wash() const {
-        return _set ? Theme::restated(_wash, _toneDark) : wash_of(_kind);
+        return Theme::palette().*wash_slot(kind);
     }
 
     double Pill::natural_width(Typeface &type) {
@@ -114,10 +126,10 @@ namespace ttk {
     }
 
     void Pill::paint(const Painter &painter) {
-        const BLRgba32 ink = Theme::of().dark ? tone() : Theme::darker(tone(), 0.35);
+        const BLRgba32 ink = _ink;
         const double radius = _box.h / 2.0;
 
-        painter.round(_box, radius, wash());
+        painter.round(_box, radius, _wash.colour());
         painter.outline(_box, radius, 1.0, Theme::alpha(ink, 0.3));
 
         const BLFont &face = painter.font(600, Theme::fontSmall);

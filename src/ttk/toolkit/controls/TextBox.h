@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/toolkit/Widget.h"
 
@@ -85,7 +86,7 @@ namespace ttk {
 
         // What is drawn for the bytes between `from` and `to`: the text itself, or a
         // bullet per character of it.
-        [[nodiscard]] std::string shown(size_t from, size_t to) const;
+        [[nodiscard]] std::string_view shown(size_t from, size_t to) const;
 
         std::string _text;
         std::string _placeholder;
@@ -101,6 +102,7 @@ namespace ttk {
         bool _mono = false;
         bool _readOnly = false;
         bool _secret = false;
+        mutable std::string _dots;
 
         // Blinks while focused, which is the one thing that keeps the loop awake.
         double _blinked = 0.0;

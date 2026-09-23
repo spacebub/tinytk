@@ -112,7 +112,7 @@ namespace ttk {
     }
 
     void Stepper::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const double dim = enabled() ? 1.0 : 0.45;
 
         painter.round(_frame, Theme::radiusSmall, Theme::alpha(palette.field, dim));

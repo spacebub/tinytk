@@ -14,7 +14,7 @@
 namespace ttk {
     namespace {
 
-        Theme::Palette DARK{
+        constexpr Theme::Palette DARK{
             .background = BLRgba32{0xff0a0d13},
             .surface = BLRgba32{0xff151b26},
             .raised = BLRgba32{0xff1d2431},
@@ -45,12 +45,16 @@ namespace ttk {
             .shadow = BLRgba32{0xa8000000},
             .scrim = BLRgba32{0xbe030509},
 
+            .statusLaunching = BLRgba32{0xffff9422},
+            .statusRunning = BLRgba32{0xff52d18b},
+            .statusFailing = BLRgba32{0xffff5470},
+            .statusIdle = BLRgba32{0xffa6b4cd},
 
             .headingWeight = 700,
             .dark = true,
         };
 
-        Theme::Palette LIGHT{
+        constexpr Theme::Palette LIGHT{
             .background = BLRgba32{0xffe8ecf4},
             .surface = BLRgba32{0xffffffff},
             .raised = BLRgba32{0xffffffff},
@@ -81,99 +85,108 @@ namespace ttk {
             .shadow = BLRgba32{0x5212203a},
             .scrim = BLRgba32{0x780c1420},
 
+            .statusLaunching = BLRgba32{0xffa83606},
+            .statusRunning = BLRgba32{0xff0a7d4e},
+            .statusFailing = BLRgba32{0xffc22a45},
+            .statusIdle = BLRgba32{0xff46536a},
 
             .headingWeight = 600,
             .dark = false,
         };
 
         // Every slot, so a tone kept from one shade can be looked up in the other.
-        constexpr BLRgba32 Theme::Palette::*SLOTS[] = {
-            &Theme::Palette::text,        &Theme::Palette::muted,       &Theme::Palette::faint,
-            &Theme::Palette::accent,      &Theme::Palette::accentHover, &Theme::Palette::accentText,
-            &Theme::Palette::accentSoft,  &Theme::Palette::success,     &Theme::Palette::successSoft,
-            &Theme::Palette::warning,     &Theme::Palette::warningSoft, &Theme::Palette::danger,
-            &Theme::Palette::dangerSoft,  &Theme::Palette::mutedSoft,   &Theme::Palette::background,
-            &Theme::Palette::surface,     &Theme::Palette::raised,      &Theme::Palette::sunken,
-            &Theme::Palette::field,       &Theme::Palette::hover,       &Theme::Palette::border,
-            &Theme::Palette::borderStrong, &Theme::Palette::shadow,     &Theme::Palette::scrim,
+        struct Look {
+            Theme::Palette dark = DARK;
+            Theme::Palette light = LIGHT;
+            Theme::Mode mode = Theme::Mode::System;
+            bool systemDark = true;
+            const Theme::Palette *shown = &dark;
+            std::uint32_t revision = 1;
         };
 
-        Theme::Mode &mode_ref() {
-            static Theme::Mode mode = Theme::Mode::System;
+        constinit Look LOOK{};
 
-            return mode;
-        }
+        void show() {
+            const Theme::Palette *was = LOOK.shown;
 
-        bool &system_dark() {
-            static bool dark = true;
+            LOOK.shown = &Theme::palette(LOOK.mode);
 
-            return dark;
+            if (LOOK.shown != was) {
+                ++LOOK.revision;
+            }
         }
 
     }
 
     namespace Theme {
 
-        bool dark() {
-            const Mode &wanted = mode_ref();
+        const Palette &palette() {
+            return *LOOK.shown;
+        }
 
-            if (wanted == Mode::Light) {
-                return false;
+        const Palette &palette(const Mode mode) {
+            switch (mode) {
+                case Mode::Light:
+                    return LOOK.light;
+                case Mode::Dark:
+                    return LOOK.dark;
+                case Mode::System:
+                    break;
             }
 
-            if (wanted == Mode::Dark) {
-                return true;
+            return LOOK.systemDark ? LOOK.dark : LOOK.light;
+        }
+
+        Mode mode() {
+            return LOOK.mode;
+        }
+
+        void set_mode(const Mode mode) {
+            LOOK.mode = mode;
+
+            show();
+        }
+
+        Mode cycle_mode() {
+            switch (LOOK.mode) {
+                case Mode::System:
+                    set_mode(Mode::Light);
+                    break;
+                case Mode::Light:
+                    set_mode(Mode::Dark);
+                    break;
+                case Mode::Dark:
+                    set_mode(Mode::System);
+                    break;
             }
 
-            return system_dark();
+            return LOOK.mode;
         }
 
-        const Palette &of() {
-            return dark() ? DARK : LIGHT;
-        }
-
-        const Mode &mode() {
-            return mode_ref();
-        }
-
-        void set_mode(const Mode &mode) {
-            mode_ref() = mode;
+        void configure(const Setup &setup) {
+            LOOK.dark = setup.dark;
+            LOOK.light = setup.light;
+            LOOK.mode = setup.mode;
+            LOOK.shown = &palette(setup.mode);
+            ++LOOK.revision;
         }
 
         void set_system_dark(const bool dark) {
-            system_dark() = dark;
+            LOOK.systemDark = dark;
+
+            show();
         }
 
-        void set_palettes(const Palette &dark, const Palette &light) {
-            DARK = dark;
-            LIGHT = light;
+        std::uint32_t revision() {
+            return LOOK.revision;
         }
 
-        Mode next_mode() {
-            const Mode &wanted = mode_ref();
+        Tone::Tone(BLRgba32 Palette::*const slot) : _slot(slot), _colour(palette().*slot) {}
 
-            if (wanted == Mode::System) {
-                return Mode::Light;
+        void Tone::restyle() {
+            if (_slot != nullptr) {
+                _colour = palette().*_slot;
             }
-
-            return wanted == Mode::Light ? Mode::Dark : Mode::System;
-        }
-
-        BLRgba32 restated(const BLRgba32 tone, const bool wasDark) {
-            if (wasDark == dark()) {
-                return tone;
-            }
-
-            const Palette &was = wasDark ? DARK : LIGHT;
-            const Palette &now = of();
-
-            for (BLRgba32 Palette::*const slot : SLOTS) {
-                if ((was.*slot).value == tone.value) {
-                    return now.*slot;
-                }
-            }
-
-            return tone;
         }
 
         BLRgba32 alpha(const BLRgba32 tone, const double fraction) {

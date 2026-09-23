@@ -300,7 +300,7 @@ namespace ttk {
 
         const BLFont &face = painter.font(_weight, _size);
         const double step = painter.line_height(face);
-        const BLRgba32 wash = Theme::alpha(Theme::of().accent, 0.3);
+        const BLRgba32 wash = Theme::alpha(Theme::palette().accent, 0.3);
 
         Spot from;
         Spot to;
@@ -341,7 +341,7 @@ namespace ttk {
             }
 
             painter.label(face, where, Align::Start, text,
-                          _ink ? _ink(row) : Theme::of().text);
+                          _ink ? _ink(row) : Theme::palette().text);
         }
     }
 }

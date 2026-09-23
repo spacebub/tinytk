@@ -94,7 +94,7 @@ namespace ttk {
     }
 
     void TabStrip::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
 
         for (size_t index = 0; index < _tabs.size(); ++index) {
             const Held &held = _tabs[index];

@@ -17,7 +17,7 @@ namespace ttk {
     }
 
     void Check::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const double on = _on.value();
 
         const BLRect body{_box.x + ((_box.w - 18.0) / 2.0), _box.y + ((_box.h - 18.0) / 2.0), 18.0, 18.0};

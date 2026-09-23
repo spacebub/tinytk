@@ -45,7 +45,7 @@ namespace ttk {
     }
 
     void Menu::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
 
         painter.round(_box, Theme::radiusSmall, palette.raised);
         painter.outline(_box, Theme::radiusSmall, 1.0, palette.borderStrong);

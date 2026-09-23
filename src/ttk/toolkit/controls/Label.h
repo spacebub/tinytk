@@ -27,7 +27,7 @@ namespace ttk {
         void set_text(std::string text);
 
         Label *font(int weight, float size);
-        Label *tone(BLRgba32 tone);
+        Label *tone(Theme::Tone tone);
         Label *align(Align where);
 
         // Wrapped to the width it is given, and as tall as that takes.
@@ -60,6 +60,9 @@ namespace ttk {
         // A link answers where its text is, not across the row it was given.
         Widget *at(double x, double y) override;
 
+    protected:
+        void restyle() override { _tone.restyle(); }
+
     private:
         // What paint() puts on the screen, which for a path is the shortened form.
         double reach(Typeface &type) const;
@@ -71,12 +74,7 @@ namespace ttk {
         int _weight = 400;
         float _size = Theme::fontBody;
 
-        BLRgba32 _tone = Theme::of().text;
-        bool _toneSet = false;
-
-        // Which shade the tone was taken from, so a label built under one and shown
-        // under the other reads as its own slot rather than a frozen colour.
-        bool _toneDark = Theme::dark();
+        Theme::Tone _tone{&Theme::Palette::text};
 
         Align _place = Align::Start;
 

@@ -17,7 +17,7 @@ namespace ttk {
     Label *Dialog::heading(Box *into, const std::string &text) {
         Label *made = into->append(std::make_unique<Label>(text));
 
-        made->font(Theme::of().headingWeight, Theme::fontLarge)->tone(Theme::of().text)->wrap();
+        made->font(Theme::palette().headingWeight, Theme::fontLarge)->tone(&Theme::Palette::text)->wrap();
 
         return made;
     }
@@ -25,7 +25,7 @@ namespace ttk {
     Label *Dialog::body(Box *into, const std::string &text) {
         Label *made = into->append(std::make_unique<Label>(text));
 
-        made->font(400, Theme::fontBody)->tone(Theme::of().muted)->wrap();
+        made->font(400, Theme::fontBody)->tone(&Theme::Palette::muted)->wrap();
 
         return made;
     }
@@ -75,7 +75,7 @@ namespace ttk {
     }
 
     void Dialog::paint(const Painter &painter) {
-        painter.fill(_box, Theme::of().scrim);
+        painter.fill(_box, Theme::palette().scrim);
 
         // The card grows into place. Blend2D can scale, so the transform is a real one.
         const double grown = _grown.value() > 0.0 ? _grown.value() : 1.0;

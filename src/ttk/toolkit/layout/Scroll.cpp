@@ -143,7 +143,7 @@ namespace ttk {
         const BLRect bar = thumb();
 
         painter.round(bar, bar.w / 2.0,
-                      Theme::alpha(Theme::of().borderStrong, _dragging ? 0.9 : 0.45));
+                      Theme::alpha(Theme::palette().borderStrong, _dragging ? 0.9 : 0.45));
     }
 
     bool Scroll::wheel(const double steps, const Pointer & /*at*/) {

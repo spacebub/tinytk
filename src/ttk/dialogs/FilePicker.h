@@ -23,7 +23,7 @@
 namespace ttk {
     class FilePicker {
     public:
-                struct Row {
+        struct Row {
             std::string name;
             std::string path;
             bool directory = false;
@@ -91,17 +91,27 @@ namespace ttk {
         std::function<void()> changed;
         void touch();
 
-        // The directory each key was last left on. Kept for the application to persist.
+        // Where the application keeps what the picker remembers between runs. A hook left
+        // empty falls back to the picker's own store.
+        struct Memory {
+            std::function<std::string(const std::string &key)> directory;
+            std::function<void(const std::string &key, const std::string &path)> remember;
+            std::function<bool()> hidden;
+            std::function<void(bool shown)> showHidden;
+        };
+
+        void set_memory(Memory memory) { _memory = std::move(memory); }
+
         [[nodiscard]] std::string start_directory(const std::string &key) const;
         void remember_directory(const std::string &key, const std::string &path);
 
         // Opens the dialog on a directory, for one file or several.
-                void open(const std::string &title, const std::vector<std::string> &filters, bool directories,
+        void open(const std::string &title, const std::vector<std::string> &filters, bool directories,
                   bool folders, bool multiple, const std::string &remember, Chosen chosen,
                   const std::string &option = {}, const std::string &optionHint = {});
 
         // Opens it to write a file, with `name` offered.
-                void open_save(const std::string &title, const std::vector<std::string> &filters,
+        void open_save(const std::string &title, const std::vector<std::string> &filters,
                        const std::string &remember, const std::string &name, Chosen chosen);
 
         void named(const std::string &name);
@@ -120,7 +130,7 @@ namespace ttk {
         void dismiss();
 
     private:
-                void start(const std::string &title, const std::vector<std::string> &filters, bool directories,
+        void start(const std::string &title, const std::vector<std::string> &filters, bool directories,
                    bool folders, bool multiple, const std::string &remember, Chosen chosen,
                    const std::string &option, const std::string &optionHint);
 
@@ -138,17 +148,19 @@ namespace ttk {
         void push();
 
         [[nodiscard]] static bool matches(std::string_view pattern, std::string_view name);
-        [[nodiscard]] bool wanted(const std::filesystem::path &path) const;
+        [[nodiscard]] bool wanted(const std::string &name) const;
 
-                [[nodiscard]] bool hidden() const { return _hidden; }
+        [[nodiscard]] bool hidden() const { return _memory.hidden ? _memory.hidden() : _hidden; }
 
         Notifier *_notifier;
-                Chosen _chosen;
+        Chosen _chosen;
         std::string _remember;
+        Memory _memory;
         std::map<std::string, std::string> _remembered;
         bool _hidden = false;
         State _state;
         std::vector<std::string> _filters;
+        std::vector<std::string> _patterns;
 
         std::vector<std::string> _suffixes;
         bool _anything{false};

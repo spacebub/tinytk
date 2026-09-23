@@ -23,7 +23,7 @@ namespace ttk {
         _takesPointer = true;
 
         _shut = append(std::make_unique<GlyphButton>(Glyphs::Glyph::Close, [this] { this->close(); }));
-        _shut->size(24.0)->tone(Theme::of().faint, Theme::of().text);
+        _shut->size(24.0)->tone(&Theme::Palette::faint, &Theme::Palette::text);
         _shut->fixedWidth = 24.0;
         _shut->fixedHeight = 24.0;
     }
@@ -97,7 +97,7 @@ namespace ttk {
     }
 
     BLRgba32 Toast::tone() const {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
 
         switch (_message.severity) {
             case Severity::Error:
@@ -117,7 +117,7 @@ namespace ttk {
     }
 
     BLRgba32 Toast::wash() const {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
 
         switch (_message.severity) {
             case Severity::Error:
@@ -157,7 +157,7 @@ namespace ttk {
     }
 
     void Toast::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const double here = _here.value();
 
         if (here <= 0.0) {

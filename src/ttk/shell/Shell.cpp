@@ -27,6 +27,9 @@ namespace ttk {
     };
 
     namespace {
+        bool system_dark() {
+            return SDL_GetSystemTheme() != SDL_SYSTEM_THEME_LIGHT;
+        }
 
         // How close to an edge a press starts a resize.
         constexpr double EDGE = 6.0;
@@ -144,7 +147,7 @@ namespace ttk {
             return false;
         }
 
-        Theme::set_system_dark(SDL_GetSystemTheme() != SDL_SYSTEM_THEME_LIGHT);
+        Theme::set_system_dark(system_dark());
 
         _root = std::make_unique<ttk::Root>(_type);
 
@@ -589,7 +592,7 @@ namespace ttk {
                 break;
 
             case SDL_EVENT_SYSTEM_THEME_CHANGED:
-                Theme::set_system_dark(SDL_GetSystemTheme() != SDL_SYSTEM_THEME_LIGHT);
+                Theme::set_system_dark(system_dark());
 
                 if (shadeChanged) {
                     shadeChanged();

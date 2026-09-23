@@ -73,7 +73,7 @@ namespace ttk {
             }
 
             void paint(const Painter &painter) override {
-                const Theme::Palette &palette = Theme::of();
+                const Theme::Palette &palette = Theme::palette();
 
                 painter.round(_box, Theme::radiusSmall, palette.raised);
                 painter.outline(_box, Theme::radiusSmall, 1.0, palette.borderStrong);
@@ -399,7 +399,7 @@ namespace ttk {
     }
 
     void Select::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const double lit = _lit.value();
         const double dim = enabled() ? 1.0 : 0.45;
 

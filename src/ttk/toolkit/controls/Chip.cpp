@@ -75,7 +75,7 @@ namespace ttk {
             return;
         }
 
-        const Theme::Palette &palette = Theme::of();
+        const Theme::Palette &palette = Theme::palette();
         const BLRgba32 ink = _tight    ? palette.warning
                            : hovered() ? palette.text
                                        : palette.faint;
