@@ -61,7 +61,13 @@ namespace ttk::Theme {
         bool dark;
     };
 
-    const Palette &palette();
+    namespace detail {
+        extern const Palette *shown;
+        extern std::uint32_t revision;
+    }
+
+    inline const Palette &palette() { return *detail::shown; }
+
     const Palette &palette(Mode mode);
 
     Mode mode();
@@ -110,7 +116,7 @@ namespace ttk::Theme {
     constexpr double lane = 10.0;
 
     // Moves on whenever the palette on screen changes.
-    std::uint32_t revision();
+    inline std::uint32_t revision() { return detail::revision; }
 
     // A palette slot that follows the shade, or a fixed colour that does not.
     class Tone {

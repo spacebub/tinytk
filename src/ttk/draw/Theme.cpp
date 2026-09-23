@@ -100,19 +100,17 @@ namespace ttk {
             Theme::Palette light = LIGHT;
             Theme::Mode mode = Theme::Mode::System;
             bool systemDark = true;
-            const Theme::Palette *shown = &dark;
-            std::uint32_t revision = 1;
         };
 
         constinit Look LOOK{};
 
         void show() {
-            const Theme::Palette *was = LOOK.shown;
+            const Theme::Palette *was = Theme::detail::shown;
 
-            LOOK.shown = &Theme::palette(LOOK.mode);
+            Theme::detail::shown = &Theme::palette(LOOK.mode);
 
-            if (LOOK.shown != was) {
-                ++LOOK.revision;
+            if (Theme::detail::shown != was) {
+                ++Theme::detail::revision;
             }
         }
 
@@ -120,8 +118,9 @@ namespace ttk {
 
     namespace Theme {
 
-        const Palette &palette() {
-            return *LOOK.shown;
+        namespace detail {
+            constinit const Palette *shown = &LOOK.dark;
+            constinit std::uint32_t revision = 1;
         }
 
         const Palette &palette(const Mode mode) {
@@ -167,18 +166,14 @@ namespace ttk {
             LOOK.dark = setup.dark;
             LOOK.light = setup.light;
             LOOK.mode = setup.mode;
-            LOOK.shown = &palette(setup.mode);
-            ++LOOK.revision;
+            detail::shown = &palette(setup.mode);
+            ++detail::revision;
         }
 
         void set_system_dark(const bool dark) {
             LOOK.systemDark = dark;
 
             show();
-        }
-
-        std::uint32_t revision() {
-            return LOOK.revision;
         }
 
         Tone::Tone(BLRgba32 Palette::*const slot) : _slot(slot), _colour(palette().*slot) {}
