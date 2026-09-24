@@ -4,9 +4,15 @@ Tiny ui toolkit on Blend2D and SDL3. Provides several premade controls and syste
 
 ## Layout
 
-`src/ttk/system` is `ttk::system`, a static library with no window in it:
-process spawning, HTTP fetches, desktop notifications, JSON over yyjson, text helpers, environment
-and paths.
+`src/ttk/system` is `ttk::system`, a static library with no window and no
+third-party dependency in it: process spawning, text helpers, environment and paths.
+What does need one sits in a target of its own, so an application links only what it uses:
+
+| Target        | What                  | Needs                                     |
+|---------------|-----------------------|-------------------------------------------|
+| `ttk::json`   | JSON over yyjson      | yyjson, fetched                           |
+| `ttk::http`   | HTTP fetches          | libcurl, or WinHTTP on Windows            |
+| `ttk::notify` | desktop notifications | nothing, it speaks D-Bus on its own       |
 
 `src/ttk` beyond that is `ttk::ui`, a widget toolkit drawn with Blend2D
 inside an SDL3 window. `draw` holds the rasteriser side, `toolkit` the
@@ -15,14 +21,15 @@ pieces every application puts over its pages.
 
 ## Using it
 
-Add the tree and link one of the two targets.
+Add the tree and link the targets the application uses.
 
 ```cmake
 add_subdirectory(tinytk)
-target_link_libraries(app PRIVATE ttk::ui)
+target_link_libraries(app PRIVATE ttk::ui ttk::http)
 ```
 
-`TTK_UI=OFF` skips the interface library and its fetches. `TTK_DOWNLOAD_CACHE`
+`TTK_UI`, `TTK_JSON`, `TTK_HTTP` and `TTK_NOTIFY` are all on. Turning one off skips
+its target along with its fetches and lookups, so a build machine needs only what is kept. `TTK_DOWNLOAD_CACHE`
 names where fetched sources are kept between build trees.
 
 `TTK_GALLERY=ON` builds `examples/gallery.cpp`, a window showing every widget,
@@ -42,8 +49,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-On Linux and the BSDs, notifications go over D-Bus, so `libdbus-1` and its headers
-must be installed.
+With the defaults, the libcurl headers must be installed.
 
 `SANITIZE=ON` adds the address and undefined sanitizers. `tools/lint.sh`
 runs clang-tidy over the sources with the checks in `.clang-tidy`.

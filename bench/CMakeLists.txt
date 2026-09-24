@@ -30,7 +30,6 @@ add_executable(ttk_bench
         support/Sandbox.cpp
         support/Sandbox.h
 
-        system/Json_bench.cpp
         system/Text_bench.cpp
 
         ui/Anim_bench.cpp
@@ -44,6 +43,11 @@ add_executable(ttk_bench
         ${TTK_SANITIZER_SOURCES})
 
 target_include_directories(ttk_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+if (TTK_JSON)
+    target_sources(ttk_bench PRIVATE system/Json_bench.cpp)
+    target_link_libraries(ttk_bench PRIVATE ttk::json)
+endif ()
 
 target_link_libraries(ttk_bench PRIVATE
         ttk::ui

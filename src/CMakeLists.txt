@@ -3,32 +3,9 @@ include(FetchContent)
 # Includes are written relative to src/.
 set(TTK_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-set(TTK_YYJSON_VERSION 0.13.0)
-
-set(YYJSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(YYJSON_BUILD_MISC OFF CACHE BOOL "" FORCE)
-set(YYJSON_BUILD_FUZZER OFF CACHE BOOL "" FORCE)
-set(YYJSON_INSTALL OFF CACHE BOOL "" FORCE)
-
-ttk_cache_source(yyjson https://github.com/ibireme/yyjson.git ${TTK_YYJSON_VERSION})
-
-FetchContent_Declare(yyjson
-        GIT_REPOSITORY https://github.com/ibireme/yyjson.git
-        GIT_TAG ${TTK_YYJSON_VERSION}
-        GIT_SHALLOW TRUE
-        EXCLUDE_FROM_ALL
-        SYSTEM)
-
-FetchContent_MakeAvailable(yyjson)
-
 add_library(ttk_system STATIC
         ttk/system/Env.cpp
         ttk/system/Env.h
-        ttk/system/Http.cpp
-        ttk/system/Http.h
-        ttk/system/Json.cpp
-        ttk/system/Json.h
-        ttk/system/Notify.h
         ttk/system/Paths.cpp
         ttk/system/Paths.h
         ttk/system/Process.cpp
@@ -39,31 +16,71 @@ add_library(ttk_system STATIC
 add_library(ttk::system ALIAS ttk_system)
 
 target_include_directories(ttk_system PUBLIC ${TTK_INCLUDE_DIR})
-
-target_link_libraries(ttk_system
-        PUBLIC
-        yyjson
-        ttk_sanitizers)
-
-if (WIN32)
-    target_link_libraries(ttk_system PRIVATE winhttp)
-else ()
-    find_package(CURL REQUIRED)
-
-    target_link_libraries(ttk_system PRIVATE CURL::libcurl)
-endif ()
-
-if (WIN32 OR APPLE)
-    target_sources(ttk_system PRIVATE ttk/system/Notify_Stub.cpp)
-else ()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(DBUS REQUIRED IMPORTED_TARGET dbus-1)
-
-    target_sources(ttk_system PRIVATE ttk/system/Notify_DBus.cpp)
-    target_link_libraries(ttk_system PRIVATE PkgConfig::DBUS)
-endif ()
-
+target_link_libraries(ttk_system PUBLIC ttk_sanitizers)
 target_compile_options(ttk_system PRIVATE ${TTK_COMPILE_FLAGS})
+
+if (TTK_JSON)
+    set(TTK_YYJSON_VERSION 0.13.0)
+
+    set(YYJSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(YYJSON_BUILD_MISC OFF CACHE BOOL "" FORCE)
+    set(YYJSON_BUILD_FUZZER OFF CACHE BOOL "" FORCE)
+    set(YYJSON_INSTALL OFF CACHE BOOL "" FORCE)
+
+    ttk_cache_source(yyjson https://github.com/ibireme/yyjson.git ${TTK_YYJSON_VERSION})
+
+    FetchContent_Declare(yyjson
+            GIT_REPOSITORY https://github.com/ibireme/yyjson.git
+            GIT_TAG ${TTK_YYJSON_VERSION}
+            GIT_SHALLOW TRUE
+            EXCLUDE_FROM_ALL
+            SYSTEM)
+
+    FetchContent_MakeAvailable(yyjson)
+
+    add_library(ttk_json STATIC
+            ttk/system/Json.cpp
+            ttk/system/Json.h)
+
+    add_library(ttk::json ALIAS ttk_json)
+
+    target_link_libraries(ttk_json PUBLIC ttk_system yyjson)
+    target_compile_options(ttk_json PRIVATE ${TTK_COMPILE_FLAGS})
+endif ()
+
+if (TTK_HTTP)
+    add_library(ttk_http STATIC
+            ttk/system/Http.cpp
+            ttk/system/Http.h)
+
+    add_library(ttk::http ALIAS ttk_http)
+
+    target_link_libraries(ttk_http PUBLIC ttk_system)
+    target_compile_options(ttk_http PRIVATE ${TTK_COMPILE_FLAGS})
+
+    if (WIN32)
+        target_link_libraries(ttk_http PRIVATE winhttp)
+    else ()
+        find_package(CURL REQUIRED)
+
+        target_link_libraries(ttk_http PRIVATE CURL::libcurl)
+    endif ()
+endif ()
+
+if (TTK_NOTIFY)
+    add_library(ttk_notify STATIC ttk/system/Notify.h)
+
+    add_library(ttk::notify ALIAS ttk_notify)
+
+    target_link_libraries(ttk_notify PUBLIC ttk_system)
+    target_compile_options(ttk_notify PRIVATE ${TTK_COMPILE_FLAGS})
+
+    if (WIN32 OR APPLE)
+        target_sources(ttk_notify PRIVATE ttk/system/Notify_Stub.cpp)
+    else ()
+        target_sources(ttk_notify PRIVATE ttk/system/Notify_DBus.cpp)
+    endif ()
+endif ()
 
 if (NOT TTK_UI)
     return()
