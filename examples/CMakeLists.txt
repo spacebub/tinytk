@@ -17,7 +17,7 @@ function(ttk_example target source name)
         target_link_options(${target} PRIVATE /ENTRY:mainCRTStartup)
     endif ()
 
-    if (SANITIZE)
+    if (TTK_SANITIZE)
         target_compile_definitions(${target} PRIVATE
                 TTK_SANITIZER_LOG="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${name}")
     endif ()

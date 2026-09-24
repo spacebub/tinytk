@@ -20,7 +20,7 @@ option(TTK_NOTIFY "Build ttk::notify, desktop notifications over the session bus
 option(TTK_EXAMPLES "Build the example programs" ${PROJECT_IS_TOP_LEVEL})
 option(TTK_GALLERY "Build the gallery, which shows every widget" OFF)
 option(TTK_BENCHMARKS "Build the benchmark suite in bench/" OFF)
-option(SANITIZE "Build with the address and undefined sanitizers" OFF)
+option(TTK_SANITIZE "Build with the address and undefined sanitizers" OFF)
 
 if (MSVC)
     set(TTK_COMPILE_FLAGS
@@ -59,7 +59,7 @@ endif ()
 
 add_library(ttk_sanitizers INTERFACE)
 
-if (SANITIZE)
+if (TTK_SANITIZE)
     set(SANITIZER_FLAGS -fsanitize=address -fsanitize=undefined)
 
     # -Og folds frames, which misattributes sanitizer stacks.
@@ -77,6 +77,8 @@ if (SANITIZE)
     configure_file(cmake/Sanitizers.cpp.in ${PROJECT_BINARY_DIR}/Sanitizers.cpp @ONLY)
 
     set(TTK_SANITIZER_SOURCES ${PROJECT_BINARY_DIR}/Sanitizers.cpp CACHE INTERNAL "")
+else ()
+    set(TTK_SANITIZER_SOURCES "" CACHE INTERNAL "")
 endif ()
 
 # One self-contained binary. This keeps every fetched library static.

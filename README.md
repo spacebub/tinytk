@@ -51,5 +51,5 @@ cmake --build build
 
 With the defaults, the libcurl headers must be installed.
 
-`SANITIZE=ON` adds the address and undefined sanitizers. `tools/lint.sh`
+`TTK_SANITIZE=ON` adds the address and undefined sanitizers. `tools/lint.sh`
 runs clang-tidy over the sources with the checks in `.clang-tidy`.

@@ -53,7 +53,7 @@ target_link_libraries(ttk_bench PRIVATE
         ttk::ui
         benchmark::benchmark)
 
-if (SANITIZE)
+if (TTK_SANITIZE)
     target_compile_definitions(ttk_bench PRIVATE
             TTK_SANITIZER_LOG="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ttk_bench")
 endif ()
