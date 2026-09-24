@@ -5,7 +5,7 @@ Tiny ui toolkit on Blend2D and SDL3. Provides several premade controls and syste
 ## Layout
 
 `src/ttk/system` is `ttk::system`, a static library with no window in it:
-process spawning, HTTP fetches, JSON over yyjson, text helpers, environment
+process spawning, HTTP fetches, desktop notifications, JSON over yyjson, text helpers, environment
 and paths.
 
 `src/ttk` beyond that is `ttk::ui`, a widget toolkit drawn with Blend2D
@@ -41,6 +41,9 @@ ttk::Http::set_agent("app/1.0");
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
+
+On Linux and the BSDs, notifications go over D-Bus, so `libdbus-1` and its headers
+must be installed.
 
 `SANITIZE=ON` adds the address and undefined sanitizers. `tools/lint.sh`
 runs clang-tidy over the sources with the checks in `.clang-tidy`.

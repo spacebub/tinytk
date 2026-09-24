@@ -28,6 +28,7 @@ add_library(ttk_system STATIC
         ttk/system/Http.h
         ttk/system/Json.cpp
         ttk/system/Json.h
+        ttk/system/Notify.h
         ttk/system/Paths.cpp
         ttk/system/Paths.h
         ttk/system/Process.cpp
@@ -50,6 +51,16 @@ else ()
     find_package(CURL REQUIRED)
 
     target_link_libraries(ttk_system PRIVATE CURL::libcurl)
+endif ()
+
+if (WIN32 OR APPLE)
+    target_sources(ttk_system PRIVATE ttk/system/Notify_Stub.cpp)
+else ()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(DBUS REQUIRED IMPORTED_TARGET dbus-1)
+
+    target_sources(ttk_system PRIVATE ttk/system/Notify_DBus.cpp)
+    target_link_libraries(ttk_system PRIVATE PkgConfig::DBUS)
 endif ()
 
 target_compile_options(ttk_system PRIVATE ${TTK_COMPILE_FLAGS})
