@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "ttk/system/Paths.h"
+#include "ttk/system/Text.h"
 #include "ttk/util/Format.h"
 
 namespace ttk {
