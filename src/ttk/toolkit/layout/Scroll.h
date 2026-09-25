@@ -40,6 +40,14 @@ namespace ttk {
 
         [[nodiscard]] bool scrollable() const;
 
+        // True with the last of the content in view, and for content that all fits.
+        [[nodiscard]] bool at_end() const;
+
+        // Measures the content again where it stands, for one that grew or shrank on
+        // its own. A view at the end stays at the end. `lost` is how much came off the
+        // top, which the offset follows so what was on screen stays there.
+        void refit(Typeface &type, double lost = 0.0);
+
         void arrange(Typeface &type) override;
 
         bool clips(BLRect &region) const override;

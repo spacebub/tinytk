@@ -20,10 +20,8 @@ namespace ttk {
         cursor = Cursor::Text;
     }
 
-    void TextView::add_rows(std::vector<std::string> rows) {
-        if (rows.empty()) {
-            return;
-        }
+    void TextView::unwrap() {
+        _spans.clear();
 
         if (_wrapped) {
             _rows.clear();
@@ -31,10 +29,80 @@ namespace ttk {
             _wrapped = false;
             _folded = -1.0;
         }
+    }
+
+    void TextView::add_rows(std::vector<std::string> rows) {
+        if (rows.empty()) {
+            return;
+        }
+
+        unwrap();
 
         _rows.insert(_rows.end(), std::make_move_iterator(rows.begin()),
                      std::make_move_iterator(rows.end()));
-        _spans.clear();
+        _open = false;
+
+        clamp();
+        invalidate();
+    }
+
+    void TextView::append(std::string_view text) {
+        if (text.empty()) {
+            return;
+        }
+
+        unwrap();
+
+        while (!text.empty()) {
+            const size_t at = text.find('\n');
+            std::string_view piece = text.substr(0, at);
+
+            if (at != std::string_view::npos && piece.ends_with('\r')) {
+                piece.remove_suffix(1);
+            }
+
+            if (!_open) {
+                _rows.emplace_back();
+            }
+
+            if (const size_t back = piece.rfind('\r'); back != std::string_view::npos) {
+                _rows.back().assign(piece.substr(back + 1));
+            } else {
+                _rows.back().append(piece);
+            }
+
+            _open = at == std::string_view::npos;
+
+            if (_open) {
+                break;
+            }
+
+            text.remove_prefix(at + 1);
+        }
+
+        clamp();
+        invalidate();
+    }
+
+    void TextView::drop_rows(size_t count) {
+        count = std::min(count, _rows.size());
+
+        if (count == 0) {
+            return;
+        }
+
+        unwrap();
+
+        _rows.erase(_rows.begin(), _rows.begin() + static_cast<std::ptrdiff_t>(count));
+
+        // A selection follows the rows it was on, and what was on the dropped ones is
+        // gathered at the top.
+        const auto lift = [count](Spot &spot) {
+            spot = spot.row >= count ? Spot{.row = spot.row - count, .at = spot.at} : Spot{};
+        };
+
+        lift(_anchor);
+        lift(_caret);
 
         clamp();
         invalidate();
@@ -49,6 +117,7 @@ namespace ttk {
         _spans.clear();
         _run.clear();
         _wrapped = false;
+        _open = false;
         _folded = -1.0;
 
         clamp();
@@ -84,6 +153,10 @@ namespace ttk {
 
     const BLFont &TextView::font(Typeface &type) const {
         return type.at(_weight, _size);
+    }
+
+    double TextView::row_height(Typeface &type) const {
+        return type.line_height(font(type));
     }
 
     void TextView::refold(Typeface &type, const double width) {
@@ -208,33 +281,8 @@ namespace ttk {
         const size_t row = static_cast<size_t>(
             std::clamp(which, 0LL, static_cast<long long>(_rows.size()) - 1));
 
-        const std::string &text = _rows[row];
-        const double wanted = x - _box.x;
-
-        size_t best = 0;
-        double closest = 1e9;
-
-        for (size_t at = 0; at <= text.size();) {
-            const double gap = std::abs(type.width(font(type), std::string_view(text).substr(0, at))
-                                        - wanted);
-
-            if (gap < closest) {
-                closest = gap;
-                best = at;
-            }
-
-            if (at == text.size()) {
-                break;
-            }
-
-            // Stepped by character, so a spot never lands inside one.
-            const auto lead = static_cast<unsigned char>(text[at]);
-
-            at += lead < 0x80 ? 1 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
-            at = std::min(at, text.size());
-        }
-
-        return Spot{.row = row, .at = best};
+        return Spot{.row = row,
+                    .at = type.nearest(font(type), _rows[row], static_cast<float>(x - _box.x))};
     }
 
     void TextView::move_to(const Spot &where, const bool selecting) {
@@ -327,21 +375,23 @@ namespace ttk {
             if (marked && row >= from.row && row <= to.row) {
                 const size_t begins = row == from.row ? std::min(from.at, text.size()) : 0;
                 const size_t ends = row == to.row ? std::min(to.at, text.size()) : text.size();
-                const double left = painter.width(face, std::string_view(text).substr(0, begins));
+
+                // Measured and not kept: a row is drawn from glyphs, so nothing else
+                // would ever ask for these prefixes again.
+                const double left = painter.type().width_once(face, std::string_view(text).substr(0, begins));
 
                 // A row selected through to its end is washed a little past its last
                 // character, so a run of rows reads as one block.
                 const double right = ends >= text.size() && row < to.row
                     ? _box.w
-                    : painter.width(face, std::string_view(text).substr(0, ends));
+                    : painter.type().width_once(face, std::string_view(text).substr(0, ends));
 
                 if (right > left) {
                     painter.fill(BLRect{where.x + left, where.y, right - left, step}, wash);
                 }
             }
 
-            painter.label(face, where, Align::Start, text,
-                          _ink ? _ink(row) : Theme::palette().text);
+            painter.row(face, where, text, _ink ? _ink(row) : Theme::palette().text);
         }
     }
 }

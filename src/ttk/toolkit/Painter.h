@@ -83,6 +83,11 @@ namespace ttk {
         void label(const BLFont &font, const BLRect &box, Align align, std::string_view run,
                    BLRgba32 tone) const;
 
+        // One row of many: vertically centred in `box` and cut with an ellipsis at its
+        // right edge, laid down from glyph masks and kept nowhere, so a thousand rows
+        // scrolled past cost the label cache nothing.
+        void row(const BLFont &font, const BLRect &box, std::string_view run, BLRgba32 tone) const;
+
         void tracked(const BLFont &font, BLPoint top, std::string_view run, BLRgba32 tone,
                      double spacing) const;
 

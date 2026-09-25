@@ -10,6 +10,8 @@
 #define TTK_DRAW_TYPEFACE_H
 
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <string_view>
@@ -74,6 +76,15 @@ namespace ttk {
         void draw_centred(BLContext &context, const BLFont &font, BLPoint top, float height,
                          std::string_view run, BLRgba32 tone);
 
+        // Laid down glyph by glyph off a cache of glyph masks, and kept nowhere: for a
+        // line drawn once and scrolled past, where a mask of the whole line would be
+        // made only to be thrown away. Cut with an ellipsis where it would pass `room`.
+        void draw_once(BLContext &context, const BLFont &font, BLPoint top, std::string_view run,
+                       BLRgba32 tone, double room);
+
+        // The byte offset in `run`, on a character boundary, nearest `x` across it.
+        size_t nearest(const BLFont &font, std::string_view run, float x);
+
         [[nodiscard]] float line_height(const BLFont &font) const;
 
     private:
@@ -91,7 +102,55 @@ namespace ttk {
             bool masked = false;
         };
 
+        struct Glyph {
+            // Coverage, in rows of `stride` bytes: a multiple of the chunk a row of it
+            // is merged in, and zero past its width so the merge needs no edge.
+            std::vector<std::uint8_t> pixels;
+            int stride = 0;
+            int wide = 0;
+            int tall = 0;
+
+            // The mask's top left, relative to the glyph's origin on the baseline.
+            BLPointI at{};
+            bool made = false;
+        };
+
+        // One font's glyphs, by id and by which fraction of a pixel each was
+        // rasterised across, so a run keeps its fractional advances without each
+        // glyph landing blurred.
+        struct Glyphs {
+            std::vector<Glyph> held;
+            size_t used = 0;
+        };
+
+        // A line composed from glyphs, kept for the frames it stays on screen through.
+        struct Row {
+            BLImage mask;
+            BLPointI at{};
+            int wide = 0;
+            int tall = 0;
+            size_t used = 0;
+        };
+
         Shaped &shaped(const BLFont &font, std::string_view run);
+
+        Glyphs &glyphs(const BLFont &font);
+
+        static void make(const BLFont &font, std::uint32_t id, std::uint32_t shift, Glyph &into);
+
+        // Where a run in `_scratch` is cut to fit, with the ellipsis that marks it.
+        struct Cut {
+            size_t shown = 0;
+            bool made = false;
+            std::uint32_t dot = 0;
+            double dotWide = 0.0;
+        };
+
+        // Shapes `run` into `_scratch`, its pens into `_pens`, and finds the cut.
+        Cut shape_to(const BLFont &font, std::string_view run, double room);
+
+        // Lays the run in `_scratch`, up to its cut, into a mask of its own.
+        void compose(const BLFont &font, const Cut &cut, double room, Row &into);
 
         std::string elide_once(const BLFont &font, std::string_view run, float room, float tracking);
 
@@ -114,6 +173,7 @@ namespace ttk {
 
         std::unordered_map<std::string, Shaped> _shaped;
         std::unordered_map<std::string, Elided> _elided;
+        std::unordered_map<std::uintptr_t, Glyphs> _glyphs;
 
         // Bumped on every lookup. What tells the two caches which entries are cold.
         size_t _asked = 0;
@@ -122,6 +182,9 @@ namespace ttk {
         // Kept between calls: measuring allocates nothing per candidate.
         BLGlyphBuffer _scratch;
         std::vector<size_t> _cuts;
+        std::vector<double> _pens;
+
+        std::unordered_map<std::string, Row> _rows;
     };
 }
 

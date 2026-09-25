@@ -285,6 +285,18 @@ namespace ttk {
         _type.draw_centred(_context, font, BLPoint{x, box.y}, static_cast<float>(box.h), shown, tone);
     }
 
+    void Painter::row(const BLFont &font, const BLRect &box, const std::string_view run,
+                      const BLRgba32 tone) const {
+        if (run.empty() || box.w <= 0.0) {
+            return;
+        }
+
+        const BLFontMetrics metrics = font.metrics();
+        const double top = box.y + ((box.h - (metrics.ascent + metrics.descent)) / 2.0);
+
+        _type.draw_once(_context, font, BLPoint{box.x, top}, run, tone, box.w);
+    }
+
     void Painter::tracked(const BLFont &font, const BLPoint top, const std::string_view run,
                           const BLRgba32 tone, const double spacing) const {
         _type.draw_tracked(_context, font, top, run, tone, static_cast<float>(spacing));

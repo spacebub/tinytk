@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -31,6 +32,17 @@ namespace ttk {
 
         // The rows already held, plus these. For a log that only ever grows.
         void add_rows(std::vector<std::string> rows);
+
+        // Output as it arrives. A newline ends a row, a carriage return starts one
+        // over, and what follows the last newline is a row the next call carries on.
+        void append(std::string_view text);
+
+        // The oldest rows go, for a log kept to a length.
+        void drop_rows(size_t count);
+
+        // What one row takes down, so a caller dropping rows knows how far up the
+        // rest moved.
+        [[nodiscard]] double row_height(Typeface &type) const;
 
         // One run, folded to the width it is given.
         void set_run(std::string run);
@@ -77,6 +89,9 @@ namespace ttk {
 
         void refold(Typeface &type, double width);
 
+        // Back to rows given outright, dropping any run they were folded from.
+        void unwrap();
+
         [[nodiscard]] Spot spot_at(Typeface &type, double x, double y) const;
 
         // The two spots in reading order.
@@ -94,6 +109,9 @@ namespace ttk {
 
         std::string _run;
         bool _wrapped = false;
+
+        // The last row ended without a newline, so the next append carries it on.
+        bool _open = false;
 
         // The width `_rows` was folded at, so a relayout to the same width costs nothing.
         double _folded = -1.0;

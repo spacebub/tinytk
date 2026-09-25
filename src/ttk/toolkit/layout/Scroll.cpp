@@ -41,6 +41,30 @@ namespace ttk {
         return _reach > _box.h + 1.0;
     }
 
+    bool Scroll::at_end() const {
+        return _offset >= std::floor(std::max(0.0, _reach - _box.h)) - 1.0;
+    }
+
+    void Scroll::refit(Typeface &type, const double lost) {
+        if (_content == nullptr) {
+            return;
+        }
+
+        const bool ending = at_end();
+
+        _reach = _content->wanted_height(type, std::max({_content->minWidth, 0.0, _box.w}));
+        _offset = ending ? _reach : std::max(0.0, _offset - lost);
+
+        if (_gliding && !ending) {
+            _goal = std::max(0.0, _goal - lost);
+            _via = std::max(0.0, _via - lost);
+            _along = std::max(0.0, _along - lost);
+        }
+
+        arrange(type);
+        invalidate();
+    }
+
     BLRect Scroll::lane() const {
         return BLRect{_box.x + _box.w - Theme::lane + 1.0, _box.y, 8.0, _box.h};
     }

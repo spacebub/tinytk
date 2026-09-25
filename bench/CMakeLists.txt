@@ -38,6 +38,7 @@ add_executable(ttk_bench
         ui/Layout_bench.cpp
         ui/Painter_bench.cpp
         ui/ReorderGrid_bench.cpp
+        ui/TextView_bench.cpp
         ui/Typeface_bench.cpp
 
         ${TTK_SANITIZER_SOURCES})
