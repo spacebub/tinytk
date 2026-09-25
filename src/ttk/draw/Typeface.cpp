@@ -703,9 +703,9 @@ namespace ttk {
 
         std::vector<Glyph> &held = glyphs(font).held;
 
-        const auto stamp = [&](const std::uint32_t id, const double x, const int lift) {
-            const double whole = std::floor(x);
-            auto shift = static_cast<std::uint32_t>(((x - whole) * SHIFTS) + 0.5);
+        const auto stamp = [&](const std::uint32_t id, const double pen, const int lift) {
+            const double whole = std::floor(pen);
+            auto shift = static_cast<std::uint32_t>(((pen - whole) * SHIFTS) + 0.5);
             int column = static_cast<int>(whole) + SLACK;
 
             if (shift == SHIFTS) {
