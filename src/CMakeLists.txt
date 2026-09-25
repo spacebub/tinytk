@@ -225,6 +225,8 @@ add_library(ttk_ui STATIC
         ttk/toolkit/controls/TabStrip.h
         ttk/toolkit/controls/TextBox.cpp
         ttk/toolkit/controls/TextBox.h
+        ttk/toolkit/controls/TextEdit.cpp
+        ttk/toolkit/controls/TextEdit.h
         ttk/toolkit/controls/TextView.cpp
         ttk/toolkit/controls/TextView.h
         ttk/toolkit/controls/Toggle.cpp
