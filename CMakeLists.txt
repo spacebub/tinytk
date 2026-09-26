@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 project(tinytk
-        VERSION 1.0.0
+        VERSION 1.1.2
         DESCRIPTION "A small system and interface toolkit"
         HOMEPAGE_URL "https://github.com/spacebub/tinytk"
         LANGUAGES C CXX)
@@ -17,10 +17,15 @@ option(TTK_UI "Build ttk::ui, which fetches SDL3 and Blend2D" ON)
 option(TTK_JSON "Build ttk::json, which fetches yyjson" ON)
 option(TTK_HTTP "Build ttk::http, which needs libcurl outside Windows" ON)
 option(TTK_NOTIFY "Build ttk::notify, desktop notifications over the session bus" ON)
-option(TTK_WLSHM "Present through wl_shm on Wayland, where SDL has no framebuffer of its own" ON)
 option(TTK_EXAMPLES "Build the example programs" ${PROJECT_IS_TOP_LEVEL})
 option(TTK_BENCHMARKS "Build the benchmark suite in bench/" OFF)
 option(TTK_SANITIZE "Build with the address and undefined sanitizers" OFF)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    option(TTK_WLSHM "Present through wl_shm on Wayland, where SDL has no framebuffer of its own" ON)
+else ()
+    set(TTK_WLSHM OFF)
+endif ()
 
 if (MSVC)
     set(TTK_COMPILE_FLAGS
