@@ -25,8 +25,5 @@ endfunction()
 
 if (TTK_EXAMPLES)
     ttk_example(ttk_hello hello.cpp hello)
-endif ()
-
-if (TTK_GALLERY)
     ttk_example(ttk_gallery gallery.cpp gallery)
 endif ()

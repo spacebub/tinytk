@@ -23,7 +23,7 @@
 #include "ttk/toolkit/overlays/Dialog.h"
 
 namespace ttk {
-    class FilePickerDialog : public ttk::Dialog {
+    class FilePickerDialog : public Dialog {
     public:
         explicit FilePickerDialog(FilePicker &picker);
 
@@ -33,18 +33,18 @@ namespace ttk {
 
         void arrange(Typeface &type) override;
 
-        [[nodiscard]] ttk::Cursor cursor_at(double x, double y) const override;
+        [[nodiscard]] Cursor cursor_at(double x, double y) const override;
 
-        void hover(const ttk::Pointer &at) override;
+        void hover(const Pointer &at) override;
 
         void leave() override;
 
-        bool press(const ttk::Pointer &at) override;
+        bool press(const Pointer &at) override;
 
-        void release(const ttk::Pointer &at) override;
+        void release(const Pointer &at) override;
 
     protected:
-        void paint_over(const ttk::Painter &painter) override;
+        void paint_over(const Painter &painter) override;
 
     private:
         // A framed strip the dialog's own controls sit inside. It is a child rather than
@@ -55,7 +55,7 @@ namespace ttk {
             BLRgba32 edge{};
             double rounding = Theme::radiusSmall;
 
-            void paint(const ttk::Painter &painter) override {
+            void paint(const Painter &painter) override {
                 painter.round(_box, rounding, fill);
                 painter.outline(_box, rounding, 1.0, edge);
             }
@@ -65,15 +65,15 @@ namespace ttk {
 
         void chose() const;
 
-        void paint_crumbs(const ttk::Painter &painter);
+        void paint_crumbs(const Painter &painter);
 
-        static void paint_crumb(const ttk::Painter &painter, const BLRect &box, bool lit);
+        static void paint_crumb(const Painter &painter, const BLRect &box, bool lit);
 
         // -2 for nothing, -1 for the root, otherwise the part's index.
         [[nodiscard]] int crumb_at(double x, double y) const;
 
         // The directory listing, drawn straight: a folder here may hold thousands.
-        class Rows : public ttk::Scroll {
+        class Rows : public Scroll {
         public:
             explicit Rows(FilePickerDialog *dialog) : _sheet(dialog) {
                 _takesPointer = true;
@@ -85,7 +85,7 @@ namespace ttk {
                 set_reach(static_cast<double>(_sheet->_picker.state().entries.size()) * ROW);
             }
 
-            void paint(const ttk::Painter &painter) override {
+            void paint(const Painter &painter) override {
                 const Theme::Palette &palette = Theme::palette();
                 const FilePicker::State &pick = _sheet->_picker.state();
 
@@ -121,7 +121,7 @@ namespace ttk {
                     painter.label(painter.font(Typeface::pick(entry.marked ? 600 : 400, true),
                                                Theme::fontBody),
                                   BLRect{line.x + 10.0 + side + 9.0, line.y, line.w - 70.0, line.h},
-                                  ttk::Align::Start, entry.name,
+                                  Align::Start, entry.name,
                                   entry.marked   ? palette.accent
                                   : entry.hidden ? palette.muted
                                                  : palette.text);
@@ -152,11 +152,11 @@ namespace ttk {
                 Scroll::paint(painter);
             }
 
-            [[nodiscard]] ttk::Cursor cursor_at(const double x, const double /*y*/) const override {
-                return over_lane(x) ? ttk::Cursor::Default : ttk::Cursor::Pointer;
+            [[nodiscard]] Cursor cursor_at(const double x, const double /*y*/) const override {
+                return over_lane(x) ? Cursor::Default : Cursor::Pointer;
             }
 
-            void hover(const ttk::Pointer &at) override {
+            void hover(const Pointer &at) override {
                 const int over = over_lane(at.x) ? -1 : row_at(at.y);
                 const bool edge = over >= 0 && at.x >= _box.x + _box.w - 44.0;
 
@@ -174,13 +174,13 @@ namespace ttk {
                 _over = -1;
             }
 
-            bool press(const ttk::Pointer &at) override {
+            bool press(const Pointer &at) override {
                 _scrolling = Scroll::press(at);
 
                 return _scrolling || holds(at.x, at.y);
             }
 
-            void release(const ttk::Pointer &at) override {
+            void release(const Pointer &at) override {
                 Scroll::release(at);
 
                 if (std::exchange(_scrolling, false)) {
@@ -239,15 +239,15 @@ namespace ttk {
         Slab *_nameSlab = nullptr;
         Slab *_listSlab = nullptr;
 
-        ttk::GlyphButton *_shut = nullptr;
-        ttk::GlyphButton *_up = nullptr;
-        ttk::GlyphButton *_typer = nullptr;
-        ttk::TextBox *_typed = nullptr;
-        ttk::TextBox *_named = nullptr;
+        GlyphButton *_shut = nullptr;
+        GlyphButton *_up = nullptr;
+        GlyphButton *_typer = nullptr;
+        TextBox *_typed = nullptr;
+        TextBox *_named = nullptr;
         Rows *_rows = nullptr;
-        ttk::Toggle *_hidden = nullptr;
-        ttk::Toggle *_option = nullptr;
-        ttk::Button *_use = nullptr;
+        Toggle *_hidden = nullptr;
+        Toggle *_option = nullptr;
+        Button *_use = nullptr;
 
         BLRect _where{};
         BLRect _crumbs{};

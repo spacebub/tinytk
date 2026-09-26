@@ -12,16 +12,14 @@
 
 #include <string>
 
-namespace ttk {
-    namespace Env {
+namespace ttk::Env {
 
-        // Empty when unset.
-        [[nodiscard]] std::string get(const char *name);
+    // Empty when unset.
+    [[nodiscard]] std::string get(const char *name);
 
-        // On Windows both the C runtime and the Win32 environment are set, since libraries read either.
-        void set(const char *name, const char *value);
+    // On Windows both the C runtime and the Win32 environment are set, since libraries read either.
+    void set(const char *name, const char *value);
 
-    }
 }
 
 

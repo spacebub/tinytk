@@ -103,7 +103,7 @@ namespace ttk {
                           Align::Start, told, trouble ? palette.danger : palette.faint);
         }
 
-        Widget::paint(painter);
+        Panel::paint(painter);
     }
 
     bool Card::press(const Pointer &at) {

@@ -278,11 +278,10 @@ namespace ttk {
 
         const double step = type.line_height(font(type));
         const auto which = static_cast<long long>((y - _box.y) / std::max(1.0, step));
-        const size_t row = static_cast<size_t>(
-            std::clamp(which, 0LL, static_cast<long long>(_rows.size()) - 1));
+        const size_t row = std::clamp(which, 0LL, static_cast<long long>(_rows.size()) - 1);
 
         return Spot{.row = row,
-                    .at = type.nearest(font(type), _rows[row], static_cast<float>(x - _box.x))};
+                    .at = type.nearest(font(type), _rows[row], static_cast<float>(x - _box.x)),};
     }
 
     void TextView::move_to(const Spot &where, const bool selecting) {

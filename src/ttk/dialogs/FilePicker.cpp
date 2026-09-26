@@ -48,7 +48,7 @@ namespace ttk {
         }
 
         bool rooted(const std::string &path) {
-            return path.starts_with("/");
+            return path.starts_with('/');
         }
 
         // "~" is home. A relative path hangs off the working directory.
@@ -97,7 +97,7 @@ namespace ttk {
         // A leading dot, or the hidden attribute on Windows.
         bool concealed(const std::filesystem::directory_entry &step) {
 #ifdef _WIN32
-            if (step.path().filename().string().starts_with(".")) {
+            if (step.path().filename().string().starts_with('.')) {
                 return true;
             }
 
@@ -105,7 +105,7 @@ namespace ttk {
 
             return marks != INVALID_FILE_ATTRIBUTES && (marks & FILE_ATTRIBUTE_HIDDEN) != 0;
 #else
-            return step.path().filename().string().starts_with(".");
+            return step.path().filename().string().starts_with('.');
 #endif
         }
 
@@ -158,7 +158,7 @@ namespace ttk {
             wanted += _parts[static_cast<size_t>(part)];
 
             if (part < index) {
-                wanted += "/";
+                wanted += '/';
             }
         }
 
@@ -217,7 +217,7 @@ namespace ttk {
 
             if (filter == "*" || filter == "*.*") {
                 _anything = true;
-            } else if (filter.starts_with("*")) {
+            } else if (filter.starts_with('*')) {
                 _suffixes.push_back(Text::lower(filter.substr(1)));
             }
         }
@@ -279,7 +279,7 @@ namespace ttk {
 
         for (const std::string &drive : Desktop::drives()) {
             _entries.push_back(Entry{
-                .name = drive, .path = drive, .directory = true, .hidden = false, .key = drive});
+                .name = drive, .path = drive, .directory = true, .hidden = false, .key = drive,});
         }
 
         push();

@@ -17,8 +17,8 @@ option(TTK_UI "Build ttk::ui, which fetches SDL3 and Blend2D" ON)
 option(TTK_JSON "Build ttk::json, which fetches yyjson" ON)
 option(TTK_HTTP "Build ttk::http, which needs libcurl outside Windows" ON)
 option(TTK_NOTIFY "Build ttk::notify, desktop notifications over the session bus" ON)
+option(TTK_WLSHM "Present through wl_shm on Wayland, where SDL has no framebuffer of its own" OFF)
 option(TTK_EXAMPLES "Build the example programs" ${PROJECT_IS_TOP_LEVEL})
-option(TTK_GALLERY "Build the gallery, which shows every widget" OFF)
 option(TTK_BENCHMARKS "Build the benchmark suite in bench/" OFF)
 option(TTK_SANITIZE "Build with the address and undefined sanitizers" OFF)
 
@@ -89,7 +89,7 @@ include(cmake/Embed.cmake)
 
 add_subdirectory(src)
 
-if ((TTK_EXAMPLES OR TTK_GALLERY) AND TTK_UI)
+if (TTK_EXAMPLES AND TTK_UI)
     add_subdirectory(examples)
 endif ()
 

@@ -36,6 +36,9 @@ namespace ttk {
 
         [[nodiscard]] bool empty() const { return _regions.empty(); }
 
+        // True when what is held covers the frame.
+        [[nodiscard]] bool whole() const;
+
         [[nodiscard]] const std::vector<BLRectI> &regions() const { return _regions; }
 
         // `region` clipped to the frame. Empty when none of it is inside.

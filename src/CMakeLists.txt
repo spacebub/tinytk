@@ -162,6 +162,7 @@ add_library(ttk_ui STATIC
         ttk/draw/Theme.h
         ttk/draw/Typeface.cpp
         ttk/draw/Typeface.h
+        ttk/draw/WlShm.h
 
         # toolkit: the widget layer
         ttk/toolkit/Compose.cpp
@@ -281,6 +282,19 @@ if (WIN32)
     target_link_libraries(ttk_ui PUBLIC dwmapi shell32 user32)
 else ()
     target_sources(ttk_ui PRIVATE ttk/draw/Chrome_Stub.cpp)
+endif ()
+
+# SDL's Wayland driver has no framebuffer: SDL_GetWindowSurface there is a GPU
+# texture. With this on, the frame goes into wl_shm buffers of ours instead, and
+# on any other driver SDL keeps the window's pixels as before.
+if (TTK_WLSHM)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+
+    target_sources(ttk_ui PRIVATE ttk/draw/WlShm.cpp)
+    target_link_libraries(ttk_ui PRIVATE PkgConfig::WAYLAND_CLIENT)
+else ()
+    target_sources(ttk_ui PRIVATE ttk/draw/WlShm_Stub.cpp)
 endif ()
 
 target_link_libraries(ttk_ui

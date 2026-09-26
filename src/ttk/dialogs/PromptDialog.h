@@ -18,7 +18,7 @@
 
 namespace ttk {
     // One line asked for, with a name for what it is.
-    class PromptDialog : public ttk::Dialog {
+    class PromptDialog : public Dialog {
     public:
         PromptDialog(const std::string &title, const std::string &label, std::string value,
                     const std::string &accept, std::function<void(const std::string &)> accepted);
@@ -30,8 +30,8 @@ namespace ttk {
 
         std::function<void(const std::string &)> _accepted;
 
-        ttk::Field *_field = nullptr;
-        ttk::Button *_accept = nullptr;
+        Field *_field = nullptr;
+        Button *_accept = nullptr;
 
         std::string _value;
     };

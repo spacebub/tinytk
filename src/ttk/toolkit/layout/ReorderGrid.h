@@ -37,7 +37,7 @@ namespace ttk {
             double step = 1.0;
         };
 
-        ReorderGrid(Widget *page, const Metrics &metrics) : _page(page) { _metrics = metrics; }
+        ReorderGrid(Widget *page, const Metrics &metrics) : _page(page), _metrics(metrics) { }
 
         void set_metrics(const Metrics &metrics) { _metrics = metrics; }
 
@@ -132,7 +132,7 @@ namespace ttk {
 
                 where[static_cast<size_t>(at)] = index == _origin
                     ? BLPoint{cell_x(_origin) + _carryX + card->slide_x() - cell_x(_target),
-                              cell_y(_origin) + _carryY + card->slide_y() - cell_y(_target)}
+                              cell_y(_origin) + _carryY + card->slide_y() - cell_y(_target),}
                     : BLPoint{card->slide_x(), card->slide_y()};
             }
 

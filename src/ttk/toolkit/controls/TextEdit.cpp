@@ -155,8 +155,8 @@ namespace ttk {
 
         // Lines that began inside what went are gone with it, and the ones after
         // moved by the difference. The rows of every touched line are made again.
-        const auto low = std::upper_bound(_starts.begin(), _starts.end(), from);
-        const auto high = std::upper_bound(_starts.begin(), _starts.end(), from + gone);
+        const auto low = std::ranges::upper_bound(_starts, from);
+        const auto high = std::ranges::upper_bound(_starts, from + gone);
         const auto lowLine = static_cast<size_t>(low - _starts.begin());
         const auto highLine = static_cast<size_t>(high - _starts.begin());
         const bool shrank = std::any_of(_columns.begin() + static_cast<std::ptrdiff_t>(first),
@@ -165,8 +165,8 @@ namespace ttk {
         const size_t was = _text.size() + gone - came;
         const size_t touchedEnd = highLine < _starts.size() ? _starts[highLine] - 1 : was;
 
-        const auto rowLow = std::lower_bound(_rowStarts.begin(), _rowStarts.end(), _starts[first]);
-        const auto rowHigh = std::upper_bound(_rowStarts.begin(), _rowStarts.end(), touchedEnd);
+        const auto rowLow = std::ranges::lower_bound(_rowStarts, _starts[first]);
+        const auto rowHigh = std::ranges::upper_bound(_rowStarts, touchedEnd);
         const auto rowAt = static_cast<size_t>(rowLow - _rowStarts.begin());
 
         _rowStarts.erase(rowLow, rowHigh);
@@ -295,7 +295,7 @@ namespace ttk {
     }
 
     size_t TextEdit::line_of(const size_t offset) const {
-        return static_cast<size_t>(std::upper_bound(_starts.begin(), _starts.end(), offset) - _starts.begin()) - 1;
+        return static_cast<size_t>(std::ranges::upper_bound(_starts, offset) - _starts.begin()) - 1;
     }
 
     size_t TextEdit::line_end(const size_t line) const {
@@ -303,7 +303,7 @@ namespace ttk {
     }
 
     size_t TextEdit::row_of(const size_t offset) const {
-        return static_cast<size_t>(std::upper_bound(_rowStarts.begin(), _rowStarts.end(), offset)
+        return static_cast<size_t>(std::ranges::upper_bound(_rowStarts, offset)
                                    - _rowStarts.begin()) - 1;
     }
 
@@ -567,7 +567,7 @@ namespace ttk {
                              .gone = _text.substr(from, to - from),
                              .came = with,
                              .caret = _caret,
-                             .anchor = _anchor});
+                             .anchor = _anchor,});
         _redo.clear();
 
         if (_undo.size() > UNDO_LIMIT) {

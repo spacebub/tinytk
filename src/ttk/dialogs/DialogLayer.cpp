@@ -35,7 +35,7 @@ namespace ttk {
     }
 
     Dialog *DialogLayer::top() const {
-        return children().empty() ? nullptr : static_cast<Dialog *>(children().back().get());
+        return children().empty() ? nullptr : dynamic_cast<Dialog *>(children().back().get());
     }
 
     void DialogLayer::sync() const {

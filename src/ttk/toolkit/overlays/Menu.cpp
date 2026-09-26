@@ -12,16 +12,16 @@
 #include "ttk/toolkit/overlays/Menu.h"
 
 namespace ttk {
-    Menu::Menu(std::vector<Menu::Row> rows, std::function<void(int)> triggered)
+    Menu::Menu(std::vector<Row> rows, std::function<void(int)> triggered)
         : _rows(std::move(rows)), _triggered(std::move(triggered)) {
         _takesPointer = true;
         cursor = Cursor::Pointer;
     }
 
-    double Menu::height_of(const std::vector<Menu::Row> &rows) {
+    double Menu::height_of(const std::vector<Row> &rows) {
         double tall = 10.0;
 
-        for (const Menu::Row &row : rows) {
+        for (const Row &row : rows) {
             tall += row.separator ? RULE : ROW;
         }
 
@@ -53,7 +53,7 @@ namespace ttk {
         double top = _box.y + 5.0;
 
         for (size_t index = 0; index < _rows.size(); ++index) {
-            const Menu::Row &row = _rows[index];
+            const Row &row = _rows[index];
             const double tall = row.separator ? RULE : ROW;
             const BLRect line{_box.x + 5.0, top, _box.w - 10.0, tall};
 
@@ -104,7 +104,7 @@ namespace ttk {
             return;
         }
 
-        const Menu::Row &picked = _rows[static_cast<size_t>(row)];
+        const Row &picked = _rows[static_cast<size_t>(row)];
 
         if (picked.separator || picked.disabled || !_triggered) {
             return;

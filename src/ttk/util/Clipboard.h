@@ -12,13 +12,11 @@
 
 #include <string>
 
-namespace ttk {
-    namespace Clipboard {
+namespace ttk::Clipboard {
 
-        std::string read();
-        void write(const std::string &text);
+    std::string read();
+    void write(const std::string &text);
 
-    }
 }
 
 

@@ -12,50 +12,48 @@
 
 #include <cstdint>
 
-namespace ttk {
-    namespace Anim {
+namespace ttk::Anim {
 
-        enum class Curve : std::uint8_t {
-            Linear,
-            // cubic-bezier(0.33, 1, 0.68, 1).
-            CubicOut,
-            // ease-out-back: overshoots and comes back.
-            BackOut,
-        };
+    enum class Curve : std::uint8_t {
+        Linear,
+        // cubic-bezier(0.33, 1, 0.68, 1).
+        CubicOut,
+        // ease-out-back: overshoots and comes back.
+        BackOut,
+    };
 
-        float shape(Curve curve, float at);
+    float shape(Curve curve, float at);
 
-        class Tween {
-        public:
-            // Jumps straight there, with nothing in flight.
-            void set(float value);
+    class Tween {
+    public:
+        // Jumps straight there, with nothing in flight.
+        void set(float value);
 
-            // Starts a run to `value`, from wherever the tween has got to.
-            void run(float value, double now, double seconds, Curve curve);
+        // Starts a run to `value`, from wherever the tween has got to.
+        void run(float value, double now, double seconds, Curve curve);
 
-            // Same, except a run already headed there is left alone. Otherwise a hover
-            // that arrives every frame would restart the animation every frame.
-            void toward(float value, double now, double seconds, Curve curve);
+        // Same, except a run already headed there is left alone. Otherwise a hover
+        // that arrives every frame would restart the animation every frame.
+        void toward(float value, double now, double seconds, Curve curve);
 
-            void advance(double now);
+        void advance(double now);
 
-            [[nodiscard]] float value() const { return _value; }
+        [[nodiscard]] float value() const { return _value; }
 
-            [[nodiscard]] bool live() const { return _running; }
+        [[nodiscard]] bool live() const { return _running; }
 
-        private:
-            float _value = 0.0F;
-            float _from = 0.0F;
-            float _to = 0.0F;
+    private:
+        float _value = 0.0F;
+        float _from = 0.0F;
+        float _to = 0.0F;
 
-            double _start = 0.0;
-            double _span = 0.0;
+        double _start = 0.0;
+        double _span = 0.0;
 
-            Curve _curve = Curve::Linear;
-            bool _running = false;
-        };
+        Curve _curve = Curve::Linear;
+        bool _running = false;
+    };
 
-    }
 }
 
 

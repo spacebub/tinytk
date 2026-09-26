@@ -10,26 +10,24 @@
 
 #include "ttk/util/Clipboard.h"
 
-namespace ttk {
-    namespace Clipboard {
+namespace ttk::Clipboard {
 
-        std::string read() {
-            char *held = SDL_GetClipboardText();
+    std::string read() {
+        char *held = SDL_GetClipboardText();
 
-            if (held == nullptr) {
-                return {};
-            }
-
-            std::string text = held;
-
-            SDL_free(held);
-
-            return text;
+        if (held == nullptr) {
+            return {};
         }
 
-        void write(const std::string &text) {
-            SDL_SetClipboardText(text.c_str());
-        }
+        std::string text = held;
 
+        SDL_free(held);
+
+        return text;
     }
+
+    void write(const std::string &text) {
+        SDL_SetClipboardText(text.c_str());
+    }
+
 }

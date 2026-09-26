@@ -18,9 +18,9 @@
 namespace ttk {
     // One dialog shown over another hides it until it goes, so a dialog can open a
     // second over itself and get it back.
-    class DialogLayer : public ttk::Widget {
+    class DialogLayer : public Widget {
     public:
-        ttk::Dialog *show(std::unique_ptr<ttk::Dialog> dialog);
+        Dialog *show(std::unique_ptr<Dialog> dialog);
 
         // Takes the dialog down unless it says it dealt with the dismissal itself.
         void close();
@@ -29,10 +29,10 @@ namespace ttk {
         void dismiss();
 
         // Called with a dialog as it goes, for whoever was holding on to it.
-        std::function<void(ttk::Dialog *)> closed;
+        std::function<void(Dialog *)> closed;
 
         // The one that is up, or nothing.
-        [[nodiscard]] ttk::Dialog *top() const;
+        [[nodiscard]] Dialog *top() const;
 
         void sync() const;
 

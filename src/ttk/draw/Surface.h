@@ -10,17 +10,20 @@
 #define TTK_DRAW_SURFACE_H
 
 
+#include <cstdint>
 #include <vector>
 
 #include <SDL3/SDL.h>
 #include <blend2d/blend2d.h>
 
 #include "ttk/draw/Damage.h"
+#include "ttk/draw/WlShm.h"
 
 namespace ttk {
     // The window's own pixels, drawn into directly where the video driver has a
-    // framebuffer of its own and through a buffer of ours where it has not. Only the
-    // rectangles that changed are repainted, and only those are presented.
+    // framebuffer of its own, into shared memory of ours on Wayland, and through a
+    // buffer of ours copied over everywhere else. Only the rectangles that changed are
+    // repainted, and only those are presented.
     class Surface {
     public:
         // Takes, or retakes, the window's surface. Called again after every resize,
@@ -32,11 +35,12 @@ namespace ttk {
 
         // True where the video driver has a framebuffer of its own, which is the only
         // case in which the window's pixels are drawn into in place.
-        [[nodiscard]] bool direct() const { return _direct; }
+        [[nodiscard]] bool direct() const { return _path == Path::Direct; }
 
-        // Re-takes the surface if SDL has replaced it since the last look. Asked every
-        // frame: an expose arriving before the resize event would otherwise draw into
-        // memory SDL has already freed.
+        // Re-takes the surface if SDL has replaced it since the last look, and on
+        // Wayland binds the frame to a buffer the compositor is not holding. Asked
+        // every frame: an expose arriving before the resize event would otherwise draw
+        // into memory SDL has already freed.
         bool sync(SDL_Window *window);
 
         // Lets go of the surface before SDL frees it.
@@ -76,18 +80,40 @@ namespace ttk {
         bool save(const char *path);
 
     private:
+        // Where the pixels the context draws into end up.
+        enum class Path : std::uint8_t {
+            // SDL's own framebuffer, wrapped in place.
+            Direct,
+
+            // A buffer of ours, the damaged rectangles copied into SDL's surface.
+            Copied,
+
+            // A wl_shm buffer of ours, handed to the compositor as it is.
+            Shared,
+        };
+
+        bool attach_shared(SDL_Window *window);
+
+        // Binds the context to the shared buffer this frame goes into.
+        bool retarget();
+
         // Copies the damaged rectangles of our own buffer into SDL's.
         bool take(SDL_Window *window);
+
+        // Ends the frame's context and forgets the target, keeping the display side.
+        void release();
 
         BLImage _image;
         BLContext _context;
 
-        // False where SDL keeps the window's pixels in a block it reallocates on every
-        // reconfigure: a fresh block can land on the old address, so nothing about the
-        // surface says it moved. Those draw into a buffer of ours and are copied over.
-        bool _direct = true;
+        Path _path = Path::Direct;
 
-        // What was wrapped, so a replacement can be spotted.
+        WlShm _shm;
+
+        // What was wrapped, so a replacement can be spotted. Off the direct path SDL
+        // keeps the window's pixels in a block it reallocates on every reconfigure: a
+        // fresh block can land on the old address, so nothing about the surface says
+        // it moved.
         SDL_Surface *_surface = nullptr;
         void *_pixels = nullptr;
 
@@ -95,6 +121,9 @@ namespace ttk {
 
         // Presented but not repainted.
         std::vector<BLRectI> _moved;
+
+        // Handed over each frame, kept so a frame allocates nothing.
+        std::vector<BLRectI> _presented;
 
         int _width = 0;
         int _height = 0;

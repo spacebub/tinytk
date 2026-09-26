@@ -46,7 +46,7 @@ namespace ttk {
         std::vector<const Widget *> gone;
 
         for (const Ptr &child : children()) {
-            if (const int id = static_cast<const Toast *>(child.get())->id();
+            if (const int id = dynamic_cast<const Toast *>(child.get())->id();
                 std::ranges::find(wanted, id) == wanted.end()) {
                 gone.push_back(child.get());
             }
@@ -70,7 +70,7 @@ namespace ttk {
             }));
         }
 
-        _shown = wanted;
+        _shown = std::move(wanted);
 
         if (root() != nullptr) {
             root()->relayout();

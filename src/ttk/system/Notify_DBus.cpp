@@ -111,7 +111,7 @@ namespace ttk::Notify {
                 u32(0);
                 align(element_alignment);
 
-                return {length_at, bytes.size()};
+                return {.length_at = length_at, .start = bytes.size()};
             }
 
             void close_array(const Array &array) {
@@ -440,7 +440,7 @@ namespace ttk::Notify {
         // Reads what has arrived, waiting until the deadline for anything at all.
         bool receive(const Clock::time_point deadline) {
             const auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - Clock::now());
-            pollfd asked{bus.socket, POLLIN, 0};
+            pollfd asked{.fd = bus.socket, .events = POLLIN, .revents = 0};
 
             if (::poll(&asked, 1, static_cast<int>(std::max<std::int64_t>(left.count(), 0))) <= 0) {
                 return false;
@@ -463,7 +463,7 @@ namespace ttk::Notify {
         // gone away is noticed here rather than on the next write.
         void drain() {
             while (bus.socket >= 0) {
-                pollfd asked{bus.socket, POLLIN, 0};
+                pollfd asked{.fd = bus.socket, .events = POLLIN, .revents = 0};
 
                 if (::poll(&asked, 1, 0) <= 0) {
                     break;
@@ -691,7 +691,7 @@ namespace ttk::Notify {
                 return false;
             }
 
-            const std::optional<Incoming> welcome = call({BUS, BUS_OBJECT, BUS, "Hello"}, why);
+            const std::optional<Incoming> welcome = call({.destination = BUS, .object = BUS_OBJECT, .interface = BUS, .member = "Hello"}, why);
 
             if (!welcome) {
                 return false;
@@ -746,7 +746,7 @@ namespace ttk::Notify {
         }
 
         const std::optional<Incoming> reply = call({
-            SERVICE, OBJECT, SERVICE, "Notify", "susssasa{sv}i", notify_body(message, replaces),
+            .destination = SERVICE, .object = OBJECT, .interface = SERVICE, .member = "Notify", .signature = "susssasa{sv}i", .body = notify_body(message, replaces),
         }, why);
 
         if (!reply) {
@@ -785,8 +785,8 @@ namespace ttk::Notify {
         Writer body;
         body.u32(id);
 
-        if (!send_all(encode({SERVICE, OBJECT, SERVICE, "CloseNotification", "u", std::move(body.bytes),
-                              NO_REPLY_EXPECTED}, next_serial()))) {
+        if (!send_all(encode({.destination = SERVICE, .object = OBJECT, .interface = SERVICE, .member = "CloseNotification", .signature = "u", .body = std::move(body.bytes),
+                              .flags = NO_REPLY_EXPECTED,}, next_serial()))) {
             drop();
         }
     }

@@ -75,4 +75,11 @@ namespace ttk {
     void Damage::all() {
         _regions = {{0, 0, _width, _height}};
     }
+
+    bool Damage::whole() const {
+        return std::ranges::any_of(_regions, [&](const BLRectI &region) {
+            return region.x <= 0 && region.y <= 0 && region.x + region.w >= _width
+                && region.y + region.h >= _height;
+        });
+    }
 }

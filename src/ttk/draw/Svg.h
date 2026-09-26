@@ -12,17 +12,15 @@
 
 #include <blend2d/blend2d.h>
 
-namespace ttk {
-    namespace Svg {
+namespace ttk::Svg {
 
-        // Fills `out`, which is cleared first. False on the first token that makes no
-        // sense, with whatever parsed cleanly left in place.
-        bool parse(const char *commands, BLPath &out);
+    // Fills `out`, which is cleared first. False on the first token that makes no
+    // sense, with whatever parsed cleanly left in place.
+    bool parse(const char *commands, BLPath &out);
 
-        // Scaled from a viewbox of `box` units square into a `size` square.
-        BLPath glyph(const char *commands, float box, float size);
+    // Scaled from a viewbox of `box` units square into a `size` square.
+    BLPath glyph(const char *commands, float box, float size);
 
-    }
 }
 
 

@@ -32,8 +32,12 @@ target_link_libraries(app PRIVATE ttk::ui ttk::http)
 its target along with its fetches and lookups, so a build machine needs only what is kept. `TTK_DOWNLOAD_CACHE`
 names where fetched sources are kept between build trees.
 
-`TTK_GALLERY=ON` builds `examples/gallery.cpp`, a window showing every widget,
-dialog, menu, tooltip and notice the library has. It is off by default.
+`TTK_WLSHM=ON` gives `ttk::ui` a framebuffer of its own on Wayland, where SDL has
+none and would otherwise draw through a GPU texture. It needs the wayland-client
+headers, and on any other video driver SDL keeps the window's pixels as before.
+
+`TTK_EXAMPLES=ON` builds `examples/*`, a basic hello world app and a gallery showing every widget,
+dialog, menu, tooltip and notice the library has. ON by default if ttk is compiled standalone.
 
 Before anything asks for a path or a request, tell the library who it is:
 

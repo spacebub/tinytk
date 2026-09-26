@@ -17,7 +17,7 @@
 
 namespace ttk {
     // A question with two answers, one of which may be the dangerous one.
-    class ConfirmDialog : public ttk::Dialog {
+    class ConfirmDialog : public Dialog {
     public:
         ConfirmDialog(const std::string &title, const std::string &said, const std::string &accept,
                      bool danger, std::function<void()> accepted);

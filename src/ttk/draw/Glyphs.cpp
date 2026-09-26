@@ -43,51 +43,51 @@ namespace ttk {
 
             set(Glyphs::Glyph::Close,
                 {.outline = "M 1.9 1.9 L 10.1 10.1 M 10.1 1.9 L 1.9 10.1",
-                 .solid = nullptr, .box = 12.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 12.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Plus,
                 {.outline = "M 0.8 6 L 11.2 6 M 6 0.8 L 6 11.2",
-                 .solid = nullptr, .box = 12.0F, .solidBox = 0.0F, .pen = 1.6F});
+                 .solid = nullptr, .box = 12.0F, .solidBox = 0.0F, .pen = 1.6F,});
 
             set(Glyphs::Glyph::Search,
                 {.outline = "M 8.25 4.75 A 3.5 3.5 0 1 1 1.25 4.75 A 3.5 3.5 0 1 1 8.25 4.75"
                             " M 7.6 9.15 L 10.71 12.26",
-                 .solid = nullptr, .box = 12.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 12.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Download,
                 {.outline = "M 7 1 L 7 9.5 M 3.2 6 L 7 9.8 L 10.8 6 M 2 12.6 L 12 12.6",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = 1.6F});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = 1.6F,});
 
             set(Glyphs::Glyph::Save,
                 {.outline = "M 1.8 2.2 L 9.2 2.2 L 12.2 5.2 L 12.2 11.8 L 1.8 11.8 Z"
                             " M 4.4 2.2 L 4.4 5.6 L 8.8 5.6 L 8.8 2.2 M 4 11.8 L 4 8.2 L 10 8.2 L 10 11.8",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Extract,
                 {.outline = "M 6.5 1.5 L 1.5 1.5 L 1.5 12.5 L 6.5 12.5 M 5 7 L 12.5 7"
                             " M 9.2 3.8 L 12.6 7 L 9.2 10.2",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Trash,
                 {.outline = "M 1.5 3.5 L 12.5 3.5 M 5.2 3.3 L 5.2 1.6 L 8.8 1.6 L 8.8 3.3"
                             " M 3 3.8 L 3.7 12.6 L 10.3 12.6 L 11 3.8 M 5.8 6 L 6 10.4 M 8.2 6 L 8 10.4",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Edit,
                 {.outline = "M 2 12 L 2 9.4 L 9.4 2 L 12 4.6 L 4.6 12 Z",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Up,
                 {.outline = "M 6.5 12 L 6.5 1.8 M 2 6.2 L 6.5 1.8 L 11 6.2",
-                 .solid = nullptr, .box = 13.0F, .solidBox = 0.0F, .pen = 1.6F});
+                 .solid = nullptr, .box = 13.0F, .solidBox = 0.0F, .pen = 1.6F,});
 
             set(Glyphs::Glyph::Down,
                 {.outline = "M 6.5 1.8 L 6.5 12 M 2 7.6 L 6.5 12 L 11 7.6",
-                 .solid = nullptr, .box = 13.0F, .solidBox = 0.0F, .pen = 1.6F});
+                 .solid = nullptr, .box = 13.0F, .solidBox = 0.0F, .pen = 1.6F,});
 
             set(Glyphs::Glyph::System,
                 {.outline = "M 11.9 7 A 4.9 4.9 0 1 1 2.1 7 A 4.9 4.9 0 1 1 11.9 7",
-                 .solid = "M 7 11.9 A 4.9 4.9 0 0 1 7 2.1 Z", .box = 14.0F, .solidBox = 13.0F, .pen = PEN});
+                 .solid = "M 7 11.9 A 4.9 4.9 0 0 1 7 2.1 Z", .box = 14.0F, .solidBox = 13.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Light,
                 {.outline = "M 10 7 A 3 3 0 1 1 4 7 A 3 3 0 1 1 10 7 M 11.8 7 L 13.3 7"
@@ -95,19 +95,19 @@ namespace ttk {
                             " M 3.606 10.394 L 2.545 11.455 M 2.2 7 L 0.7 7"
                             " M 3.606 3.606 L 2.545 2.545 M 7 2.2 L 7 0.7"
                             " M 10.394 3.606 L 11.455 2.545",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Dark,
                 {.outline = "M 8.98 2.41 A 5 5 0 1 1 2.41 8.98 A 5 5 0 0 0 8.98 2.41 Z",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Check,
                 {.outline = "M 2 7.4 L 5.6 11 L 12 3.2",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = 1.8F});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = 1.8F,});
 
             set(Glyphs::Glyph::Refresh,
                 {.outline = "M 8.77 10.955 A 5 5 0 1 1 10.955 4.23",
-                 .solid = "M 9.8 1.6 L 10.6 5.4 L 6.9 4.4 Z", .box = 13.0F, .solidBox = 13.0F, .pen = 1.6F});
+                 .solid = "M 9.8 1.6 L 10.6 5.4 L 6.9 4.4 Z", .box = 13.0F, .solidBox = 13.0F, .pen = 1.6F,});
 
             set(Glyphs::Glyph::Cog,
                 {.outline = "M 10.9 7 A 3.9 3.9 0 1 1 3.1 7 A 3.9 3.9 0 1 1 10.9 7 M 10.9 7 L 13.2 7"
@@ -115,35 +115,35 @@ namespace ttk {
                             " M 4.242 9.758 L 2.616 11.384 M 3.1 7 L 0.8 7"
                             " M 4.242 4.242 L 2.616 2.616 M 7 3.1 L 7 0.8"
                             " M 9.758 4.242 L 11.384 2.616",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Terminal,
                 {.outline = "M 3 2 L 11 2 A 2 2 0 0 1 13 4 L 13 10 A 2 2 0 0 1 11 12 L 3 12"
                             " A 2 2 0 0 1 1 10 L 1 4 A 2 2 0 0 1 3 2 Z"
                             " M 3.6 5.6 L 5.8 7.4 L 3.6 9.2 M 7.4 9.4 L 10.6 9.4",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = 1.4F});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = 1.4F,});
 
             set(Glyphs::Glyph::Copy,
                 {.outline = "M 5.2 5.2 L 12.6 5.2 L 12.6 12.6 L 5.2 12.6 Z"
                             " M 8.8 4.6 L 8.8 1.4 L 1.4 1.4 L 1.4 8.8 L 4.6 8.8",
-                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN});
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Folder,
                 {.outline = nullptr,
-                 .solid = "M 1 3.5 L 5.5 3.5 L 7 5.4 L 13 5.4 L 13 12 L 1 12 Z", .box = 0.0F, .solidBox = 14.0F, .pen = PEN});
+                 .solid = "M 1 3.5 L 5.5 3.5 L 7 5.4 L 13 5.4 L 13 12 L 1 12 Z", .box = 0.0F, .solidBox = 14.0F, .pen = PEN,});
 
             set(Glyphs::Glyph::Play,
                 {.outline = nullptr,
-                 .solid = "M 3.4 1.6 L 11.6 6.5 L 3.4 11.4 Z", .box = 0.0F, .solidBox = 13.0F, .pen = PEN});
+                 .solid = "M 3.4 1.6 L 11.6 6.5 L 3.4 11.4 Z", .box = 0.0F, .solidBox = 13.0F, .pen = PEN,});
 
             // These draw in a 15 unit box of their own.
             set(Glyphs::Glyph::File,
                 {.outline = "M 3 1.5 L 9.5 1.5 L 12.5 4.8 L 12.5 13.5 L 3 13.5 Z M 9.3 1.7 L 9.3 5 L 12.3 5",
-                 .solid = nullptr, .box = 15.0F, .solidBox = 0.0F, .pen = 1.2F});
+                 .solid = nullptr, .box = 15.0F, .solidBox = 0.0F, .pen = 1.2F,});
 
             set(Glyphs::Glyph::FileFolder,
                 {.outline = nullptr,
-                 .solid = "M 1 4 L 5.5 4 L 7 5.8 L 14 5.8 L 14 13 L 1 13 Z", .box = 0.0F, .solidBox = 15.0F, .pen = PEN});
+                 .solid = "M 1 4 L 5.5 4 L 7 5.8 L 14 5.8 L 14 13 L 1 13 Z", .box = 0.0F, .solidBox = 15.0F, .pen = PEN,});
 
             return table;
         }();
@@ -189,7 +189,7 @@ namespace ttk {
         // a rotated or off-grid draw falls back to.
         void stroke(BLContext &context, const Glyphs::Glyph glyph, const BLPoint origin,
                     const float weight, const BLRgba32 tone) {
-            using Glyph = Glyphs::Glyph;
+            using Glyphs::Glyph;
 
             const double side = Glyphs::element * weight;
 
@@ -418,7 +418,7 @@ namespace ttk {
             if (const BLImage &mask = mask_of(Where{.glyph = glyph,
                                                    .weight = weight,
                                                    .fx = origin.x - left,
-                                                   .fy = origin.y - top});
+                                                   .fy = origin.y - top,});
                 !mask.is_empty()) {
                 context.fill_mask(BLPointI{static_cast<int>(left) - PAD, static_cast<int>(top) - PAD},
                                   mask, tone);

@@ -19,6 +19,19 @@ namespace ttk {
     }
 
     bool Surface::sync(SDL_Window *window) {
+        if (!_ready) {
+            return attach(window);
+        }
+
+        if (_path == Path::Shared) {
+            int wide = 0;
+            int tall = 0;
+
+            SDL_GetWindowSizeInPixels(window, &wide, &tall);
+
+            return wide == _width && tall == _height ? retarget() : attach(window);
+        }
+
         SDL_Surface *surface = SDL_GetWindowSurface(window);
 
         if (surface == nullptr) {
@@ -28,7 +41,7 @@ namespace ttk {
             return false;
         }
 
-        if (_ready && surface->w == _width && surface->h == _height) {
+        if (surface->w == _width && surface->h == _height) {
             if (surface == _surface && surface->pixels == _pixels) {
                 return true;
             }
@@ -36,7 +49,7 @@ namespace ttk {
             // Off the direct path our own buffer still holds the frame, so there is
             // nothing to re-wrap. SDL's buffer is new though, and a frame with no damage
             // would present nothing into it and leave whatever was in that memory on screen.
-            if (!_direct) {
+            if (_path == Path::Copied) {
                 _surface = surface;
                 _pixels = surface->pixels;
 
@@ -50,7 +63,16 @@ namespace ttk {
     }
 
     bool Surface::attach(SDL_Window *window) {
-        detach();
+        release();
+
+        // Wayland has no framebuffer for SDL to hand out, so the frame goes into
+        // shared memory of ours where that is built in. Where it is not, or the
+        // compositor has no wl_shm, SDL's fallback below is a GPU texture.
+        if (WlShm::available(window) && (_shm.opened() || _shm.open(window))) {
+            return attach_shared(window);
+        }
+
+        _shm.close();
 
         SDL_Surface *surface = SDL_GetWindowSurface(window);
 
@@ -67,10 +89,12 @@ namespace ttk {
 
         const char *driver = SDL_GetCurrentVideoDriver();
 
-        _direct = driver != nullptr
-            && (SDL_strcmp(driver, "windows") == 0 || SDL_strcmp(driver, "x11") == 0);
+        _path = driver != nullptr
+                && (SDL_strcmp(driver, "windows") == 0 || SDL_strcmp(driver, "x11") == 0)
+            ? Path::Direct
+            : Path::Copied;
 
-        const BLResult made = _direct
+        const BLResult made = _path == Path::Direct
             ? _image.create_from_data(surface->w, surface->h, BL_FORMAT_XRGB32, surface->pixels,
                                       surface->pitch)
             : _image.create(surface->w, surface->h, BL_FORMAT_XRGB32);
@@ -97,7 +121,64 @@ namespace ttk {
         return true;
     }
 
-    void Surface::detach() {
+    bool Surface::attach_shared(SDL_Window *window) {
+        int wide = 0;
+        int tall = 0;
+
+        SDL_GetWindowSizeInPixels(window, &wide, &tall);
+
+        if (wide <= 0 || tall <= 0) {
+            return false;
+        }
+
+        _path = Path::Shared;
+        _width = wide;
+        _height = tall;
+
+        _damage.resize(_width, _height);
+        _damage.all();
+        _moved.clear();
+
+        return retarget();
+    }
+
+    bool Surface::retarget() {
+        WlShm::Target target;
+
+        // A frame about to be repainted whole has nothing to carry over from the last.
+        if (!_shm.acquire(_width, _height, _damage.whole(), target)) {
+            release();
+
+            return false;
+        }
+
+        if (target.fresh) {
+            damage_all();
+        }
+
+        if (_ready && target.pixels == _pixels) {
+            return true;
+        }
+
+        if (_ready) {
+            _context.end();
+        }
+
+        if (_image.create_from_data(_width, _height, BL_FORMAT_XRGB32, target.pixels, target.stride)
+                != BL_SUCCESS
+            || _context.begin(_image) != BL_SUCCESS) {
+            release();
+
+            return false;
+        }
+
+        _pixels = target.pixels;
+        _ready = true;
+
+        return true;
+    }
+
+    void Surface::release() {
         if (_ready) {
             _context.end();
             _image.reset();
@@ -110,6 +191,12 @@ namespace ttk {
         _ready = false;
         _width = 0;
         _height = 0;
+    }
+
+    void Surface::detach() {
+        release();
+
+        _shm.close();
     }
 
     void Surface::damage(const BLRect &region) {
@@ -158,7 +245,7 @@ namespace ttk {
             return;
         }
 
-        // Ours to write: the image is either our own or wraps SDL's surface.
+        // Ours to write: the image is our own or wraps a buffer of the window's.
         auto *pixels = static_cast<uint8_t *>(data.pixel_data);
         const size_t wide = static_cast<size_t>(region.w) * 4;
         const size_t at = static_cast<size_t>(region.x) * 4;
@@ -204,7 +291,7 @@ namespace ttk {
             return false;
         }
 
-        _direct = false;
+        _path = Path::Copied;
         _width = width;
         _height = height;
         _ready = true;
@@ -234,9 +321,28 @@ namespace ttk {
         // them. The context is synchronous, so this is the one place it has to be said.
         _context.flush(BL_CONTEXT_FLUSH_SYNC);
 
+        if (_path == Path::Shared) {
+            // A buffer committed before the surface has its role is a protocol error.
+            // The damage stands, and the frame after the window is shown is drawn whole.
+            if ((SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0) {
+                return;
+            }
+
+            _presented.clear();
+            _presented.insert(_presented.end(), _damage.regions().begin(), _damage.regions().end());
+            _presented.insert(_presented.end(), _moved.begin(), _moved.end());
+
+            if (_shm.present(_presented)) {
+                _damage.clear();
+                _moved.clear();
+            }
+
+            return;
+        }
+
         // Off the direct path our own pixels have to be handed over, the damaged
         // rectangles alone unless the surface is one take() has not seen.
-        if (!_direct && !take(window)) {
+        if (_path == Path::Copied && !take(window)) {
             return;
         }
 
@@ -312,7 +418,8 @@ namespace ttk {
 
         _context.flush(BL_CONTEXT_FLUSH_SYNC);
 
-        // The image wraps SDL's pixels, so this writes exactly what is on screen.
+        // The image wraps the pixels handed to the desktop, so this writes exactly
+        // what is on screen.
         return _image.write_to_file(path) == BL_SUCCESS;
     }
 }
