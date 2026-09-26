@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <system_error>
 #include <termios.h>
@@ -128,6 +129,10 @@ namespace ttk {
                     settings.c_lflag &= ~static_cast<tcflag_t>(ECHO | ECHONL);
                     tcsetattr(secondary, TCSANOW, &settings);
                 }
+
+                // A child sizing its output to the terminal reads zero columns otherwise.
+                const winsize size{.ws_row = 24, .ws_col = 80, .ws_xpixel = 0, .ws_ypixel = 0};
+                ioctl(secondary, TIOCSWINSZ, &size);
 
                 ends[0] = primary;
                 ends[1] = secondary;
