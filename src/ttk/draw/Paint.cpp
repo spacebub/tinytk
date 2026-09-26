@@ -15,9 +15,13 @@
 #include <tuple>
 #include <vector>
 
-#if defined(__SSE2__) || defined(_M_X64)
+#ifdef __AVX2__
+#include <immintrin.h>
+#define TTK_BLUR_AVX2
+#define TTK_BLUR_SIMD
+#elif defined(__SSE2__) || defined(_M_X64)
 #include <emmintrin.h>
-#define TTK_BLUR_SSE2
+#define TTK_BLUR_SIMD
 #endif
 
 #include "ttk/draw/Paint.h"
@@ -42,47 +46,151 @@ namespace ttk {
             return std::clamp(radius, 1, 127);
         }
 
+#ifdef TTK_BLUR_SIMD
+        // The vector the passes are written against: eight words of a pixel each
+        // under SSE2, sixteen under AVX2. The blur only ever needs these operations,
+        // and the AVX2 pack and unpack work within each half, which `order` undoes.
+        struct Lane {
+#ifdef TTK_BLUR_AVX2
+            using V = __m256i;
+
+            static constexpr int WORDS = 16;
+
+            static V zero() { return _mm256_setzero_si256(); }
+            static V set1(const short value) { return _mm256_set1_epi16(value); }
+            static V load(const void *at) { return _mm256_loadu_si256(static_cast<const V *>(at)); }
+            static void store(void *at, const V v) { _mm256_storeu_si256(static_cast<V *>(at), v); }
+            static V add(const V a, const V b) { return _mm256_add_epi16(a, b); }
+            static V sub(const V a, const V b) { return _mm256_sub_epi16(a, b); }
+            static V mulhi(const V a, const V b) { return _mm256_mulhi_epu16(a, b); }
+            static V mullo(const V a, const V b) { return _mm256_mullo_epi16(a, b); }
+            static V subs(const V a, const V b) { return _mm256_subs_epu16(a, b); }
+            static V equal(const V a, const V b) { return _mm256_cmpeq_epi16(a, b); }
+            static V andnot(const V a, const V b) { return _mm256_andnot_si256(a, b); }
+            static V shift7(const V v) { return _mm256_srli_epi16(v, 7); }
+            static V lo(const V v) { return _mm256_unpacklo_epi8(v, zero()); }
+            static V hi(const V v) { return _mm256_unpackhi_epi8(v, zero()); }
+            static V pack(const V a, const V b) { return _mm256_packus_epi16(a, b); }
+            static V zip8(const V a, const V b) { return _mm256_unpacklo_epi8(a, b); }
+            static V zip16lo(const V a, const V b) { return _mm256_unpacklo_epi16(a, b); }
+            static V zip16hi(const V a, const V b) { return _mm256_unpackhi_epi16(a, b); }
+
+            static V widen(const uint8_t *at) {
+                return _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(at)));
+            }
+
+            static void narrow(uint8_t *at, const V words) {
+                const V packed = _mm256_permute4x64_epi64(pack(words, zero()), 0x08);
+
+                _mm_storeu_si128(reinterpret_cast<__m128i *>(at), _mm256_castsi256_si128(packed));
+            }
+
+            static V scan(V v) {
+                v = add(v, _mm256_slli_si256(v, 2));
+                v = add(v, _mm256_slli_si256(v, 4));
+                v = add(v, _mm256_slli_si256(v, 8));
+
+                const V tops = _mm256_shuffle_epi32(_mm256_shufflehi_epi16(v, 0xff), 0xff);
+
+                return add(v, _mm256_permute2x128_si256(tops, tops, 0x08));
+            }
+
+            static V last(const V v) {
+                const V tops = _mm256_shuffle_epi32(_mm256_shufflehi_epi16(v, 0xff), 0xff);
+
+                return _mm256_permute2x128_si256(tops, tops, 0x11);
+            }
+
+            static void order(V &a, V &b) {
+                const V first = _mm256_permute2x128_si256(a, b, 0x20);
+                const V second = _mm256_permute2x128_si256(a, b, 0x31);
+
+                a = first;
+                b = second;
+            }
+#else
+            using V = __m128i;
+
+            static constexpr int WORDS = 8;
+
+            static V zero() { return _mm_setzero_si128(); }
+            static V set1(const short value) { return _mm_set1_epi16(value); }
+            static V load(const void *at) { return _mm_loadu_si128(static_cast<const V *>(at)); }
+            static void store(void *at, const V v) { _mm_storeu_si128(static_cast<V *>(at), v); }
+            static V add(const V a, const V b) { return _mm_add_epi16(a, b); }
+            static V sub(const V a, const V b) { return _mm_sub_epi16(a, b); }
+            static V mulhi(const V a, const V b) { return _mm_mulhi_epu16(a, b); }
+            static V mullo(const V a, const V b) { return _mm_mullo_epi16(a, b); }
+            static V subs(const V a, const V b) { return _mm_subs_epu16(a, b); }
+            static V equal(const V a, const V b) { return _mm_cmpeq_epi16(a, b); }
+            static V andnot(const V a, const V b) { return _mm_andnot_si128(a, b); }
+            static V shift7(const V v) { return _mm_srli_epi16(v, 7); }
+            static V lo(const V v) { return _mm_unpacklo_epi8(v, zero()); }
+            static V hi(const V v) { return _mm_unpackhi_epi8(v, zero()); }
+            static V pack(const V a, const V b) { return _mm_packus_epi16(a, b); }
+            static V zip8(const V a, const V b) { return _mm_unpacklo_epi8(a, b); }
+            static V zip16lo(const V a, const V b) { return _mm_unpacklo_epi16(a, b); }
+            static V zip16hi(const V a, const V b) { return _mm_unpackhi_epi16(a, b); }
+
+            static V widen(const uint8_t *at) {
+                return lo(_mm_loadl_epi64(reinterpret_cast<const __m128i *>(at)));
+            }
+
+            static void narrow(uint8_t *at, const V words) {
+                _mm_storel_epi64(reinterpret_cast<__m128i *>(at), pack(words, zero()));
+            }
+
+            static V scan(V v) {
+                v = add(v, _mm_slli_si128(v, 2));
+                v = add(v, _mm_slli_si128(v, 4));
+                v = add(v, _mm_slli_si128(v, 8));
+
+                return v;
+            }
+
+            static V last(const V v) {
+                return _mm_shuffle_epi32(_mm_shufflehi_epi16(v, 0xff), 0xff);
+            }
+
+            static void order(V & /*unused*/, V & /*unused*/) {}
+#endif
+        };
+
+        using V = Lane::V;
+
         // Rows of coverage are this many bytes across, so every pass reads and writes
         // whole vectors.
-        constexpr int LANES = 16;
+        constexpr int LANES = Lane::WORDS * 2;
 
-#ifdef TTK_BLUR_SSE2
-        // floor(x / span) over eight lanes, exact for x up to 255 * span: the magic
+        // floor(x / span) over the lanes, exact for x up to 255 * span: the magic
         // quotient is at most one too high, and multiplying back finds when.
         struct Divider {
-            __m128i magic;
-            __m128i span;
-            __m128i one;
+            V magic;
+            V span;
+            V one;
         };
 
         Divider divider(const int span) {
-            return {.magic = _mm_set1_epi16(static_cast<short>((65536 + span - 1) / span)),
-                    .span = _mm_set1_epi16(static_cast<short>(span)),
-                    .one = _mm_set1_epi16(1)};
+            return {.magic = Lane::set1(static_cast<short>((65536 + span - 1) / span)),
+                    .span = Lane::set1(static_cast<short>(span)),
+                    .one = Lane::set1(1)};
         }
 
-        __m128i divide(const __m128i x, const Divider &d) {
-            const __m128i q = _mm_mulhi_epu16(x, d.magic);
-            const __m128i back = _mm_mullo_epi16(q, d.span);
-            const __m128i over = _mm_subs_epu16(back, x);
-            const __m128i fine = _mm_cmpeq_epi16(over, _mm_setzero_si128());
+        V divide(const V x, const Divider &d) {
+            const V q = Lane::mulhi(x, d.magic);
+            const V back = Lane::mullo(q, d.span);
+            const V over = Lane::subs(back, x);
+            const V fine = Lane::equal(over, Lane::zero());
 
-            return _mm_sub_epi16(q, _mm_andnot_si128(fine, d.one));
+            return Lane::sub(q, Lane::andnot(fine, d.one));
         }
 
-        // floor(x / 255) over eight lanes, exact for x up to 255 * 255.
-        __m128i div255(const __m128i x) {
-            return _mm_srli_epi16(_mm_mulhi_epu16(x, _mm_set1_epi16(-32639)), 7);
+        // floor(x / 255) over the lanes, exact for x up to 255 * 255.
+        V div255(const V x) {
+            return Lane::shift7(Lane::mulhi(x, Lane::set1(-32639)));
         }
-
-        // Inclusive prefix sums of eight lanes, wrapping.
-        __m128i scan(__m128i v) {
-            v = _mm_add_epi16(v, _mm_slli_si128(v, 2));
-            v = _mm_add_epi16(v, _mm_slli_si128(v, 4));
-            v = _mm_add_epi16(v, _mm_slli_si128(v, 8));
-
-            return v;
-        }
+#else
+        constexpr int LANES = 16;
 #endif
 
         // One horizontal box pass, in place. Each output is the difference of two
@@ -100,17 +208,15 @@ namespace ttk {
                 uint8_t *row = pixels + (static_cast<size_t>(y) * static_cast<size_t>(stride));
                 uint16_t *sums = prefix.data() + lead;
 
-#ifdef TTK_BLUR_SSE2
-                const __m128i zero = _mm_setzero_si128();
-                __m128i carry = zero;
+#ifdef TTK_BLUR_SIMD
+                V carry = Lane::zero();
 
-                for (int x = 0; x < width; x += 8) {
-                    const __m128i bytes = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(row + x));
-                    const __m128i v = _mm_add_epi16(scan(_mm_unpacklo_epi8(bytes, zero)), carry);
+                for (int x = 0; x < width; x += Lane::WORDS) {
+                    const V v = Lane::add(Lane::scan(Lane::widen(row + x)), carry);
 
-                    _mm_storeu_si128(reinterpret_cast<__m128i *>(sums + x), v);
+                    Lane::store(sums + x, v);
 
-                    carry = _mm_shuffle_epi32(_mm_shufflehi_epi16(v, 0xff), 0xff);
+                    carry = Lane::last(v);
                 }
 #else
                 uint16_t running = 0;
@@ -123,20 +229,17 @@ namespace ttk {
 
                 const uint16_t total = sums[width - 1];
 
-                for (auto at = static_cast<size_t>(width); at < static_cast<size_t>(stride) + span + 8; ++at) {
+                for (auto at = static_cast<size_t>(width); at < static_cast<size_t>(stride) + span + Lane::WORDS; ++at) {
                     sums[at] = total;
                 }
 
-#ifdef TTK_BLUR_SSE2
+#ifdef TTK_BLUR_SIMD
                 const Divider d = divider(span);
 
-                for (int x = 0; x < width; x += 8) {
-                    const __m128i sum = _mm_sub_epi16(
-                        _mm_loadu_si128(reinterpret_cast<const __m128i *>(prefix.data() + x + span)),
-                        _mm_loadu_si128(reinterpret_cast<const __m128i *>(prefix.data() + x)));
-                    const __m128i q = divide(sum, d);
+                for (int x = 0; x < width; x += Lane::WORDS) {
+                    const V sum = Lane::sub(Lane::load(prefix.data() + x + span), Lane::load(prefix.data() + x));
 
-                    _mm_storel_epi64(reinterpret_cast<__m128i *>(row + x), _mm_packus_epi16(q, q));
+                    Lane::narrow(row + x, divide(sum, d));
                 }
 #else
                 for (int x = 0; x < width; ++x) {
@@ -157,26 +260,25 @@ namespace ttk {
                 return from + (static_cast<size_t>(y) * static_cast<size_t>(stride));
             };
 
-#ifdef TTK_BLUR_SSE2
+#ifdef TTK_BLUR_SIMD
             const Divider d = divider(span);
-            const __m128i zero = _mm_setzero_si128();
 
             for (int x = 0; x < stride; x += LANES) {
-                __m128i lo = zero;
-                __m128i hi = zero;
+                V lo = Lane::zero();
+                V hi = Lane::zero();
 
                 const auto add = [&](const int y) {
-                    const __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i *>(row(y) + x));
+                    const V v = Lane::load(row(y) + x);
 
-                    lo = _mm_add_epi16(lo, _mm_unpacklo_epi8(v, zero));
-                    hi = _mm_add_epi16(hi, _mm_unpackhi_epi8(v, zero));
+                    lo = Lane::add(lo, Lane::lo(v));
+                    hi = Lane::add(hi, Lane::hi(v));
                 };
 
                 const auto drop = [&](const int y) {
-                    const __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i *>(row(y) + x));
+                    const V v = Lane::load(row(y) + x);
 
-                    lo = _mm_sub_epi16(lo, _mm_unpacklo_epi8(v, zero));
-                    hi = _mm_sub_epi16(hi, _mm_unpackhi_epi8(v, zero));
+                    lo = Lane::sub(lo, Lane::lo(v));
+                    hi = Lane::sub(hi, Lane::hi(v));
                 };
 
                 for (int y = 0; y <= radius && y < height; ++y) {
@@ -184,8 +286,7 @@ namespace ttk {
                 }
 
                 for (int y = 0; y < height; ++y) {
-                    _mm_storeu_si128(reinterpret_cast<__m128i *>(to + (static_cast<size_t>(y) * stride) + x),
-                                     _mm_packus_epi16(divide(lo, d), divide(hi, d)));
+                    Lane::store(to + (static_cast<size_t>(y) * stride) + x, Lane::pack(divide(lo, d), divide(hi, d)));
 
                     if (y + radius + 1 < height) {
                         add(y + radius + 1);
@@ -227,28 +328,30 @@ namespace ttk {
 #endif
         }
 
-#ifdef TTK_BLUR_SSE2
-        // Eight coverages to the tint premultiplied by each, as the sprite is.
+#ifdef TTK_BLUR_SIMD
+        // A vector of coverages to the tint premultiplied by each, as the sprite is.
         void tint_row(uint32_t *line, const uint8_t *cover, const int width, const BLRgba32 tint) {
-            const __m128i zero = _mm_setzero_si128();
-            const __m128i alpha = _mm_set1_epi16(static_cast<short>(tint.value >> 24U));
-            const __m128i red = _mm_set1_epi16(static_cast<short>((tint.value >> 16U) & 0xffU));
-            const __m128i green = _mm_set1_epi16(static_cast<short>((tint.value >> 8U) & 0xffU));
-            const __m128i blue = _mm_set1_epi16(static_cast<short>(tint.value & 0xffU));
+            const V zero = Lane::zero();
+            const V alpha = Lane::set1(static_cast<short>(tint.value >> 24U));
+            const V red = Lane::set1(static_cast<short>((tint.value >> 16U) & 0xffU));
+            const V green = Lane::set1(static_cast<short>((tint.value >> 8U) & 0xffU));
+            const V blue = Lane::set1(static_cast<short>(tint.value & 0xffU));
 
-            for (int x = 0; x < width; x += 8) {
-                const __m128i c = _mm_unpacklo_epi8(
-                    _mm_loadl_epi64(reinterpret_cast<const __m128i *>(cover + x)), zero);
-                const __m128i solid = div255(_mm_mullo_epi16(c, alpha));
-                const __m128i r = div255(_mm_mullo_epi16(solid, red));
-                const __m128i g = div255(_mm_mullo_epi16(solid, green));
-                const __m128i b = div255(_mm_mullo_epi16(solid, blue));
+            for (int x = 0; x < width; x += Lane::WORDS) {
+                const V solid = div255(Lane::mullo(Lane::widen(cover + x), alpha));
+                const V r = div255(Lane::mullo(solid, red));
+                const V g = div255(Lane::mullo(solid, green));
+                const V b = div255(Lane::mullo(solid, blue));
 
-                const __m128i bg = _mm_unpacklo_epi8(_mm_packus_epi16(b, zero), _mm_packus_epi16(g, zero));
-                const __m128i ra = _mm_unpacklo_epi8(_mm_packus_epi16(r, zero), _mm_packus_epi16(solid, zero));
+                const V bg = Lane::zip8(Lane::pack(b, zero), Lane::pack(g, zero));
+                const V ra = Lane::zip8(Lane::pack(r, zero), Lane::pack(solid, zero));
 
-                _mm_storeu_si128(reinterpret_cast<__m128i *>(line + x), _mm_unpacklo_epi16(bg, ra));
-                _mm_storeu_si128(reinterpret_cast<__m128i *>(line + x + 4), _mm_unpackhi_epi16(bg, ra));
+                V first = Lane::zip16lo(bg, ra);
+                V second = Lane::zip16hi(bg, ra);
+
+                Lane::order(first, second);
+                Lane::store(line + x, first);
+                Lane::store(line + x + (Lane::WORDS / 2), second);
             }
         }
 #else
@@ -361,10 +464,10 @@ namespace ttk {
             std::swap(blurred, spare);
         }
 
-#ifdef TTK_BLUR_SSE2
+#ifdef TTK_BLUR_SIMD
         // The sprite's rows are exactly as wide as asked, so the last few pixels of
         // one go through a vector of their own.
-        const int whole = across & ~7;
+        const int whole = across & ~(Lane::WORDS - 1);
 #else
         const std::array<uint32_t, 256> tone = tone_of(tint);
 #endif
@@ -374,13 +477,13 @@ namespace ttk {
                                                       + (static_cast<ptrdiff_t>(y) * data.stride));
             const uint8_t *from = blurred + (static_cast<size_t>(y) * static_cast<size_t>(stride));
 
-#ifdef TTK_BLUR_SSE2
+#ifdef TTK_BLUR_SIMD
             tint_row(line, from, whole, tint);
 
             if (whole < across) {
-                alignas(16) uint32_t tail[8];
+                alignas(32) uint32_t tail[Lane::WORDS];
 
-                tint_row(tail, from + whole, 8, tint);
+                tint_row(tail, from + whole, Lane::WORDS, tint);
                 std::memcpy(line + whole, tail, static_cast<size_t>(across - whole) * sizeof(uint32_t));
             }
 #else

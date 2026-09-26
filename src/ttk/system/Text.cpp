@@ -7,8 +7,19 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <bit>
 #include <charconv>
+#include <cstdint>
 #include <ranges>
+
+#ifdef __AVX2__
+#include <immintrin.h>
+#define TTK_TEXT_AVX2
+#define TTK_TEXT_SIMD
+#elif defined(__SSE2__) || defined(_M_X64)
+#include <emmintrin.h>
+#define TTK_TEXT_SIMD
+#endif
 
 #include "ttk/system/Env.h"
 #include "ttk/system/Text.h"
@@ -35,6 +46,40 @@ namespace ttk {
                 || (value >= 'a' && value <= 'z')
                 || (value >= 'A' && value <= 'Z');
         }
+
+        bool is_continuation(const char value) {
+            return (static_cast<unsigned char>(value) & 0xc0U) == 0x80U;
+        }
+
+#ifdef TTK_TEXT_SIMD
+        // The scans below go a vector at a time: thirty two bytes under AVX2 and
+        // sixteen under SSE2, with the bits of a byte comparison read as a mask.
+        struct Bytes {
+#ifdef TTK_TEXT_AVX2
+            using V = __m256i;
+
+            static constexpr size_t WIDE = 32;
+
+            static V load(const char *at) { return _mm256_loadu_si256(reinterpret_cast<const V *>(at)); }
+            static V set1(const char value) { return _mm256_set1_epi8(value); }
+            static V both(const V a, const V b) { return _mm256_and_si256(a, b); }
+            static V either(const V a, const V b) { return _mm256_or_si256(a, b); }
+            static V equal(const V a, const V b) { return _mm256_cmpeq_epi8(a, b); }
+            static std::uint32_t bits(const V v) { return static_cast<std::uint32_t>(_mm256_movemask_epi8(v)); }
+#else
+            using V = __m128i;
+
+            static constexpr size_t WIDE = 16;
+
+            static V load(const char *at) { return _mm_loadu_si128(reinterpret_cast<const V *>(at)); }
+            static V set1(const char value) { return _mm_set1_epi8(value); }
+            static V both(const V a, const V b) { return _mm_and_si128(a, b); }
+            static V either(const V a, const V b) { return _mm_or_si128(a, b); }
+            static V equal(const V a, const V b) { return _mm_cmpeq_epi8(a, b); }
+            static std::uint32_t bits(const V v) { return static_cast<std::uint32_t>(_mm_movemask_epi8(v)); }
+#endif
+        };
+#endif
 
     }
 
@@ -172,6 +217,93 @@ namespace ttk {
             }
 
             return ri < right.size();
+        }
+
+        size_t characters(const std::string_view value) {
+            size_t continuations = 0;
+            size_t at = 0;
+
+#ifdef TTK_TEXT_SIMD
+            const Bytes::V high = Bytes::set1(static_cast<char>(0xc0));
+            const Bytes::V lead = Bytes::set1(static_cast<char>(0x80));
+
+            for (; at + Bytes::WIDE <= value.size(); at += Bytes::WIDE) {
+                const Bytes::V v = Bytes::load(value.data() + at);
+
+                continuations += static_cast<size_t>(std::popcount(Bytes::bits(Bytes::equal(Bytes::both(v, high), lead))));
+            }
+
+            // The rest through one vector over the end, its bits shifted past what
+            // the loop already counted.
+            if (at < value.size() && value.size() >= Bytes::WIDE) {
+                const Bytes::V v = Bytes::load(value.data() + value.size() - Bytes::WIDE);
+                const std::uint32_t found = Bytes::bits(Bytes::equal(Bytes::both(v, high), lead));
+
+                continuations += static_cast<size_t>(std::popcount(found >> (Bytes::WIDE - (value.size() - at))));
+                at = value.size();
+            }
+#endif
+
+            for (; at < value.size(); ++at) {
+                continuations += is_continuation(value[at]) ? 1 : 0;
+            }
+
+            return value.size() - continuations;
+        }
+
+        bool simple(const std::string_view value) {
+            size_t at = 0;
+
+#ifdef TTK_TEXT_SIMD
+            const Bytes::V tab = Bytes::set1('\t');
+
+            for (; at + Bytes::WIDE <= value.size(); at += Bytes::WIDE) {
+                const Bytes::V v = Bytes::load(value.data() + at);
+
+                if (Bytes::bits(Bytes::either(v, Bytes::equal(v, tab))) != 0) {
+                    return false;
+                }
+            }
+
+            // The rest through one vector over the end: a byte seen twice changes nothing.
+            if (at < value.size() && value.size() >= Bytes::WIDE) {
+                const Bytes::V v = Bytes::load(value.data() + value.size() - Bytes::WIDE);
+
+                return Bytes::bits(Bytes::either(v, Bytes::equal(v, tab))) == 0;
+            }
+#endif
+
+            for (; at < value.size(); ++at) {
+                if (value[at] == '\t' || static_cast<unsigned char>(value[at]) >= 0x80U) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        size_t last_of(const std::string_view value, const char letter) {
+            size_t end = value.size();
+
+#ifdef TTK_TEXT_SIMD
+            const Bytes::V wanted = Bytes::set1(letter);
+
+            for (; end >= Bytes::WIDE; end -= Bytes::WIDE) {
+                const std::uint32_t found = Bytes::bits(Bytes::equal(Bytes::load(value.data() + end - Bytes::WIDE), wanted));
+
+                if (found != 0) {
+                    return end - Bytes::WIDE + static_cast<size_t>(std::bit_width(found)) - 1;
+                }
+            }
+#endif
+
+            for (; end > 0; --end) {
+                if (value[end - 1] == letter) {
+                    return end - 1;
+                }
+            }
+
+            return std::string_view::npos;
         }
 
         std::vector<std::string> parse_arguments(const std::string_view line) {

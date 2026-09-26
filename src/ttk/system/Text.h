@@ -38,6 +38,15 @@ namespace ttk::Text {
     // After David Koelle's Alphanum Algorithm (MIT), http://www.davekoelle.com/alphanum.html
     [[nodiscard]] bool natural_less(std::string_view left, std::string_view right);
 
+    // How many characters `value` holds, with a UTF-8 sequence counting as one.
+    [[nodiscard]] size_t characters(std::string_view value);
+
+    // True when every byte of `value` takes one column: ASCII, and no tab.
+    [[nodiscard]] bool simple(std::string_view value);
+
+    // The last `letter` in `value`, or npos.
+    [[nodiscard]] size_t last_of(std::string_view value, char letter);
+
     [[nodiscard]] std::vector<std::string> parse_arguments(std::string_view line);
 
     [[nodiscard]] std::string quote_argument(std::string_view argument);

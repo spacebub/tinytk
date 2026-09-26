@@ -136,6 +136,8 @@ namespace ttk {
         // A column counts from the start of the line, and a row's base is where it
         // starts counting from.
         [[nodiscard]] size_t column_of(size_t offset) const;
+        // The columns from `start`, the beginning of its line, up to `offset`.
+        [[nodiscard]] size_t columns_from(size_t start, size_t offset) const;
         [[nodiscard]] size_t base_of(size_t row) const;
         [[nodiscard]] size_t offset_at(size_t row, size_t column) const;
 

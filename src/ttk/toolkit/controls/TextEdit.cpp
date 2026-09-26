@@ -13,6 +13,7 @@
 #include "ttk/draw/Theme.h"
 #include "ttk/draw/Typeface.h"
 #include "ttk/toolkit/Root.h"
+#include "ttk/system/Text.h"
 #include "ttk/toolkit/controls/TextEdit.h"
 #include "ttk/util/Clipboard.h"
 
@@ -133,17 +134,15 @@ namespace ttk {
     void TextEdit::reindex() {
         _starts.assign(1, 0);
 
-        for (size_t at = 0; at < _text.size(); ++at) {
-            if (_text[at] == '\n') {
-                _starts.push_back(at + 1);
-            }
+        for (size_t at = _text.find('\n'); at != std::string::npos; at = _text.find('\n', at + 1)) {
+            _starts.push_back(at + 1);
         }
 
         _columns.resize(_starts.size());
         _widest = 0;
 
         for (size_t line = 0; line < line_count(); ++line) {
-            _columns[line] = column_of(line_end(line));
+            _columns[line] = columns_from(_starts[line], line_end(line));
             _widest = std::max(_widest, _columns[line]);
         }
 
@@ -185,12 +184,11 @@ namespace ttk {
 
         size_t added = 0;
 
-        for (size_t at = from; at < from + came; ++at) {
-            if (_text[at] == '\n') {
-                _starts.insert(_starts.begin() + static_cast<std::ptrdiff_t>(lowLine + added), at + 1);
-                _columns.insert(_columns.begin() + static_cast<std::ptrdiff_t>(lowLine + added), 0);
-                ++added;
-            }
+        for (size_t at = _text.find('\n', from); at != std::string::npos && at < from + came;
+             at = _text.find('\n', at + 1)) {
+            _starts.insert(_starts.begin() + static_cast<std::ptrdiff_t>(lowLine + added), at + 1);
+            _columns.insert(_columns.begin() + static_cast<std::ptrdiff_t>(lowLine + added), 0);
+            ++added;
         }
 
         widen(first, first + added, shrank);
@@ -208,7 +206,7 @@ namespace ttk {
         size_t widest = 0;
 
         for (size_t line = fromLine; line <= toLine; ++line) {
-            _columns[line] = column_of(line_end(line));
+            _columns[line] = columns_from(_starts[line], line_end(line));
             widest = std::max(widest, _columns[line]);
         }
 
@@ -236,6 +234,23 @@ namespace ttk {
         into.push_back(start);
 
         if (!_wrapped || _fit == 0) {
+            return;
+        }
+
+        // A line of plain ASCII with no tab has a column per byte, so each row is
+        // cut at the last space inside its width, or at its width, with nothing
+        // walked in between.
+        const std::string_view text = _text;
+
+        if (Text::simple(text.substr(start, end - start))) {
+            for (size_t at = start; end - at > _fit;) {
+                const size_t space = Text::last_of(text.substr(at, _fit), ' ');
+
+                at = space == std::string_view::npos ? at + _fit : at + space + 1;
+
+                into.push_back(at);
+            }
+
             return;
         }
 
@@ -319,9 +334,19 @@ namespace ttk {
     }
 
     size_t TextEdit::column_of(const size_t offset) const {
+        return columns_from(_starts[line_of(offset)], offset);
+    }
+
+    size_t TextEdit::columns_from(const size_t start, const size_t offset) const {
+        const std::string_view run = std::string_view(_text).substr(start, offset - start);
+
+        if (!run.contains('\t')) {
+            return Text::characters(run);
+        }
+
         size_t column = 0;
 
-        for (size_t at = _starts[line_of(offset)]; at < offset; ++at) {
+        for (size_t at = start; at < offset; ++at) {
             if (_text[at] == '\t') {
                 column = ((column / TAB) + 1) * TAB;
             } else if (!is_continuation(_text[at])) {
@@ -357,11 +382,20 @@ namespace ttk {
     }
 
     const std::string &TextEdit::expand(const size_t row) {
+        const size_t begin = _rowStarts[row];
+        const size_t end = row_end(row);
+
+        if (!std::string_view(_text).substr(begin, end - begin).contains('\t')) {
+            _shown.assign(_text, begin, end - begin);
+
+            return _shown;
+        }
+
         size_t column = base_of(row);
 
         _shown.clear();
 
-        for (size_t at = _rowStarts[row], end = row_end(row); at < end; ++at) {
+        for (size_t at = begin; at < end; ++at) {
             if (_text[at] == '\t') {
                 const size_t next = ((column / TAB) + 1) * TAB;
 
