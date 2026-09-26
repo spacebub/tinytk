@@ -58,9 +58,9 @@ namespace ttk::Json {
         }
     }
 
-    yyjson_val *obj_get(yyjson_val  const*obj, const char *key);
+    yyjson_val *obj_get(yyjson_val *obj, const char *key);
     std::string obj_get_string(yyjson_val *obj, const char *key, const std::string &def = {});
-    int obj_get_int(yyjson_val  const*obj, const char *key, int def = 0);
+    int obj_get_int(yyjson_val *obj, const char *key, int def = 0);
 
     class Doc {
     public:
