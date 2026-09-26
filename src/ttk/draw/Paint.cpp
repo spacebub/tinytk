@@ -9,9 +9,16 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <map>
 #include <tuple>
 #include <vector>
+
+#if defined(__SSE2__) || defined(_M_X64)
+#include <emmintrin.h>
+#define TTK_BLUR_SSE2
+#endif
 
 #include "ttk/draw/Paint.h"
 
@@ -27,62 +34,224 @@ namespace ttk {
         }
 
         // Three box passes approximate a Gaussian closely enough that nothing here can
-        // tell the difference. This is the usual width for one of them.
+        // tell the difference. This is the usual radius for one of them, capped where a
+        // window's sum would no longer fit sixteen bits.
         int box_of(const double blur) {
-            const int width = static_cast<int>(std::lround(sigma_of(blur) * 1.88));
+            const int radius = static_cast<int>(std::lround(sigma_of(blur) * 1.88));
 
-            return std::max(1, width);
+            return std::clamp(radius, 1, 127);
         }
 
-        // One horizontal box pass over the coverage, using a running sum so the cost does
-        // not depend on the radius. Vertical is the same pass over a transposed copy,
-        // which keeps this to one loop rather than two nearly identical ones.
-        void blur_rows(std::vector<uint8_t> &cover, const int width, const int height,
-                      const int radius) {
-            if (radius < 1) {
-                return;
-            }
+        // Rows of coverage are this many bytes across, so every pass reads and writes
+        // whole vectors.
+        constexpr int LANES = 16;
 
+#ifdef TTK_BLUR_SSE2
+        // floor(x / span) over eight lanes, exact for x up to 255 * span: the magic
+        // quotient is at most one too high, and multiplying back finds when.
+        struct Divider {
+            __m128i magic;
+            __m128i span;
+            __m128i one;
+        };
+
+        Divider divider(const int span) {
+            return {.magic = _mm_set1_epi16(static_cast<short>((65536 + span - 1) / span)),
+                    .span = _mm_set1_epi16(static_cast<short>(span)),
+                    .one = _mm_set1_epi16(1)};
+        }
+
+        __m128i divide(const __m128i x, const Divider &d) {
+            const __m128i q = _mm_mulhi_epu16(x, d.magic);
+            const __m128i back = _mm_mullo_epi16(q, d.span);
+            const __m128i over = _mm_subs_epu16(back, x);
+            const __m128i fine = _mm_cmpeq_epi16(over, _mm_setzero_si128());
+
+            return _mm_sub_epi16(q, _mm_andnot_si128(fine, d.one));
+        }
+
+        // floor(x / 255) over eight lanes, exact for x up to 255 * 255.
+        __m128i div255(const __m128i x) {
+            return _mm_srli_epi16(_mm_mulhi_epu16(x, _mm_set1_epi16(-32639)), 7);
+        }
+
+        // Inclusive prefix sums of eight lanes, wrapping.
+        __m128i scan(__m128i v) {
+            v = _mm_add_epi16(v, _mm_slli_si128(v, 2));
+            v = _mm_add_epi16(v, _mm_slli_si128(v, 4));
+            v = _mm_add_epi16(v, _mm_slli_si128(v, 8));
+
+            return v;
+        }
+#endif
+
+        // One horizontal box pass, in place. Each output is the difference of two
+        // prefix sums, so the cost does not depend on the radius, and the sums wrap at
+        // sixteen bits since a window never holds more than 255 * span. Past either
+        // edge the window reads zero: the sprite is transparent there.
+        void blur_across(uint8_t *pixels, const int stride, const int width, const int height,
+                         const int radius, std::vector<uint16_t> &prefix) {
+            const int span = (radius * 2) + 1;
+            const size_t lead = static_cast<size_t>(radius) + 1;
+
+            prefix.assign(lead + static_cast<size_t>(stride) + static_cast<size_t>(span) + LANES, 0);
+
+            for (int y = 0; y < height; ++y) {
+                uint8_t *row = pixels + (static_cast<size_t>(y) * static_cast<size_t>(stride));
+                uint16_t *sums = prefix.data() + lead;
+
+#ifdef TTK_BLUR_SSE2
+                const __m128i zero = _mm_setzero_si128();
+                __m128i carry = zero;
+
+                for (int x = 0; x < width; x += 8) {
+                    const __m128i bytes = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(row + x));
+                    const __m128i v = _mm_add_epi16(scan(_mm_unpacklo_epi8(bytes, zero)), carry);
+
+                    _mm_storeu_si128(reinterpret_cast<__m128i *>(sums + x), v);
+
+                    carry = _mm_shuffle_epi32(_mm_shufflehi_epi16(v, 0xff), 0xff);
+                }
+#else
+                uint16_t running = 0;
+
+                for (int x = 0; x < width; ++x) {
+                    running = static_cast<uint16_t>(running + row[x]);
+                    sums[x] = running;
+                }
+#endif
+
+                const uint16_t total = sums[width - 1];
+
+                for (auto at = static_cast<size_t>(width); at < static_cast<size_t>(stride) + span + 8; ++at) {
+                    sums[at] = total;
+                }
+
+#ifdef TTK_BLUR_SSE2
+                const Divider d = divider(span);
+
+                for (int x = 0; x < width; x += 8) {
+                    const __m128i sum = _mm_sub_epi16(
+                        _mm_loadu_si128(reinterpret_cast<const __m128i *>(prefix.data() + x + span)),
+                        _mm_loadu_si128(reinterpret_cast<const __m128i *>(prefix.data() + x)));
+                    const __m128i q = divide(sum, d);
+
+                    _mm_storel_epi64(reinterpret_cast<__m128i *>(row + x), _mm_packus_epi16(q, q));
+                }
+#else
+                for (int x = 0; x < width; ++x) {
+                    const auto sum = static_cast<uint16_t>(prefix[static_cast<size_t>(x) + span] - prefix[x]);
+
+                    row[x] = static_cast<uint8_t>(sum / span);
+                }
+#endif
+            }
+        }
+
+        // One vertical box pass, `from` to `to`, with a running sum per column.
+        void blur_down(const uint8_t *from, uint8_t *to, const int stride, const int height,
+                       const int radius) {
             const int span = (radius * 2) + 1;
 
-            // 2^31/span rounded up, which divides exactly for every sum a row can reach.
-            const auto over = static_cast<uint64_t>(((1ULL << 31) + span - 1) / span);
+            const auto row = [&](const int y) {
+                return from + (static_cast<size_t>(y) * static_cast<size_t>(stride));
+            };
 
-            std::vector<uint8_t> row(static_cast<size_t>(width));
+#ifdef TTK_BLUR_SSE2
+            const Divider d = divider(span);
+            const __m128i zero = _mm_setzero_si128();
 
-            for (int y = 0; y < height; ++y) {
-                uint8_t *line = cover.data() + (static_cast<size_t>(y) * width);
+            for (int x = 0; x < stride; x += LANES) {
+                __m128i lo = zero;
+                __m128i hi = zero;
 
-                std::copy_n(line, width, row.begin());
+                const auto add = [&](const int y) {
+                    const __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i *>(row(y) + x));
 
-                int sum = 0;
+                    lo = _mm_add_epi16(lo, _mm_unpacklo_epi8(v, zero));
+                    hi = _mm_add_epi16(hi, _mm_unpackhi_epi8(v, zero));
+                };
 
-                // The window starts hanging off the left edge, where every sample is the
-                // first pixel. The sprite is transparent there, so this is also zero.
-                for (int at = -radius; at <= radius; ++at) {
-                    sum += row[static_cast<size_t>(std::clamp(at, 0, width - 1))];
+                const auto drop = [&](const int y) {
+                    const __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i *>(row(y) + x));
+
+                    lo = _mm_sub_epi16(lo, _mm_unpacklo_epi8(v, zero));
+                    hi = _mm_sub_epi16(hi, _mm_unpackhi_epi8(v, zero));
+                };
+
+                for (int y = 0; y <= radius && y < height; ++y) {
+                    add(y);
                 }
 
-                for (int x = 0; x < width; ++x) {
-                    line[x] = static_cast<uint8_t>((static_cast<uint64_t>(sum) * over) >> 31);
+                for (int y = 0; y < height; ++y) {
+                    _mm_storeu_si128(reinterpret_cast<__m128i *>(to + (static_cast<size_t>(y) * stride) + x),
+                                     _mm_packus_epi16(divide(lo, d), divide(hi, d)));
 
-                    sum += row[static_cast<size_t>(std::clamp(x + radius + 1, 0, width - 1))]
-                        - row[static_cast<size_t>(std::clamp(x - radius, 0, width - 1))];
+                    if (y + radius + 1 < height) {
+                        add(y + radius + 1);
+                    }
+
+                    if (y - radius >= 0) {
+                        drop(y - radius);
+                    }
                 }
             }
-        }
+#else
+            std::vector<uint32_t> sums(static_cast<size_t>(stride), 0);
 
-        void transpose(const std::vector<uint8_t> &from, std::vector<uint8_t> &to, const int width,
-                       const int height) {
-            to.resize(from.size());
-
-            for (int y = 0; y < height; ++y) {
-                for (int x = 0; x < width; ++x) {
-                    to[(static_cast<size_t>(x) * height) + y] = from[(static_cast<size_t>(y) * width) + x];
+            for (int y = 0; y <= radius && y < height; ++y) {
+                for (int x = 0; x < stride; ++x) {
+                    sums[x] += row(y)[x];
                 }
             }
+
+            for (int y = 0; y < height; ++y) {
+                uint8_t *line = to + (static_cast<size_t>(y) * static_cast<size_t>(stride));
+
+                for (int x = 0; x < stride; ++x) {
+                    line[x] = static_cast<uint8_t>(sums[x] / static_cast<uint32_t>(span));
+                }
+
+                if (y + radius + 1 < height) {
+                    for (int x = 0; x < stride; ++x) {
+                        sums[x] += row(y + radius + 1)[x];
+                    }
+                }
+
+                if (y - radius >= 0) {
+                    for (int x = 0; x < stride; ++x) {
+                        sums[x] -= row(y - radius)[x];
+                    }
+                }
+            }
+#endif
         }
 
+#ifdef TTK_BLUR_SSE2
+        // Eight coverages to the tint premultiplied by each, as the sprite is.
+        void tint_row(uint32_t *line, const uint8_t *cover, const int width, const BLRgba32 tint) {
+            const __m128i zero = _mm_setzero_si128();
+            const __m128i alpha = _mm_set1_epi16(static_cast<short>(tint.value >> 24U));
+            const __m128i red = _mm_set1_epi16(static_cast<short>((tint.value >> 16U) & 0xffU));
+            const __m128i green = _mm_set1_epi16(static_cast<short>((tint.value >> 8U) & 0xffU));
+            const __m128i blue = _mm_set1_epi16(static_cast<short>(tint.value & 0xffU));
+
+            for (int x = 0; x < width; x += 8) {
+                const __m128i c = _mm_unpacklo_epi8(
+                    _mm_loadl_epi64(reinterpret_cast<const __m128i *>(cover + x)), zero);
+                const __m128i solid = div255(_mm_mullo_epi16(c, alpha));
+                const __m128i r = div255(_mm_mullo_epi16(solid, red));
+                const __m128i g = div255(_mm_mullo_epi16(solid, green));
+                const __m128i b = div255(_mm_mullo_epi16(solid, blue));
+
+                const __m128i bg = _mm_unpacklo_epi8(_mm_packus_epi16(b, zero), _mm_packus_epi16(g, zero));
+                const __m128i ra = _mm_unpacklo_epi8(_mm_packus_epi16(r, zero), _mm_packus_epi16(solid, zero));
+
+                _mm_storeu_si128(reinterpret_cast<__m128i *>(line + x), _mm_unpacklo_epi16(bg, ra));
+                _mm_storeu_si128(reinterpret_cast<__m128i *>(line + x + 4), _mm_unpackhi_epi16(bg, ra));
+            }
+        }
+#else
         // The tint at every coverage the blur can leave, premultiplied as the sprite is.
         std::array<uint32_t, 256> tone_of(const BLRgba32 tint) {
             const uint32_t alpha = tint.value >> 24U;
@@ -101,6 +270,7 @@ namespace ttk {
 
             return made;
         }
+#endif
 
         using Shape = std::tuple<int, int, int, int, uint32_t>;
 
@@ -168,37 +338,56 @@ namespace ttk {
             return nothing();
         }
 
-        // Blend2D rows may be padded, so the blur works on a packed copy.
-        std::vector<uint8_t> cover(static_cast<size_t>(across) * down);
+        // Packed copies with rows padded to a vector. The vertical pass reads rows it
+        // has already written, so it goes from one to the other.
+        const int stride = ((across + LANES - 1) / LANES) * LANES;
+        std::vector<uint8_t> cover(static_cast<size_t>(stride) * static_cast<size_t>(down));
+        std::vector<uint8_t> other(cover.size());
 
         for (int y = 0; y < down; ++y) {
-            const auto *line = static_cast<const uint8_t *>(held.pixel_data)
-                + (static_cast<ptrdiff_t>(y) * held.stride);
-
-            std::copy_n(line, across, cover.begin() + (static_cast<ptrdiff_t>(y) * across));
+            std::memcpy(cover.data() + (static_cast<size_t>(y) * static_cast<size_t>(stride)),
+                        static_cast<const uint8_t *>(held.pixel_data) + (static_cast<ptrdiff_t>(y) * held.stride),
+                        static_cast<size_t>(across));
         }
 
         const int box = box_of(blur);
-        std::vector<uint8_t> turned;
+        std::vector<uint16_t> prefix;
+        uint8_t *blurred = cover.data();
+        uint8_t *spare = other.data();
 
         for (int pass = 0; pass < 3; ++pass) {
-            blur_rows(cover, across, down, box);
-
-            transpose(cover, turned, across, down);
-            blur_rows(turned, down, across, box);
-            transpose(turned, cover, down, across);
+            blur_across(blurred, stride, across, down, box, prefix);
+            blur_down(blurred, spare, stride, down, box);
+            std::swap(blurred, spare);
         }
 
+#ifdef TTK_BLUR_SSE2
+        // The sprite's rows are exactly as wide as asked, so the last few pixels of
+        // one go through a vector of their own.
+        const int whole = across & ~7;
+#else
         const std::array<uint32_t, 256> tone = tone_of(tint);
+#endif
 
         for (int y = 0; y < down; ++y) {
             auto *line = reinterpret_cast<uint32_t *>(static_cast<uint8_t *>(data.pixel_data)
                                                       + (static_cast<ptrdiff_t>(y) * data.stride));
-            const uint8_t *from = cover.data() + (static_cast<size_t>(y) * across);
+            const uint8_t *from = blurred + (static_cast<size_t>(y) * static_cast<size_t>(stride));
 
+#ifdef TTK_BLUR_SSE2
+            tint_row(line, from, whole, tint);
+
+            if (whole < across) {
+                alignas(16) uint32_t tail[8];
+
+                tint_row(tail, from + whole, 8, tint);
+                std::memcpy(line + whole, tail, static_cast<size_t>(across - whole) * sizeof(uint32_t));
+            }
+#else
             for (int x = 0; x < across; ++x) {
                 line[x] = tone[from[x]];
             }
+#endif
         }
 
         return sprites.emplace(shape, std::move(sprite)).first->second;

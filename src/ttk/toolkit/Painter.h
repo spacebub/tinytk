@@ -109,6 +109,9 @@ namespace ttk {
 
         mutable BLRectI _clip;
         mutable std::vector<BLRectI> _held;
+
+        // Kept between outlines, so one allocates nothing.
+        mutable BLPath _ring;
     };
 }
 

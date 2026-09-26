@@ -28,7 +28,7 @@ if (MSVC)
             "/WX"
             "/MP"
             "/GS"
-            "$<$<CONFIG:RELEASE>:/O1;/GL;/Gw;/Gy>")
+            "$<$<CONFIG:RELEASE>:/O2;/GL;/Gw;/Gy>")
 else ()
     set(TTK_COMPILE_FLAGS
             "-Wall"
@@ -37,7 +37,7 @@ else ()
             "-Wpedantic"
             "-fstack-protector-strong"
             "$<$<CONFIG:DEBUG>:-Og>"
-            "$<$<CONFIG:RELEASE>:-Os;-ffunction-sections;-fdata-sections;-fvisibility=hidden>")
+            "$<$<CONFIG:RELEASE>:-O2;-ffunction-sections;-fdata-sections;-fvisibility=hidden>")
 
     if (NOT APPLE)
         list(APPEND TTK_COMPILE_FLAGS "$<$<CONFIG:RELEASE>:-fno-plt>")

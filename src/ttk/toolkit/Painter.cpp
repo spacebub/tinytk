@@ -27,7 +27,7 @@ namespace ttk {
             size_t used = 0;
         };
 
-        std::unordered_map<std::string, Folded> folds;
+        Cache::RunMap<Folded> folds;
         size_t asked = 0;
 
         std::vector<Fold> fold_once(Typeface &type, const BLFont &font, std::string_view run,
@@ -39,25 +39,18 @@ namespace ttk {
                                        const double room) {
         Cache::evict_oldest(folds, KEPT);
 
-        const auto face = reinterpret_cast<std::uintptr_t>(&font);
-        const auto wide = static_cast<int>(std::lround(room * 4.0));
+        auto [held, fresh] = Cache::run_entry(
+            folds, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
+                                  .at = std::lround(room * 4.0),
+                                  .run = run});
 
-        std::string key;
-
-        key.reserve(sizeof(face) + sizeof(wide) + run.size());
-        key.append(reinterpret_cast<const char *>(&face), sizeof(face));
-        key.append(reinterpret_cast<const char *>(&wide), sizeof(wide));
-        key.append(run);
-
-        const auto [held, fresh] = folds.try_emplace(std::move(key));
-
-        held->second.used = ++asked;
+        held.used = ++asked;
 
         if (fresh) {
-            held->second.lines = fold_once(type, font, run, room);
+            held.lines = fold_once(type, font, run, room);
         }
 
-        return held->second.lines;
+        return held.lines;
     }
 
     namespace {
@@ -81,14 +74,14 @@ namespace ttk {
                 used = 0.0;
             };
 
-            const double gap = type.width_once(font, " ");
+            const double gap = type.width_word(font, " ");
             size_t at = 0;
 
             while (at <= run.size()) {
                 const size_t space = run.find_first_of(" \n", at);
                 const std::string_view word = run.substr(at, space == std::string_view::npos
                     ? std::string_view::npos : space - at);
-                const double wide = type.width_once(font, word);
+                const double wide = type.width_word(font, word);
 
                 if (line.empty()) {
                     from = at;
@@ -216,13 +209,19 @@ namespace ttk {
         const double corner = std::max(0.0, std::min(radius - (width / 2.0),
                                                      std::min(inset.w, inset.h) / 2.0));
 
-        _context.set_stroke_width(width);
+        // Filled as the ring between the outer and the inner rounded rectangle, the
+        // inner wound the other way, which lands on the pixels a stroke would and
+        // measures a third cheaper.
+        const double outer = corner > 0.0 ? corner + (width / 2.0) : 0.0;
+        const double inner = corner > 0.0 ? std::max(0.0, corner - (width / 2.0)) : 0.0;
 
-        if (corner <= 0.0) {
-            _context.stroke_rect(inset, tone);
-        } else {
-            _context.stroke_round_rect(inset, corner, corner, tone);
-        }
+        _ring.clear();
+        _ring.add_round_rect(BLRoundRect(box.x, box.y, box.w, box.h, outer, outer));
+        _ring.add_round_rect(BLRoundRect(box.x + width, box.y + width, box.w - (width * 2.0),
+                                         box.h - (width * 2.0), inner, inner),
+                             BL_GEOMETRY_DIRECTION_CCW);
+
+        _context.fill_path(_ring, tone);
     }
 
     void Painter::circle(const BLPoint centre, const double radius, const BLRgba32 tone) const {

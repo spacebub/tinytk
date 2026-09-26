@@ -21,6 +21,8 @@
 
 #include <blend2d/blend2d.h>
 
+#include "ttk/util/Cache.h"
+
 namespace ttk {
     // Type, such as Blend2D gives it: a face off the filesystem, a size, and glyphs
     // filled as paths. There is no font engine to configure and no atlas, but also
@@ -55,6 +57,10 @@ namespace ttk {
         // The same without keeping the run: for a candidate that is measured once and
         // never drawn, which would otherwise crowd the drawn runs out of the cache.
         float width_once(const BLFont &font, std::string_view run);
+
+        // A word's advance, kept in a table of its own: a paragraph is folded again at
+        // every width it is laid out at, out of the same words each time.
+        float width_word(const BLFont &font, std::string_view word);
 
         // `run` shortened until it fits, with an ellipsis where anything was dropped.
         // Measured with the tracking it will be drawn with, when there is any.
@@ -171,8 +177,14 @@ namespace ttk {
             size_t used = 0;
         };
 
-        std::unordered_map<std::string, Shaped> _shaped;
-        std::unordered_map<std::string, Elided> _elided;
+        struct Measured {
+            float width = 0.0F;
+            size_t used = 0;
+        };
+
+        Cache::RunMap<Shaped> _shaped;
+        Cache::RunMap<Elided> _elided;
+        Cache::RunMap<Measured> _words;
         std::unordered_map<std::uintptr_t, Glyphs> _glyphs;
 
         // Bumped on every lookup. What tells the two caches which entries are cold.
@@ -184,7 +196,7 @@ namespace ttk {
         std::vector<size_t> _cuts;
         std::vector<double> _pens;
 
-        std::unordered_map<std::string, Row> _rows;
+        Cache::RunMap<Row> _rows;
     };
 }
 

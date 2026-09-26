@@ -102,9 +102,10 @@ namespace ttk {
             return std::min(wide, run.size() - at);
         }
 
-        // How many runs and answers are kept before the coldest quarter goes.
+        // How many runs, answers and words are kept before the coldest quarter goes.
         constexpr size_t SHAPED = 4096;
         constexpr size_t ELIDED = 4096;
+        constexpr size_t WORDS = 4096;
 
         // How many fonts keep a table of glyphs before the one longest unasked for goes.
         constexpr size_t TABLES = 8;
@@ -236,19 +237,12 @@ namespace ttk {
             });
         }
 
-        const auto at = reinterpret_cast<std::uintptr_t>(&font);
-        std::string key;
+        auto [made, fresh] = Cache::run_entry(
+            _shaped, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font), .run = run});
 
-        key.reserve(sizeof(at) + run.size());
-        key.append(reinterpret_cast<const char *>(&at), sizeof(at));
-        key.append(run);
-
-        const auto [held, fresh] = _shaped.try_emplace(std::move(key));
-
-        held->second.used = ++_asked;
+        made.used = ++_asked;
 
         if (fresh) {
-            Shaped &made = held->second;
             BLTextMetrics metrics{};
 
             made.buffer.set_utf8_text(run.data(), run.size());
@@ -260,7 +254,7 @@ namespace ttk {
             }
         }
 
-        return held->second;
+        return made;
     }
 
     namespace {
@@ -351,35 +345,46 @@ namespace ttk {
             : 0.0F;
     }
 
+    float Typeface::width_word(const BLFont &font, const std::string_view word) {
+        if (word.empty()) {
+            return 0.0F;
+        }
+
+        Cache::evict_oldest(_words, WORDS);
+
+        auto [held, fresh] = Cache::run_entry(
+            _words, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font), .run = word});
+
+        held.used = ++_asked;
+
+        if (fresh) {
+            held.width = width_once(font, word);
+        }
+
+        return held.width;
+    }
+
     std::string Typeface::elide(const BLFont &font, const std::string_view run, const float room,
                                 const float tracking) {
         // The answer is kept, not the candidates: a label elides to the same string every
         // paint, and putting the candidates in the shape cache would evict what is drawn.
         Cache::evict_oldest(_elided, ELIDED);
 
-        const auto face = reinterpret_cast<std::uintptr_t>(&font);
-        const auto wide = static_cast<int>(std::lround(room * 4.0));
-        const auto space = static_cast<int>(std::lround(tracking * 16.0));
+        const auto wide = static_cast<std::int64_t>(std::lround(room * 4.0));
+        const auto space = static_cast<std::uint32_t>(std::lround(tracking * 16.0));
 
-        std::string asked;
+        auto [held, fresh] = Cache::run_entry(
+            _elided, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
+                                    .at = (wide << 32) | space,
+                                    .run = run});
 
-        asked.reserve(sizeof(face) + sizeof(wide) + sizeof(space) + run.size());
-        asked.append(reinterpret_cast<const char *>(&face), sizeof(face));
-        asked.append(reinterpret_cast<const char *>(&wide), sizeof(wide));
-        asked.append(reinterpret_cast<const char *>(&space), sizeof(space));
-        asked.append(run);
+        held.used = ++_asked;
 
-        if (const auto found = _elided.find(asked); found != _elided.end()) {
-            found->second.used = ++_asked;
-
-            return found->second.text;
+        if (fresh) {
+            held.text = elide_once(font, run, room, tracking);
         }
 
-        std::string answer = elide_once(font, run, room, tracking);
-
-        _elided.emplace(std::move(asked), Elided{.text = answer, .used = ++_asked});
-
-        return answer;
+        return held.text;
     }
 
     std::string Typeface::elide_once(const BLFont &font, const std::string_view run, const float room,
@@ -632,20 +637,12 @@ namespace ttk {
             return;
         }
 
-        const auto at = reinterpret_cast<std::uintptr_t>(&font);
-        const auto fits = static_cast<int>(std::lround(room * 4.0));
-
-        std::string key;
-
-        key.reserve(sizeof(at) + sizeof(fits) + run.size());
-        key.append(reinterpret_cast<const char *>(&at), sizeof(at));
-        key.append(reinterpret_cast<const char *>(&fits), sizeof(fits));
-        key.append(run);
-
         Cache::evict_oldest(_rows, ROWS);
 
-        const auto [held, fresh] = _rows.try_emplace(std::move(key));
-        Row &made = held->second;
+        auto [made, fresh] = Cache::run_entry(
+            _rows, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
+                                  .at = std::lround(room * 4.0),
+                                  .run = run});
 
         made.used = ++_asked;
 
