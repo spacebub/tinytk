@@ -41,8 +41,13 @@ else ()
             "-Werror"
             "-Wpedantic"
             "-fstack-protector-strong"
-            "$<$<CONFIG:DEBUG>:-Og>"
-            "$<$<CONFIG:RELEASE>:-O2;-ffunction-sections;-fdata-sections;-fvisibility=hidden>")
+            "$<$<CONFIG:RELEASE>:-ffunction-sections;-fdata-sections;-fvisibility=hidden>")
+
+    # These land after CMAKE_CXX_FLAGS on the command line, where the last one wins, so the
+    # default steps aside for a level the user sets there.
+    if (NOT CMAKE_CXX_FLAGS MATCHES "(^| )-O")
+        list(APPEND TTK_COMPILE_FLAGS "$<$<CONFIG:DEBUG>:-Og>" "$<$<CONFIG:RELEASE>:-O2>")
+    endif ()
 
     if (NOT APPLE)
         list(APPEND TTK_COMPILE_FLAGS "$<$<CONFIG:RELEASE>:-fno-plt>")
@@ -51,7 +56,10 @@ endif ()
 
 # The binaries are the consumer's, so what strips them is only set up when this is one.
 if (PROJECT_IS_TOP_LEVEL)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    # Its -flto=thin would land after one the user sets in CMAKE_CXX_FLAGS.
+    if (NOT CMAKE_CXX_FLAGS MATCHES "-f(no-)?lto")
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    endif ()
 
     if (MSVC)
         add_link_options("$<$<CONFIG:RELEASE>:/LTCG;/OPT:REF;/OPT:ICF;/INCREMENTAL:NO;/DEBUG:NONE>")
