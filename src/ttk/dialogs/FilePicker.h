@@ -106,8 +106,6 @@ namespace ttk {
             //! The name field belongs to the user once it is filled, so a dialog copies this in only when
             //! \ref nameSeed changes.
             std::string name;
-            //! Length in bytes of \ref name without its extension.
-            int nameStem = 0;
             //! Counter bumped each time a \ref name is offered, so offering the same name twice is still seen.
             int nameSeed = 0;
 

@@ -432,7 +432,6 @@ namespace ttk {
         _saveName = name;
 
         state.name = name;
-        state.nameStem = static_cast<int>(std::filesystem::path(name).stem().string().size());
         state.nameSeed++;
 
         show_target();
