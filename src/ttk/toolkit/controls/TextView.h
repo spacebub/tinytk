@@ -56,7 +56,8 @@ namespace ttk {
         //! Removes the first `count` rows, or all of them when there are fewer.
         //!
         //! The selection moves up with the rows it was on, and an end of it that was on a removed row moves to the
-        //! start of the first row.
+        //! start of the first row. Does nothing while a run from \ref set_run() is held, since its rows are folded
+        //! again at each layout.
         void drop_rows(size_t count);
 
         //! Returns the height of one row in pixels, which is the line height of the face. A caller that drops

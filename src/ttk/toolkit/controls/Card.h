@@ -114,8 +114,8 @@ namespace ttk {
         //! Places the button row along the bottom edge, inset 16 pixels. Other children are not placed.
         void arrange(Typeface &type) override;
 
-        //! Paints the panel, lit while the pointer is on the card or one of its buttons or while it is dragged,
-        //! then the badges, title, subtitle or file, the status line or progress bar, and the buttons.
+        //! Paints the panel and its buttons, lit while the pointer is on the card or one of its buttons or while it
+        //! is dragged, then the badges, title, subtitle or file, and the status line or progress bar.
         void paint(const Painter &painter) override;
 
         //! Takes every press and remembers where it started, so it can become a drag or an \ref opened click.

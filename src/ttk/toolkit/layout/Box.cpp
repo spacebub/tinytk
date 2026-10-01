@@ -128,12 +128,12 @@ namespace ttk {
         return std::max(minHeight, total + _top + _bottom);
     }
 
-    // What each visible child gets along the main axis, in order. `across` is the
-    // room the other axis has, which is what a height is measured against.
     double Box::main_of(const Ptr &child, Typeface &type) const {
         return child->wanted_width(type);
     }
 
+    // What each visible child gets along the main axis, in order. `across` is the
+    // room the other axis has, which is what a height is measured against.
     std::vector<double> Box::share(Typeface &type, const double room, const double across) const {
         std::vector<double> mains;
         std::vector<double> least;

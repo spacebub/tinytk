@@ -86,9 +86,9 @@ namespace ttk::Glyphs {
 
     //! Draws `glyph` in `tone` inside a square \ref span() of `weight` across, with its top-left corner at `origin`.
     //!
-    //! `turn` rotates the glyph clockwise about the centre of the square, in degrees. When `turn` is zero and
-    //! `context` only translates by whole pixels, a glyph drawn twice at the same `weight` and sub-pixel offset is
-    //! drawn from a cached mask.
+    //! `turn` rotates the glyph clockwise about the centre of the square, in degrees. The state of `context` is
+    //! left as it was. When `turn` is zero and `context` only translates by whole pixels, a glyph drawn twice at
+    //! the same `weight` and sub-pixel offset is drawn from a cached mask.
     void draw(BLContext &context, Glyph glyph, BLPoint origin, float weight, BLRgba32 tone,
               float turn = 0.0F);
 

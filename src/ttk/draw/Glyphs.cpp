@@ -233,6 +233,7 @@ namespace ttk {
                 const double box = 10.0 * weight;
                 const double pen = 1.5 * weight;
 
+                context.save();
                 context.set_stroke_width(pen);
 
                 // A stroke straddles the path, so the rectangle is
@@ -241,6 +242,7 @@ namespace ttk {
                     BLRect{origin.x + ((side - box) * 0.5) + (pen * 0.5),
                            origin.y + ((side - box) * 0.5) + (pen * 0.5), box - pen, box - pen},
                     2.0, 2.0, tone);
+                context.restore();
 
                 return;
             }

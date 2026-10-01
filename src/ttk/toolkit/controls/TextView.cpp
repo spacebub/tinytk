@@ -85,13 +85,15 @@ namespace ttk {
     }
 
     void TextView::drop_rows(size_t count) {
+        if (_wrapped) {
+            return;
+        }
+
         count = std::min(count, _rows.size());
 
         if (count == 0) {
             return;
         }
-
-        unwrap();
 
         _rows.erase(_rows.begin(), _rows.begin() + static_cast<std::ptrdiff_t>(count));
 

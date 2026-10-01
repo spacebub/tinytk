@@ -102,8 +102,6 @@ namespace ttk {
             painter.label(painter.font(400, Theme::fontSmall), BLRect{_box.x + 16.0, line, _box.w - 32.0, 16.0},
                           Align::Start, told, trouble ? palette.danger : palette.faint);
         }
-
-        Panel::paint(painter);
     }
 
     bool Card::press(const Pointer &at) {
