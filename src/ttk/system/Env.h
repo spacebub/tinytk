@@ -12,12 +12,17 @@
 
 #include <string>
 
+//! Reading and writing environment variables of the current process.
 namespace ttk::Env {
 
-    // Empty when unset.
+    //! Returns the value of the environment variable `name`, or an empty string when it is not set.
     [[nodiscard]] std::string get(const char *name);
 
-    // On Windows both the C runtime and the Win32 environment are set, since libraries read either.
+    //! Sets the environment variable `name` to `value`, replacing any existing value. Both are UTF-8.
+    //!
+    //! On Windows both the Win32 environment and the C runtime's copy are set, since libraries read either.
+    //!
+    //! \note Not thread safe. Call it before any other thread starts.
     void set(const char *name, const char *value);
 
 }

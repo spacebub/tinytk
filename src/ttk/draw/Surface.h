@@ -20,87 +20,108 @@
 #include "ttk/draw/WlShm.h"
 
 namespace ttk {
-    // The window's own pixels, drawn into directly where the video driver has a
-    // framebuffer of its own, into shared memory of ours on Wayland, and through a
-    // buffer of ours copied over everywhere else. Only the rectangles that changed are
-    // repainted, and only those are presented.
+    //! Pixels of a window, drawn into with a Blend2D context and presented by damaged rectangles.
+    //!
+    //! On the Windows and X11 video drivers the context draws straight into SDL's window framebuffer. On Wayland,
+    //! where shared memory is available, it draws into buffers handed to the compositor as they are. Elsewhere it
+    //! draws into a buffer of its own whose damaged rectangles are copied to SDL's window surface when presented.
+    //! The pixels are 32-bit XRGB and opaque. Sizes and rectangles are in pixels.
     class Surface {
     public:
-        // Takes, or retakes, the window's surface. Called again after every resize,
-        // which is when SDL throws the old one away.
+        //! Releases any previous target, takes the surface of `window` and damages all of it.
+        //!
+        //! Returns false when `window` has no surface, its pixel format is not 32-bit XRGB or ARGB, or the target
+        //! cannot be created. SDL replaces the window surface on every resize, which \ref sync() handles.
         bool attach(SDL_Window *window);
 
-        // A target of its own, with no window behind it.
+        //! Releases any previous target and creates one of `width` by `height` pixels with no window behind it,
+        //! damaged whole. Returns false when the image cannot be created.
         bool attach(int width, int height);
 
-        // True where the video driver has a framebuffer of its own, which is the only
-        // case in which the window's pixels are drawn into in place.
+        //! Tests whether the context draws in place into the window's framebuffer, which only the Windows and X11
+        //! video drivers allow.
         [[nodiscard]] bool direct() const { return _path == Path::Direct; }
 
-        // Re-takes the surface if SDL has replaced it since the last look, and on
-        // Wayland binds the frame to a buffer the compositor is not holding. Asked
-        // every frame: an expose arriving before the resize event would otherwise draw
-        // into memory SDL has already freed.
+        //! Brings the target in line with `window`. Call it before painting every frame.
+        //!
+        //! Calls \ref attach() when nothing is attached or the size changed, takes over a window surface SDL replaced
+        //! since the last call, and on Wayland binds the context to a buffer the compositor is not holding. Returns
+        //! false when there is nothing to draw into, such as while the window is minimized, and then the surface is
+        //! detached.
         bool sync(SDL_Window *window);
 
-        // Lets go of the surface before SDL frees it.
+        //! Releases the target and any Wayland shared memory. Call it before SDL frees the window surface.
         void detach();
 
+        //! Tests whether a target is attached and the context can draw.
         [[nodiscard]] bool ready() const { return _ready; }
 
+        //! Returns the width of the target in pixels, or 0 when nothing is attached.
         [[nodiscard]] int width() const { return _width; }
+
+        //! Returns the height of the target in pixels, or 0 when nothing is attached.
         [[nodiscard]] int height() const { return _height; }
 
+        //! Returns the context that draws into the target. It can only draw while \ref ready() is true, and
+        //! \ref attach() and \ref sync() can bind it to new pixels.
         BLContext &context() { return _context; }
 
+        //! Returns the image the context draws into, which wraps the window's own pixels when \ref direct() is true
+        //! or on Wayland.
         [[nodiscard]] const BLImage &image() const { return _image; }
 
-        // Marks a region for repaint. Rectangles outside the surface are dropped, and
-        // ones that overlap are left alone: painting a pixel twice is cheaper than
-        // working out that it would be.
+        //! Marks `region` for repainting and presenting, as \ref Damage::add() does. Ignored while nothing is
+        //! attached.
         void damage(const BLRect &region);
+
+        //! Marks the whole target for repainting and presenting and drops pending shifts. Ignored while nothing is
+        //! attached.
         void damage_all();
 
-        // Moves the pixels of `region` down by `dy` (up when negative) instead of
-        // repainting them, carrying any pending damage inside it along. The region is
-        // still presented whole.
+        //! Moves the pixels of `wanted`, clipped to the target, down by `dy` pixels, or up when `dy` is negative,
+        //! instead of repainting them.
+        //!
+        //! Damage pending inside the region is also added `dy` further down. The strip the move uncovers is not
+        //! damaged, so the caller must damage it. The region is presented whole by the next \ref present() that has
+        //! damage. When `dy` is at least the height of the region, the region is damaged instead. Does nothing when
+        //! `dy` is zero, nothing is attached or the region lies outside the target.
         void shift(const BLRectI &wanted, int dy);
 
+        //! Tests whether anything was damaged or shifted since the last present.
         [[nodiscard]] bool dirty() const { return !_damage.empty() || !_moved.empty(); }
 
+        //! Returns the damaged rectangles waiting to be repainted.
         [[nodiscard]] const std::vector<BLRectI> &regions() const { return _damage.regions(); }
 
-        // Pushes the damaged rectangles and forgets them.
+        //! Flushes the context, hands the damaged and shifted rectangles to `window` and clears them.
+        //!
+        //! Does nothing while no rectangle is damaged, even after \ref shift(). The rectangles are kept for the next
+        //! call when the window is hidden on Wayland, the compositor cannot take the buffer, or the window surface no
+        //! longer matches the target in size.
         void present(SDL_Window *window);
 
-        // Settles the pixels and forgets the damage, for a target with no window.
+        //! Flushes the context and clears all damage and shifts, for a target with no window.
         void present();
 
-        // The window's pixels to a PNG, which Blend2D encodes itself.
+        //! Flushes the context and writes the pixels to the image file at `path`, in the format its extension names,
+        //! such as PNG. Returns false when nothing is attached or the file cannot be written.
         bool save(const char *path);
 
     private:
-        // Where the pixels the context draws into end up.
         enum class Path : std::uint8_t {
-            // SDL's own framebuffer, wrapped in place.
             Direct,
 
-            // A buffer of ours, the damaged rectangles copied into SDL's surface.
             Copied,
 
-            // A wl_shm buffer of ours, handed to the compositor as it is.
             Shared,
         };
 
         bool attach_shared(SDL_Window *window);
 
-        // Binds the context to the shared buffer this frame goes into.
         bool retarget();
 
-        // Copies the damaged rectangles of our own buffer into SDL's.
         bool take(SDL_Window *window);
 
-        // Ends the frame's context and forgets the target, keeping the display side.
         void release();
 
         BLImage _image;
@@ -119,7 +140,6 @@ namespace ttk {
 
         Damage _damage;
 
-        // Presented but not repainted.
         std::vector<BLRectI> _moved;
 
         // Handed over each frame, kept so a frame allocates nothing.

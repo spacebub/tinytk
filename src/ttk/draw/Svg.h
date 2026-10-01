@@ -12,13 +12,20 @@
 
 #include <blend2d/blend2d.h>
 
+//! Parsing of SVG path data into Blend2D paths.
 namespace ttk::Svg {
 
-    // Fills `out`, which is cleared first. False on the first token that makes no
-    // sense, with whatever parsed cleanly left in place.
+    //! Parses the SVG path data in `commands` into `out`, which is cleared first.
+    //!
+    //! Accepts every SVG path command in absolute and relative form, with commas, whitespace or nothing as
+    //! separators where the grammar allows. Returns false when `commands` is null or on the first token that does
+    //! not parse, leaving in `out` whatever was parsed before it.
     bool parse(const char *commands, BLPath &out);
 
-    // Scaled from a viewbox of `box` units square into a `size` square.
+    //! Returns the SVG path data in `commands` scaled from a square viewbox `box` units across to a square `size`
+    //! units across. `box` must be positive.
+    //!
+    //! When \ref parse() fails, returns the part parsed before the failure without scaling it.
     BLPath glyph(const char *commands, float box, float size);
 
 }

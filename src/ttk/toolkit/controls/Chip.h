@@ -16,23 +16,33 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
-    // A small box of type that explains itself on hover and does nothing else: the
-    // tokens a custom command is written with, or a count beside a panel's title.
+    //! Small piece of text that shows a tooltip on hover and does nothing when clicked.
+    //!
+    //! Drawn in small fixed width type by default, such as a token of a command template or a count beside a
+    //! title. A background and border appear only on hover or while \ref set_tight() is on.
     class Chip : public Widget {
     public:
+        //! Creates a chip showing `text` with `about` as its tooltip, \ref Widget::hint.
         Chip(std::string text, std::string about);
 
+        //! Sets the text to `text` and repaints. The layout is not redone, so a longer text is elided to the
+        //! current box until the next layout.
         void set_text(std::string text);
 
-        // Drawn in the warning tone, for a budget with nothing left in it.
+        //! Sets whether the chip is drawn in the warning colours, such as for an exhausted budget, and repaints.
         void set_tight(bool value);
 
-        // The proportional face, rather than the fixed width one a token wants.
+        //! Switches the chip to the proportional face and returns it.
         Chip *plain();
 
+        //! Returns the width of the text plus padding, or \ref fixedWidth when it is set.
         double natural_width(Typeface &type) override;
+
+        //! Returns the line height of the face plus padding, or \ref fixedHeight when it is set.
         double natural_height(Typeface &type, double width) override;
 
+        //! Paints the text, with a background and border while hovered or tight. Paints nothing when the text is
+        //! empty.
         void paint(const Painter &painter) override;
 
     private:

@@ -24,73 +24,108 @@
 #include "ttk/util/Cache.h"
 
 namespace ttk {
-    // Type, such as Blend2D gives it: a face off the filesystem, a size, and glyphs
-    // filled as paths. There is no font engine to configure and no atlas, but also
-    // no hinting, and nothing here goes anywhere near DirectWrite.
+    //! Font faces loaded from system font files, and cached shaping, measuring and drawing of UTF-8 text runs.
+    //!
+    //! One face is loaded per weight and glyphs are filled by Blend2D without hinting or fallback fonts. All sizes
+    //! and positions are in pixels. A run is shaped once and kept, keyed by its font's address and its text, and
+    //! drawn from a coverage mask made on its first draw whenever the context only translates by whole pixels.
+    //! Every method that takes a `font` expects one returned by \ref at() of the same typeface.
     class Typeface {
     public:
-        // Weights, as the application asks for them.
+        //! Weight of regular text.
         static constexpr int regular = 400;
+        //! Weight of semibold text.
         static constexpr int semibold = 600;
+        //! Weight of bold text.
         static constexpr int bold = 700;
 
-        // The fixed width face, for paths, command lines and run output.
+        //! Weight that selects the regular monospace face, for paths, command lines and program output.
         static constexpr int mono = 1;
+        //! Weight that selects the bold monospace face.
         static constexpr int monoBold = 2;
 
-        // The weight to ask at() for, given what a label wants.
+        //! Returns `weight` when `fixed` is false. Otherwise returns \ref monoBold for a `weight` of \ref semibold
+        //! or more and \ref mono below it.
         static int pick(int weight, bool fixed);
 
-        // False when the platform has no face this can find, which the caller turns
-        // into a clean exit rather than a crash.
+        //! Loads a face for each of \ref regular, \ref semibold, \ref bold, \ref mono and \ref monoBold.
+        //!
+        //! Each weight takes the first file that loads from a list of well-known system font paths. A weight with
+        //! none takes the loaded face of the lowest weight value, which is a monospace face when one loaded. Returns
+        //! false when no face loads at all.
         bool load();
 
+        //! Returns the font of `weight` at `size` pixels, created on first use.
+        //!
+        //! The font keeps its address for the life of the typeface. Sizes are told apart to a quarter pixel.
+        //! `weight` must be one of the five weight constants: any other value, or a call before \ref load(), gives
+        //! a font with no face, and that font stays cached.
         const BLFont &at(int weight, float size);
 
-        // A run is shaped once and kept, and rasterised once into a mask the first time
-        // it is drawn: a label is measured, elided and drawn every paint, and Blend2D
-        // would otherwise shape it and fill every glyph outline again each time.
-
-        // The advance width, which is what a layout needs. The ink may be narrower.
+        //! Returns the advance width of `run`, or 0 when it is empty. The ink may be narrower or wider.
+        //!
+        //! The shaped run is kept for later measuring and drawing.
         float width(const BLFont &font, std::string_view run);
 
-        // The same without keeping the run: for a candidate that is measured once and
-        // never drawn, which would otherwise crowd the drawn runs out of the cache.
+        //! Returns the advance width of `run` without keeping the shaped run, or 0 when it is empty.
+        //!
+        //! Use it for text measured once and never drawn, which would otherwise push drawn runs out of the cache.
         float width_once(const BLFont &font, std::string_view run);
 
-        // A word's advance, kept in a table of its own: a paragraph is folded again at
-        // every width it is laid out at, out of the same words each time.
+        //! Returns the advance width of `word`, or 0 when it is empty, kept in a cache of words apart from shaped runs.
+        //!
+        //! Use it for wrapping, which measures the same words again at every width a paragraph is laid out at.
         float width_word(const BLFont &font, std::string_view word);
 
-        // `run` shortened until it fits, with an ellipsis where anything was dropped.
-        // Measured with the tracking it will be drawn with, when there is any.
+        //! Returns `run` unchanged when it fits in `room`, otherwise its longest prefix that fits with an ellipsis
+        //! after it, cut on a character boundary.
+        //!
+        //! Returns an empty string when not even the ellipsis fits. A positive `tracking` measures as
+        //! \ref width_tracked() does. Results are cached by font, run, `room` to a quarter pixel and `tracking`.
         std::string elide(const BLFont &font, std::string_view run, float room,
                           float tracking = 0.0F);
 
-        // `top` is the top of the line box. The baseline is worked out from the face.
+        //! Draws `run` in `tone` with the top-left of its line box at `top`. Does nothing when `run` is empty.
+        //!
+        //! The baseline is `top.y` plus the font's ascent, rounded to a whole pixel. When the run is drawn from its
+        //! mask, `top.x` is rounded to a whole pixel too.
         void draw(BLContext &context, const BLFont &font, BLPoint top, std::string_view run,
                   BLRgba32 tone);
 
-        // Letter-spaced, which fill_utf8_text has no notion of: the run is drawn one
-        // character at a time with the tracking added to each advance.
+        //! Returns the width of `run` drawn with `tracking` pixels between neighbouring characters, or 0 when it is
+        //! empty.
+        //!
+        //! Each character is measured on its own, so kerning and ligatures across characters do not apply.
         float width_tracked(const BLFont &font, std::string_view run, float tracking);
 
+        //! Draws `run` in `tone` one character at a time, adding `tracking` pixels after each advance, with the
+        //! top-left of its line box at `top` as \ref draw() places it.
         void draw_tracked(BLContext &context, const BLFont &font, BLPoint top, std::string_view run,
                          BLRgba32 tone, float tracking);
 
-        // Centred vertically inside a box `height` tall starting at `top`.
+        //! Draws `run` in `tone` centred vertically in a box `height` tall whose top-left is `top`. Does nothing when
+        //! `run` is empty.
+        //!
+        //! The line box of the font, its ascent plus its descent, is centred in the box and the baseline rounded to a
+        //! whole pixel.
         void draw_centred(BLContext &context, const BLFont &font, BLPoint top, float height,
                          std::string_view run, BLRgba32 tone);
 
-        // Laid down glyph by glyph off a cache of glyph masks, and kept nowhere: for a
-        // line drawn once and scrolled past, where a mask of the whole line would be
-        // made only to be thrown away. Cut with an ellipsis where it would pass `room`.
+        //! Draws `run` in `tone` with the top-left of its line box at `top`, cut with an ellipsis where it would pass
+        //! `room` pixels. Does nothing when `run` is empty or `room` is not positive.
+        //!
+        //! The shaped run is not kept. When the context only translates by whole pixels, the line is composed from
+        //! cached glyph masks at quarter-pixel positions, and the composed line is kept for the few hundred lines
+        //! drawn most recently. Use it for long text such as logs, where lines are drawn and scrolled past.
         void draw_once(BLContext &context, const BLFont &font, BLPoint top, std::string_view run,
                        BLRgba32 tone, double room);
 
-        // The byte offset in `run`, on a character boundary, nearest `x` across it.
+        //! Returns the byte offset in `run` of the character boundary nearest `x` pixels from its start.
+        //!
+        //! Returns 0 for an empty `run` and the size of `run` when `x` is nearest its end.
         size_t nearest(const BLFont &font, std::string_view run, float x);
 
+        //! Returns the ascent plus the descent of `font`.
         [[nodiscard]] float line_height(const BLFont &font) const;
 
     private:
@@ -99,10 +134,8 @@ namespace ttk {
             size_t used = 0;
             float width = 0.0F;
 
-            // The ink, relative to the origin on the baseline.
             BLBox ink{};
 
-            // Coverage only. The tone is applied when it is laid down.
             BLImage mask;
             BLPointI maskAt{};
             bool masked = false;
@@ -116,7 +149,6 @@ namespace ttk {
             int wide = 0;
             int tall = 0;
 
-            // The mask's top left, relative to the glyph's origin on the baseline.
             BLPointI at{};
             bool made = false;
         };
@@ -129,7 +161,6 @@ namespace ttk {
             size_t used = 0;
         };
 
-        // A line composed from glyphs, kept for the frames it stays on screen through.
         struct Row {
             BLImage mask;
             BLPointI at{};
@@ -144,7 +175,6 @@ namespace ttk {
 
         static void make(const BLFont &font, std::uint32_t id, std::uint32_t shift, Glyph &into);
 
-        // Where a run in `_scratch` is cut to fit, with the ellipsis that marks it.
         struct Cut {
             size_t shown = 0;
             bool made = false;
@@ -152,7 +182,6 @@ namespace ttk {
             double dotWide = 0.0;
         };
 
-        // Shapes `run` into `_scratch`, its pens into `_pens`, and finds the cut.
         Cut shape_to(const BLFont &font, std::string_view run, double room);
 
         // Lays the run in `_scratch`, up to its cut, into a mask of its own.
@@ -160,11 +189,9 @@ namespace ttk {
 
         std::string elide_once(const BLFont &font, std::string_view run, float room, float tracking);
 
-        // Lays a run down at `origin` on the baseline, from its mask.
         void lay(BLContext &context, const BLFont &font, Shaped &made, BLPoint origin,
                  BLRgba32 tone);
 
-        // Faces are held by weight. A size makes a BLFont out of one.
         std::map<int, BLFontFace> _faces;
         std::map<long long, BLFont> _fonts;
 
@@ -187,7 +214,7 @@ namespace ttk {
         Cache::RunMap<Measured> _words;
         std::unordered_map<std::uintptr_t, Glyphs> _glyphs;
 
-        // Bumped on every lookup. What tells the two caches which entries are cold.
+        // Bumped on every lookup. Every cache reads it to tell which entries are cold.
         size_t _asked = 0;
         size_t _maskBytes = 0;
 

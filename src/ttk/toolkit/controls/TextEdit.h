@@ -20,18 +20,29 @@
 #include "ttk/toolkit/overlays/Menu.h"
 
 namespace ttk {
-    // Many lines of fixed width text, with a line number down the left and wrapping
-    // at the edge if asked. It scrolls itself both ways, so it stands on its own
-    // rather than in a Scroll. The caret is a byte offset into the text.
+    //! Multi-line text editor in a fixed-width face, with optional line numbers and word wrap.
+    //!
+    //! The editor scrolls itself in both directions and draws its own scroll bars, so it is not placed inside a
+    //! \ref Scroll. The text is UTF-8 with `\n` line breaks. Carriage returns are removed from everything that
+    //! enters it. Tab stops are every 4 columns, and the caret moves by whole code points.
     class TextEdit : public Widget {
     public:
-        // A cog in the corner opens a menu of the settings the reader can change.
+        //! Whether the editor shows a settings button in its top-right corner.
         enum class Cog : std::uint8_t {
+            //! No settings button.
             Hidden,
+            //! A cog button that opens a menu toggling line numbers and word wrap.
             Shown,
         };
 
+        //! Creates an empty, editable editor that reports edits to `edited`, with a settings button when `cog` is
+        //! \ref Cog::Shown.
+        //!
+        //! `edited` is called with the whole text after every change made from the keyboard, the clipboard, undo
+        //! or redo, but not after \ref set_text(). It may be null.
         explicit TextEdit(std::function<void(const std::string &)> edited = {}, Cog cog = Cog::Hidden);
+
+        //! Closes the settings menu when it is open.
         ~TextEdit() override;
 
         TextEdit(const TextEdit &) = delete;
@@ -39,60 +50,114 @@ namespace ttk {
         TextEdit(TextEdit &&) = delete;
         TextEdit &operator=(TextEdit &&) = delete;
 
+        //! Returns the text, in UTF-8 with `\n` line breaks.
         [[nodiscard]] const std::string &text() const { return _text; }
 
-        // Starts over: the caret goes home and nothing can be undone past this.
+        //! Replaces the text with `text`, without carriage returns, and repaints.
+        //!
+        //! The caret moves to the start, the view scrolls to the top-left corner and the undo and redo history is
+        //! cleared. The `edited` callback is not called.
         void set_text(std::string text);
 
+        //! Sets whether the text is protected from editing, and returns this.
+        //!
+        //! A read-only editor still takes focus, selects, copies and scrolls, but shows no caret and ignores
+        //! typing, pasting, cutting, deleting, undo and redo.
         TextEdit *read_only(bool value = true);
 
-        // A line number down the left of every line.
+        //! Sets whether a gutter on the left shows the number of each line, and returns this.
+        //!
+        //! With wrapping on, only the first row of a line carries its number.
         TextEdit *numbered(bool value = true);
 
-        // Lines broken at the edge, on a space where there is one, instead of
-        // scrolling sideways.
+        //! Sets whether lines wider than the view are wrapped instead of scrolled sideways, and returns this.
+        //!
+        //! A line breaks after the last space that fits in the row, or at the edge when the row has no space.
         TextEdit *wrapped(bool value = true);
 
+        //! Tests whether the text can be edited, which is when \ref read_only() is not set.
         [[nodiscard]] bool editable() const { return !_readOnly; }
 
+        //! Sets the text shown in a faint colour while the editor is empty, and returns this.
         TextEdit *placeholder(std::string text);
 
+        //! Returns the selected text, or an empty string when nothing is selected.
         [[nodiscard]] std::string selection() const;
 
+        //! Selects the whole text, with the caret at the end.
         void select_all();
 
+        //! Returns \ref Widget::fixedWidth when it is set, otherwise 240 pixels.
         double natural_width(Typeface &type) override;
+
+        //! Returns \ref Widget::fixedHeight when it is set, otherwise 180 pixels.
         double natural_height(Typeface &type, double width) override;
 
+        //! Places the settings button and wraps the text again when the width available to it has changed.
         void arrange(Typeface &type) override;
 
+        //! Paints the frame, the gutter, the visible rows, the selection, the caret and the scroll bars.
+        //!
+        //! The selection stays visible, in a lighter tint, while the editor does not have focus.
         void paint(const Painter &painter) override;
 
+        //! Returns the default cursor over the scroll bars and the line number gutter, and the text cursor
+        //! elsewhere.
         [[nodiscard]] Cursor cursor_at(double x, double y) const override;
 
+        //! Handles a press on a scroll bar, which starts dragging it, or on the text, which takes focus and
+        //! places the caret.
+        //!
+        //! Shift extends the selection. A second press within 0.4 seconds and 4 pixels of the last selects a
+        //! word, and a third selects the whole line with its line break. Returns false when the editor is
+        //! disabled or not attached to a root.
         bool press(const Pointer &at) override;
+
+        //! Drags the held scroll bar, or extends the selection to `at` after a single press.
         void drag(const Pointer &at) override;
+
+        //! Ends a scroll bar drag.
         void release(const Pointer &at) override;
 
+        //! Scrolls by 3 rows per notch of `steps`, or sideways by 3 columns per notch while Shift is held.
+        //!
+        //! Returns false, leaving the scroll to the parent, when there is nothing to scroll in that direction.
         bool wheel(double steps, const Pointer &at) override;
 
+        //! Handles editing and caret keys and returns true when the key was consumed.
+        //!
+        //! Arrows move by a character or a row, Ctrl+Left and Ctrl+Right by a word, PageUp and PageDown by a view
+        //! less one row. Home goes to the first non-blank character of the row, then to the row's start. End goes
+        //! to the row's end. Ctrl+Home and Ctrl+End go to either end of the text. Shift extends the selection.
+        //! Backspace and Delete remove the selection, or else a character, or a word with Ctrl. Return inserts a line
+        //! break that keeps the current line's indent. Tab inserts spaces up to the next tab stop, and Shift+Tab
+        //! is consumed and does nothing. Ctrl+A, Ctrl+C, Ctrl+X and Ctrl+V select all, copy, cut and paste.
+        //! Ctrl+Z undoes, and Ctrl+Shift+Z and Ctrl+Y redo. A run of typing undoes as one step, and up to 256
+        //! steps are kept. Ctrl+Tab, and Return and Tab while read-only, are not consumed.
         bool key(const Key &pressed) override;
+
+        //! Replaces the selection with `text`, in UTF-8, or inserts it at the caret. Ignored when read-only.
         void wrote(const std::string &text) override;
 
+        //! Tests whether the editor can receive keyboard focus, which it can while enabled.
         [[nodiscard]] bool takes_focus() const override { return enabled(); }
+
+        //! Called when the editor receives focus. Shows the caret, starts it blinking and repaints.
         void gained_focus() override;
+
+        //! Called when the editor loses focus. Repaints it. The selection is kept.
         void lost_focus() override;
 
+        //! Blinks the caret while the editor has focus and is editable, sleeping between blinks. Returns false
+        //! otherwise.
         bool advance(double now) override;
 
     private:
-        // One change, small enough to keep and to take back whatever the text's size.
         struct Edit {
             size_t at = 0;
             std::string gone;
             std::string came;
 
-            // Where the caret and anchor were before it.
             size_t caret = 0;
             size_t anchor = 0;
         };
@@ -104,44 +169,31 @@ namespace ttk {
 
         void measure(Typeface &type);
 
-        // Where each line starts, how many columns each has and where its rows begin,
-        // from scratch.
         void reindex();
 
-        // The same for the lines a change touched, the rest moved along by it.
         void reindex(size_t from, size_t gone, size_t came);
 
         void widen(size_t fromLine, size_t toLine, bool shrank);
 
-        // The rows of every line again, for a width that changed.
         void rewrap();
 
-        // Where `line` breaks into rows at the width held, appended to `into`.
         void wrap_line(size_t line, std::vector<size_t> &into) const;
 
-        // Takes the width on again, and wraps to it if that changed.
         void refit();
 
         [[nodiscard]] size_t line_count() const { return _starts.size(); }
         [[nodiscard]] size_t line_of(size_t offset) const;
         [[nodiscard]] size_t line_end(size_t line) const;
 
-        // A row is what one line of the screen shows: a line, or a piece of one
-        // when wrapping.
         [[nodiscard]] size_t row_count() const { return _rowStarts.size(); }
         [[nodiscard]] size_t row_of(size_t offset) const;
         [[nodiscard]] size_t row_end(size_t row) const;
 
-        // Columns, with tabs expanded, which is what the pointer and the arrows go by.
-        // A column counts from the start of the line, and a row's base is where it
-        // starts counting from.
         [[nodiscard]] size_t column_of(size_t offset) const;
-        // The columns from `start`, the beginning of its line, up to `offset`.
         [[nodiscard]] size_t columns_from(size_t start, size_t offset) const;
         [[nodiscard]] size_t base_of(size_t row) const;
         [[nodiscard]] size_t offset_at(size_t row, size_t column) const;
 
-        // The row as drawn, tabs expanded, into `_shown`.
         [[nodiscard]] const std::string &expand(size_t row);
 
         [[nodiscard]] size_t before(size_t at) const;
@@ -161,7 +213,6 @@ namespace ttk {
 
         [[nodiscard]] size_t hit(double x, double y) const;
 
-        // The selection in order, or the caret twice over.
         void span(size_t &from, size_t &to) const;
 
         void move_to(size_t offset, bool selecting, bool keepGoal = false);
@@ -185,7 +236,7 @@ namespace ttk {
         size_t _widest = 0;
         std::string _shown;
 
-        // Columns a row holds when wrapping. Zero until the width is known.
+        // Zero until the width is known.
         size_t _fit = 0;
 
         size_t _caret = 0;
@@ -216,7 +267,6 @@ namespace ttk {
         double _lastY = 0.0;
         int _clicks = 0;
 
-        // The bar down the right or the one along the bottom, held by the pointer.
         bool _thumbDrag = false;
         bool _railDrag = false;
         double _grabAt = 0.0;
@@ -225,7 +275,6 @@ namespace ttk {
         GlyphButton *_cog = nullptr;
         Menu *_menu = nullptr;
 
-        // Blinks while focused, which is the one thing that keeps the loop awake.
         double _blinked = 0.0;
         bool _showCaret = true;
     };

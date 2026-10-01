@@ -23,27 +23,51 @@
 #include "ttk/toolkit/overlays/Dialog.h"
 
 namespace ttk {
+    //! Dialog that presents a \ref FilePicker: a path bar with breadcrumbs, a name field when saving, the listing
+    //! and the pick button.
+    //!
+    //! The dialog does not watch the picker. Its owner shows it when \ref FilePicker::State::open becomes true,
+    //! calls \ref sync() from \ref FilePicker::changed, and dismisses it when the picker closes.
     class FilePickerDialog : public Dialog {
     public:
+        //! Creates a dialog for `picker`, which must outlive it.
         explicit FilePickerDialog(FilePicker &picker);
 
+        //! Updates the controls from the picker's state.
+        //!
+        //! Scrolls the listing to the top when the directory changes, puts an offered name in the name field and
+        //! focuses it when saving, and asks the root for a new layout only when something the layout depends on
+        //! has changed.
         void sync() override;
 
+        //! Called when the dialog is asked to close. Calls \ref FilePicker::dismiss(), then returns false when the
+        //! user was typing a path, as the dismissal only ends the typing and the dialog stays up. Returns true
+        //! otherwise.
         bool closing() override;
 
+        //! Places the card as \ref Dialog::arrange() does, then places the dialog's controls inside it.
         void arrange(Typeface &type) override;
 
+        //! Returns \ref Cursor::Pointer over a breadcrumb and \ref Cursor::Default elsewhere.
         [[nodiscard]] Cursor cursor_at(double x, double y) const override;
 
+        //! Handles the motion as \ref Dialog::hover() does, then highlights the breadcrumb under `at`.
         void hover(const Pointer &at) override;
 
+        //! Handles the pointer leaving as \ref Dialog::leave() does, then clears the breadcrumb highlight.
         void leave() override;
 
+        //! Takes a press on a breadcrumb and hands any other press to \ref Dialog::press().
         bool press(const Pointer &at) override;
 
+        //! Lists the directory of the breadcrumb under `at`. The first breadcrumb lists `/`, or the drive list on
+        //! Windows. A release anywhere else is handled by \ref Dialog::release().
         void release(const Pointer &at) override;
 
     protected:
+        //! Called after the card's children are painted. Paints the title, the breadcrumbs while browsing, the
+        //! name label when saving, \ref FilePicker::State::nothing when the listing is empty, and a warning when
+        //! saving would replace a file.
         void paint_over(const Painter &painter) override;
 
     private:
@@ -69,7 +93,6 @@ namespace ttk {
 
         static void paint_crumb(const Painter &painter, const BLRect &box, bool lit);
 
-        // -2 for nothing, -1 for the root, otherwise the part's index.
         [[nodiscard]] int crumb_at(double x, double y) const;
 
         // The directory listing, drawn straight: a folder here may hold thousands.
@@ -256,7 +279,6 @@ namespace ttk {
 
         std::vector<BLRect> _crumbBoxes;
 
-        // -2 for nothing, -1 for the root, otherwise the part under the pointer.
         int _overCrumb = -2;
 
         // The directory the list is showing, so only a change to it moves the view.

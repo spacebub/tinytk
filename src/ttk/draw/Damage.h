@@ -15,33 +15,41 @@
 #include <blend2d/blend2d.h>
 
 namespace ttk {
-    // Which rectangles of a frame changed. The window and the benchmark canvas both
-    // keep one, so a change to how regions are merged cannot leave the two measuring
-    // different things.
+    //! Set of rectangles of a frame that changed and must be repainted and presented.
+    //!
+    //! All rectangles are in pixels and clipped to the frame size given to \ref resize().
     class Damage {
     public:
-        // More than this many separate rectangles and it is cheaper to present one that
-        // covers them all than to hand the desktop a long list.
+        //! Number of rectangles above which \ref add() merges all of them into their bounding rectangle.
         static constexpr size_t CROWDED = 12;
 
+        //! Sets the frame size to `width` by `height` pixels and clears all rectangles.
         void resize(int width, int height);
 
-        // Clamped to the frame, dropped when something held already covers it, and the
-        // lot folded into one once there are too many.
+        //! Adds `region` to the set.
+        //!
+        //! `region` is first clipped to the frame and rounded outward to whole pixels. It is dropped when nothing
+        //! of it is left, or when a rectangle already in the set covers it. Once the set holds more than
+        //! \ref CROWDED rectangles, they are replaced by their bounding rectangle.
         void add(const BLRect &region);
 
+        //! Replaces the set with a single rectangle covering the whole frame.
         void all();
 
+        //! Removes all rectangles.
         void clear() { _regions.clear(); }
 
+        //! Tests whether the set holds no rectangles.
         [[nodiscard]] bool empty() const { return _regions.empty(); }
 
-        // True when what is held covers the frame.
+        //! Tests whether a single rectangle in the set covers the whole frame.
         [[nodiscard]] bool whole() const;
 
+        //! Returns the rectangles in the set.
         [[nodiscard]] const std::vector<BLRectI> &regions() const { return _regions; }
 
-        // `region` clipped to the frame. Empty when none of it is inside.
+        //! Returns `region` rounded outward to whole pixels and clipped to the frame, or an empty rectangle when
+        //! none of it is inside the frame.
         [[nodiscard]] BLRectI clamp_to(const BLRect &region) const;
 
     private:

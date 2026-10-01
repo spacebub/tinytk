@@ -14,15 +14,29 @@
 
 #include <SDL3/SDL.h>
 
- // Dragging and resizing are not here: SDL's hit test hands those to the platform.
+//! Native frame adjustments for a borderless window. Calls do nothing outside Windows.
  namespace ttk::Chrome {
-    // Safe to call right after the window is created. The native handle already exists.
+    //! Fits the native frame of `window` to a borderless window.
+    //!
+    //! On Windows it subclasses the window procedure to keep one row of frame for the compositor to round, outline
+    //! and shadow, to keep a maximized window inside the monitor's work area and a pixel clear of an auto-hidden
+    //! taskbar, asks for rounded corners and applies a colour already given to \ref outline(). Safe to call right
+    //! after the window is created. Only one window is tracked, the last one passed.
     void apply(SDL_Window *window);
 
+    //! Sets the colour of the border the compositor draws around the window passed to \ref apply().
+    //!
+    //! `red`, `green` and `blue` are 0 to 255.
+    //!
+    //! The colour is kept and applied by \ref apply() when no window has been applied yet. Windows versions without
+    //! border colours ignore it.
     void outline(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
-    // Called with true when the desktop opens a modal move/resize loop of its own and
-    // false when it closes it. Never called where there is no such thing.
+    //! Sets `told` as the function called with true when the desktop enters a modal move or resize loop of its own,
+    //! and with false when it leaves it.
+    //!
+    //! Never called on platforms without such a loop. Only the window passed to \ref apply() reports it. Null
+    //! removes the function.
     void while_resizing(void (*told)(bool));
 }
 

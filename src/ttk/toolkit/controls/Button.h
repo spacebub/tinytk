@@ -18,39 +18,84 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
+    //! Push button with a text label and an optional glyph before it.
+    //!
+    //! A click is a press released inside the button, or Return or Space while it has focus. The methods that
+    //! return `this` are meant to be chained at construction: \ref kind(), \ref glyph() and \ref compact() neither
+    //! repaint nor ask for a new layout.
     class Button : public Widget {
     public:
+        //! Visual style of a button.
         enum class Kind : std::uint8_t {
+            //! Raised surface with a border that turns to the accent colour on hover.
             Default,
+            //! Filled with the accent colour, for the main action of a view.
             Primary,
+            //! Danger coloured text and border, for a destructive action.
             Danger,
+            //! No border and accent coloured text, with a soft accent wash on hover.
             Ghost,
         };
 
+        //! Creates a button showing `text` that calls `clicked` on each click. `clicked` may be empty.
         Button(std::string text, std::function<void()> clicked);
 
+        //! Sets the label to `text` and repaints. The layout is not redone, so the width stays as it was.
         void set_text(std::string text);
 
+        //! Sets the visual style to `value` and returns this button.
         Button *kind(Kind value);
+
+        //! Sets the glyph drawn before the label and returns this button. \ref Glyphs::Glyph::Empty shows none.
         Button *glyph(Glyphs::Glyph glyph);
+
+        //! Selects the small variant, with a lower height, a smaller font and no minimum width, and returns this
+        //! button.
         Button *compact(bool value = true);
+
+        //! Sets whether the button is busy and returns this button.
+        //!
+        //! A busy button replaces its label with three animated dots and ignores clicks, both from the pointer and
+        //! from the keyboard.
         Button *busy(bool value);
+
+        //! Sets the tooltip, \ref Widget::hint, to `text` and returns this button.
         Button *tooltip(std::string text);
 
-        // Never takes a row's spare width.
+        //! Returns the width of the glyph and label plus padding, never less than \ref Theme::buttonWidth unless
+        //! the button is compact. Returns \ref fixedWidth when it is set.
         double natural_width(Typeface &type) override;
+
+        //! Returns \ref Theme::control, or \ref Theme::controlSmall when compact. Returns \ref fixedHeight when it
+        //! is set.
         double natural_height(Typeface &type, double width) override;
 
+        //! Paints the button body in its \ref Kind style, then either the glyph and label centred in the box or the
+        //! busy dots. A disabled button draws its label faded.
         void paint(const Painter &painter) override;
 
+        //! Takes the press unless the button is disabled or busy, and shrinks the body slightly while it is held.
         bool press(const Pointer &at) override;
+
+        //! Ends the press and calls the click callback when `at` is still inside the button and it is enabled
+        //! and not busy.
         void release(const Pointer &at) override;
+
+        //! Called when the pointer moves onto the button. Starts the hover highlight.
         void enter() override;
+
+        //! Called when the pointer moves off the button. Fades out the hover highlight.
         void leave() override;
 
+        //! Tests whether the button can receive keyboard focus, which is whenever it is enabled.
         [[nodiscard]] bool takes_focus() const override { return enabled(); }
+
+        //! Consumes Return and Space and clicks the button on them when it is enabled and not busy. Returns false
+        //! for every other key.
         bool key(const Key &pressed) override;
 
+        //! Steps the hover and press animations and, while busy, the dots. Returns true while either animation
+        //! runs, otherwise sleeps until the next dot step when busy.
         bool advance(double now) override;
 
     private:
@@ -67,7 +112,6 @@ namespace ttk {
         Anim::Tween _lit;
         Anim::Tween _give;
 
-        // The three dots, while busy.
         int _tick = 0;
         double _ticked = 0.0;
     };

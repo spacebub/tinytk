@@ -19,55 +19,83 @@
 #include "ttk/toolkit/layout/Panel.h"
 
 namespace ttk {
-    // The dialog itself only darkens what is under it, catches the press that
-    // dismisses it, and keeps the rest of the window from answering the pointer.
+    //! Modal dialog: a scrim over everything under it with a card centred on top.
+    //!
+    //! The dialog takes every pointer event its card does not, so nothing under it answers the pointer, and a click
+    //! on the scrim calls \ref dismissed. Subclasses fill \ref card(). Dialogs are normally shown through a
+    //! \ref DialogLayer, which calls \ref opened(), \ref closing() and \ref sync().
     class Dialog : public Widget {
     public:
+        //! Creates an open dialog with an empty card. The card grows into place from 95% scale on its first layout.
         Dialog();
 
+        //! Returns the panel that holds the dialog's content.
         [[nodiscard]] Panel *card() const { return _card; }
 
-        // What the card would like, before the window's own room is taken into account.
+        //! Width of the card in pixels, reduced to leave at least 24 pixels on each side of the dialog's box.
         double wanted = 460.0;
+        //! Height of the card in pixels, or 0 to size it to its content at \ref wanted width. Either way it is reduced
+        //! to leave at least 24 pixels above and below.
         double tall = 0.0;
 
+        //! Called when the dialog asks to be closed: on a click on the scrim, and by subclasses for a Cancel button.
+        //!
+        //! A press and its release must both land outside the card. A press that closed a popup does not count, see
+        //! \ref Root::just_dismissed(). \ref DialogLayer::show() sets it to \ref DialogLayer::close().
         std::function<void()> dismissed;
 
-        // False when the dialog dealt with the dismissal itself and means to stay up.
+        //! Called by \ref DialogLayer::close() before taking the dialog down. Returns false to stay up, having dealt
+        //! with the request itself. The default implementation returns true.
         virtual bool closing() { return true; }
 
-        // Called once it is up and can reach the tree, for whatever wants the keyboard.
+        //! Called by \ref DialogLayer once the dialog is attached and on top, both when it is shown and when the
+        //! dialog above it closes. Override it to take keyboard focus. The default implementation does nothing.
         virtual void opened() {}
 
-        // Called each turn while it is up, for a dialog whose content moves under it.
+        //! Called by \ref DialogLayer::sync() while the dialog is on top, for a dialog that reflects state changing
+        //! under it. The default implementation does nothing.
         virtual void sync() {}
 
     protected:
-        // Drawn over the card's children, under the same scale while the card grows.
+        //! Called after the card and its children are painted, under the same scale while the card grows. The default
+        //! implementation does nothing.
         virtual void paint_over(const Painter & /*painter*/) {}
 
-        // The heading and the paragraph under it, which every dialog opens with.
+        //! Appends a wrapped heading label with `text` to `into` and returns it.
         static Label *heading(Box *into, const std::string &text);
+        //! Appends a wrapped body label with `text`, in the muted colour, to `into` and returns it.
         static Label *body(Box *into, const std::string &text);
 
     public:
 
+        //! Tests whether the dialog is open. A new dialog is open.
         [[nodiscard]] bool open() const { return _open; }
 
     protected:
+        //! Opens or closes the dialog, showing or hiding it. Opening again plays the grow on the next layout. Does
+        //! nothing when the state does not change.
         void set_open(bool open);
 
     public:
 
+        //! Centres the card in the dialog's box, sized by \ref wanted and \ref tall, and starts the grow when it is
+        //! due.
         void arrange(Typeface &type) override;
 
+        //! Fills the box with the scrim, then paints the card and \ref paint_over() scaled about the card's centre
+        //! while it grows.
         void paint(const Painter &painter) override;
 
+        //! Takes every press and notes whether it landed on the scrim.
         bool press(const Pointer &at) override;
+        //! Calls \ref dismissed when both the press and `at` are outside the card.
         void release(const Pointer &at) override;
 
+        //! Returns the card's widget at `[x, y]`, otherwise the dialog itself, wherever the point is. Returns null
+        //! while the dialog is hidden.
         Widget *at(double x, double y) override;
 
+        //! Steps the grow animation and repaints, returning true while it runs.
         bool advance(double now) override;
 
     private:

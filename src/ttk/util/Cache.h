@@ -21,10 +21,14 @@
 #include <utility>
 #include <vector>
 
+//! Eviction and keys for caches of text runs.
 namespace ttk::Cache {
 
-    // Only the quarter that has gone longest unasked for goes. Clearing the lot would
-    // make a page holding more than the cap rebuild everything on it every frame.
+    //! Removes about a quarter of the entries of `held`, those used least recently, once it holds `keep` or more.
+    //!
+    //! Every value in `held` must have a `used` field that grows with recency of use. Entries whose `used` is at or
+    //! below the quarter mark are removed, so ties can remove more. `dropped` is called with each value before it
+    //! is removed. Does nothing while `held` holds fewer than `keep` entries.
     template <typename Map, typename Dropped = decltype([](const auto &) {})>
     void evict_oldest(Map &held, const size_t keep, Dropped dropped = {}) {
         if (held.size() < keep) {
@@ -56,31 +60,37 @@ namespace ttk::Cache {
         });
     }
 
-    // A run of text under a font, with whatever else the answer depends on packed
-    // into `at`. A cache that answers for a run keys on this and is asked through
-    // the view, so a hit allocates nothing.
+    //! Owning key of a cache entry for a run of text under a font.
+    //!
+    //! A \ref RunMap is looked up with a \ref RunView of the same fields, so a hit allocates nothing.
     struct RunKey {
+        //! Identity of the font, normally its address.
         std::uintptr_t font = 0;
+        //! Every other input the cached answer depends on, packed by the cache that uses the key.
         std::int64_t at = 0;
+        //! Text of the run, UTF-8.
         std::string run;
     };
 
+    //! Non-owning form of \ref RunKey used to look up a \ref RunMap without copying the text.
     struct RunView {
+        //! Identity of the font, normally its address.
         std::uintptr_t font = 0;
+        //! Every other input the cached answer depends on, packed by the cache that uses the key.
         std::int64_t at = 0;
+        //! Text of the run, UTF-8. Must stay alive for the lookup.
         std::string_view run;
     };
 
+    //! Transparent hash of \ref RunKey and \ref RunView that gives equal values for equal fields.
     struct RunHash {
         using is_transparent = void;
 
-        // A paragraph is a key too, so only its ends go into the hash: its length and
-        // both ends tell paragraphs apart as well as the whole would, at a cost that
-        // does not grow with it. The equality still reads all of it.
+        //! Number of bytes hashed from each end of the run. Only the ends and the length of a longer run are hashed,
+        //! so hashing costs the same for any length.
         static constexpr std::size_t END = 64;
 
-        // The fields are mixed by Knuth's multiplicative hashing: 2^64 over the
-        // golden ratio spreads small and adjacent values as evenly as one multiplier can.
+        //! Returns the hash of `view` from its font, its `at` and the ends and length of its run.
         std::size_t operator()(const RunView &view) const noexcept {
             constexpr auto golden = static_cast<std::size_t>(0x9e3779b97f4a7c15ULL);
             constexpr std::hash<std::string_view> bytes;
@@ -99,31 +109,40 @@ namespace ttk::Cache {
             return text ^ (rest + golden + (text << 6U) + (text >> 2U));
         }
 
+        //! Returns the hash of `key`, equal to the hash of a \ref RunView with the same fields.
         std::size_t operator()(const RunKey &key) const noexcept {
             return (*this)(RunView{.font = key.font, .at = key.at, .run = key.run});
         }
     };
 
+    //! Transparent equality of \ref RunKey and \ref RunView that compares the font, `at` and the whole run.
     struct RunEqual {
         using is_transparent = void;
 
+        //! Tests whether `one` and `two` have the same font, `at` and run.
         bool operator()(const RunKey &one, const RunKey &two) const noexcept {
             return one.font == two.font && one.at == two.at && one.run == two.run;
         }
 
+        //! Tests whether key `one` and view `two` have the same font, `at` and run.
         bool operator()(const RunKey &one, const RunView &two) const noexcept {
             return one.font == two.font && one.at == two.at && one.run == two.run;
         }
 
+        //! Tests whether view `one` and key `two` have the same font, `at` and run.
         bool operator()(const RunView &one, const RunKey &two) const noexcept {
             return one.font == two.font && one.at == two.at && one.run == two.run;
         }
     };
 
+    //! Hash map from \ref RunKey to `Value` that can be looked up with a \ref RunView.
     template <typename Value>
     using RunMap = std::unordered_map<RunKey, Value, RunHash, RunEqual>;
 
-    // The entry for `view`, made fresh when there was none, which the second answer says.
+    //! Returns the entry of `held` for `view` and whether it was just created.
+    //!
+    //! When there is no entry, one is added with a value-initialized `Value` and a copy of the run, and the second
+    //! member is true. A reference stays valid until the entry is removed from `held`.
     template <typename Value>
     std::pair<Value &, bool> run_entry(RunMap<Value> &held, const RunView &view) {
         if (const auto found = held.find(view); found != held.end()) {

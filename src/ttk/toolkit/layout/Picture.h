@@ -13,11 +13,15 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
-    // A picture at a fixed size, which the interface only ever needs for the mark.
+    //! Widget that draws an image scaled to its box.
+    //!
+    //! The picture does not size itself from the image, so give it a \ref fixedWidth and a \ref fixedHeight.
     class Picture : public Widget {
     public:
+        //! Creates a picture that draws `image`.
         explicit Picture(BLImage image) : _image(std::move(image)) {}
 
+        //! Draws the image stretched to \ref box(). Draws nothing for an empty image, and never paints children.
         void paint(const Painter &painter) override;
 
     private:
