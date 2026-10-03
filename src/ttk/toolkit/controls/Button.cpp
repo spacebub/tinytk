@@ -7,6 +7,8 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 #include "ttk/draw/Glyphs.h"
 #include "ttk/draw/Theme.h"
@@ -22,14 +24,84 @@ namespace ttk {
         // How long the busy dot rests on each of its three positions.
         constexpr double TICK = 0.3;
 
+        // Interpolates premultiplied, so a transparent fill fades in without darkening. Theme::mix keeps the
+        // alpha of the colour below, which would leave such a fill transparent.
+        BLRgba32 blend(const BLRgba32 from, const BLRgba32 to, const double amount) {
+            const double weight = std::clamp(amount, 0.0, 1.0);
+            const double fromAlpha = from.a() / 255.0;
+            const double toAlpha = to.a() / 255.0;
+            const double alpha = fromAlpha + ((toAlpha - fromAlpha) * weight);
+
+            if (alpha <= 0.0) {
+                return BLRgba32{0};
+            }
+
+            const auto channel = [=](const uint32_t below, const uint32_t above) {
+                const double start = below * fromAlpha;
+                const double end = above * toAlpha;
+
+                const double mixed = (start + ((end - start) * weight)) / alpha;
+
+                return static_cast<uint32_t>(std::lround(std::min(255.0, mixed)));
+            };
+
+            return BLRgba32{channel(from.r(), to.r()), channel(from.g(), to.g()), channel(from.b(), to.b()),
+                            static_cast<uint32_t>(std::lround(alpha * 255.0))};
+        }
+
+        Button::Look default_look(const Theme::Palette &palette) {
+            return {.ground = palette.raised,
+                    .lit = Theme::mix(palette.raised, palette.hover, 1.0),
+                    .down = palette.sunken,
+                    .edge = palette.borderStrong,
+                    .edgeLit = palette.accent,
+                    .ink = palette.text,
+                    .dots = palette.accent};
+        }
+
+        Button::Look primary_look(const Theme::Palette &palette) {
+            return {.ground = palette.accent,
+                    .lit = palette.accentHover,
+                    .down = Theme::darker(palette.accent, 0.15),
+                    .edge = {},
+                    .edgeLit = {},
+                    .ink = palette.accentText,
+                    .dots = palette.accentText};
+        }
+
+        Button::Look danger_look(const Theme::Palette &palette) {
+            return {.ground = palette.raised,
+                    .lit = palette.dangerSoft,
+                    .down = Theme::darker(palette.dangerSoft, 0.08),
+                    .edge = Theme::alpha(palette.danger, 0.5),
+                    .edgeLit = Theme::alpha(palette.danger, 0.5),
+                    .ink = palette.danger,
+                    .dots = palette.accent};
+        }
+
+        Button::Look ghost_look(const Theme::Palette &palette) {
+            return {.ground = {},
+                    .lit = palette.accentSoft,
+                    .down = palette.accentSoft,
+                    .edge = {},
+                    .edgeLit = {},
+                    .ink = palette.accent,
+                    .dots = palette.accent};
+        }
+
     }
 
+    constinit const Button::Kind Button::Kind::Default{&default_look};
+    constinit const Button::Kind Button::Kind::Primary{&primary_look};
+    constinit const Button::Kind Button::Kind::Danger{&danger_look};
+    constinit const Button::Kind Button::Kind::Ghost{&ghost_look};
 
     Button::Button(std::string text, std::function<void()> clicked)
         : _text(std::move(text)), _clicked(std::move(clicked)) {
         _takesPointer = true;
         cursor = Cursor::Pointer;
         _give.set(1.0F);
+        derive_look();
     }
 
     void Button::set_text(std::string text) {
@@ -44,8 +116,17 @@ namespace ttk {
 
     Button *Button::kind(const Kind value) {
         _kind = value;
+        derive_look();
 
         return this;
+    }
+
+    void Button::restyle() {
+        derive_look();
+    }
+
+    void Button::derive_look() {
+        _look = (_kind.look != nullptr ? _kind.look : default_look)(Theme::palette());
     }
 
     Button *Button::glyph(const Glyphs::Glyph glyph) {
@@ -82,24 +163,6 @@ namespace ttk {
         return this;
     }
 
-    BLRgba32 Button::ink() const {
-        const Theme::Palette &palette = Theme::palette();
-
-        switch (_kind) {
-            case Kind::Primary:
-                return palette.accentText;
-
-            case Kind::Danger:
-                return palette.danger;
-
-            case Kind::Ghost:
-                return palette.accent;
-
-            default:
-                return palette.text;
-        }
-    }
-
     double Button::natural_width(Typeface &type) {
         if (fixedWidth >= 0.0) {
             return fixedWidth;
@@ -117,7 +180,6 @@ namespace ttk {
     }
 
     void Button::paint(const Painter &painter) {
-        const Theme::Palette &palette = Theme::palette();
         const double lit = _lit.value();
         const bool down = pressed();
 
@@ -126,46 +188,12 @@ namespace ttk {
         const BLRect body{_box.x + (_box.w * (1.0 - give) / 2.0), _box.y + (_box.h * (1.0 - give) / 2.0),
                           _box.w * give, _box.h * give};
 
-        BLRgba32 ground{};
-        BLRgba32 edge = palette.borderStrong;
-        double border = 1.0;
+        const BLRgba32 edge = blend(_look.edge, _look.edgeLit, lit);
 
-        switch (_kind) {
-            case Kind::Primary:
-                ground = down ? Theme::darker(palette.accent, 0.15)
-                              : Theme::mix(palette.accent, palette.accentHover, lit);
-                border = 0.0;
+        painter.round(body, Theme::radiusSmall, down ? _look.down : blend(_look.ground, _look.lit, lit));
 
-                break;
-
-            case Kind::Ghost:
-                ground = Theme::alpha(palette.accentSoft, lit);
-                edge = Theme::alpha(palette.accentSoft, 0.0);
-
-                break;
-
-            case Kind::Danger:
-                ground = down ? Theme::darker(palette.dangerSoft, 0.08)
-                              : Theme::mix(palette.raised, palette.dangerSoft, lit);
-                edge = Theme::mix(Theme::alpha(palette.danger, 0.5), palette.danger, lit);
-
-                break;
-
-            default:
-                ground = down ? palette.sunken : palette.raised;
-                edge = Theme::mix(palette.borderStrong, palette.accent, lit);
-
-                break;
-        }
-
-        painter.round(body, Theme::radiusSmall, ground);
-
-        if (_kind == Kind::Default && !down && lit > 0.0) {
-            painter.round(body, Theme::radiusSmall, Theme::alpha(palette.hover, lit));
-        }
-
-        if (border > 0.0) {
-            painter.outline(body, Theme::radiusSmall, border, edge);
+        if (edge.a() > 0) {
+            painter.outline(body, Theme::radiusSmall, 1.0, edge);
         }
 
         if (_busy) {
@@ -173,11 +201,9 @@ namespace ttk {
             constexpr double span = (dot * 3.0) + (5.0 * 2.0);
 
             for (int at = 0; at < 3; ++at) {
-                const BLRgba32 tone = _kind == Kind::Primary ? palette.accentText : palette.accent;
-
                 painter.circle(BLPoint{_box.x + ((_box.w - span) / 2.0) + (at * (dot + 5.0)) + (dot / 2.0),
                                        _box.y + (_box.h / 2.0)},
-                               dot / 2.0, _tick == at ? Theme::alpha(tone, 0.25) : tone);
+                               dot / 2.0, _tick == at ? Theme::alpha(_look.dots, 0.25) : _look.dots);
             }
 
             return;
@@ -190,7 +216,7 @@ namespace ttk {
 
         double x = _box.x + ((_box.w - content) / 2.0);
 
-        const BLRgba32 tint = enabled() ? ink() : Theme::alpha(ink(), 0.45);
+        const BLRgba32 tint = enabled() ? _look.ink : Theme::alpha(_look.ink, 0.45);
 
         if (_glyph != Glyphs::Glyph::Empty) {
             Glyphs::draw(painter.context(), _glyph,

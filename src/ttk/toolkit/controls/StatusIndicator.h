@@ -16,6 +16,9 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
+    namespace Theme {
+        struct Palette;
+    }
     //! Pill that shows the state of a launched process as a coloured word and a dot on a dark tile.
     //!
     //! While the status is \ref Status::Launching or \ref Status::Stopping the dot blinks, switching between full
@@ -38,11 +41,30 @@ namespace ttk {
             Failed,
         };
 
+        //! Colours of the word, the dot and the border of the pill.
+        struct Tones {
+            //! Colour for \ref Status::Launching.
+            BLRgba32 launching;
+            //! Colour for \ref Status::Running.
+            BLRgba32 running;
+            //! Colour for \ref Status::Stopping and \ref Status::Failed.
+            BLRgba32 failing;
+            //! Colour for \ref Status::Closed.
+            BLRgba32 idle;
+        };
+
         //! Height of the pill in pixels.
         static constexpr double HEIGHT = 24.0;
 
         //! Time in seconds the blinking dot stays on each of its full and faint phases.
         static constexpr double BEAT = 0.62;
+
+        //! Sets the function that derives the tones of every pill from a palette.
+        //!
+        //! The tones are derived again whenever the palette on screen changes. Until this is called they are the
+        //! palette's \ref Theme::Palette::accentHover, \ref Theme::Palette::success, \ref Theme::Palette::danger
+        //! and \ref Theme::Palette::muted.
+        static void set_tones(Tones (*derive)(const Theme::Palette &palette));
 
         //! Paints the pill for `status` with its top-left corner at `at` and returns the box it covers.
         //!

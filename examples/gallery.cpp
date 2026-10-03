@@ -118,6 +118,8 @@ namespace {
     };
 
     constexpr const char *KINDS[] = {"Default", "Primary", "Danger", "Ghost"};
+    constexpr const ttk::Button::Kind *BUTTON_KINDS[] = {&ttk::Button::Kind::Default, &ttk::Button::Kind::Primary,
+                                                         &ttk::Button::Kind::Danger, &ttk::Button::Kind::Ghost};
     constexpr const char *STATES[] = {"", "Starting", "Running", "Stopping", "Closed", "Failed"};
     constexpr const char *BADGES[] = {"Accent", "Muted", "Success", "Warning", "Danger"};
 
@@ -289,7 +291,7 @@ namespace {
             gallery.shell.after(1.0, [&gallery] {
                 gallery.kind = (gallery.kind + 1) % 4;
                 gallery.button->busy(false);
-                gallery.button->kind(static_cast<ttk::Button::Kind>(gallery.kind));
+                gallery.button->kind(*BUTTON_KINDS[gallery.kind]);
                 gallery.button->set_text(KINDS[gallery.kind]);
             });
         }));

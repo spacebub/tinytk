@@ -18,6 +18,9 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
+    namespace Theme {
+        struct Palette;
+    }
     //! Push button with a text label and an optional glyph before it.
     //!
     //! A click is a press released inside the button, or Return or Space while it has focus. The methods that
@@ -25,16 +28,46 @@ namespace ttk {
     //! repaint nor ask for a new layout.
     class Button : public Widget {
     public:
+        //! Colours a button is painted with.
+        struct Look {
+            //! Fill at rest.
+            BLRgba32 ground;
+            //! Fill under the pointer, blended from \ref ground while the hover fades.
+            BLRgba32 lit;
+            //! Fill while pressed.
+            BLRgba32 down;
+            //! Border at rest. No border is drawn when both edges are fully transparent.
+            BLRgba32 edge;
+            //! Border under the pointer, blended from \ref edge while the hover fades.
+            BLRgba32 edgeLit;
+            //! Colour of the label and glyph.
+            BLRgba32 ink;
+            //! Colour of the busy dots.
+            BLRgba32 dots;
+        };
+
         //! Visual style of a button.
-        enum class Kind : std::uint8_t {
+        //!
+        //! A program adds its own kinds beside the built-in ones with a function that derives a \ref Look from a
+        //! palette. The look is derived again whenever the palette on screen changes.
+        struct Kind {
+            //! Creates a kind whose look `derive` computes from a palette. A null `derive` paints as \ref Default.
+            constexpr explicit Kind(Look (*const derive)(const Theme::Palette &palette)) : look(derive) {}
+
+            //! Returns the look of the kind under `palette`.
+            Look (*look)(const Theme::Palette &palette);
+
+            //! True when both kinds derive their look with the same function.
+            constexpr bool operator==(const Kind &) const = default;
+
             //! Raised surface with a border that turns to the accent colour on hover.
-            Default,
+            static const Kind Default;
             //! Filled with the accent colour, for the main action of a view.
-            Primary,
+            static const Kind Primary;
             //! Danger coloured text and border, for a destructive action.
-            Danger,
+            static const Kind Danger;
             //! No border and accent coloured text, with a soft accent wash on hover.
-            Ghost,
+            static const Kind Ghost;
         };
 
         //! Creates a button showing `text` that calls `clicked` on each click. `clicked` may be empty.
@@ -43,7 +76,7 @@ namespace ttk {
         //! Sets the label to `text` and repaints. The layout is not redone, so the width stays as it was.
         void set_text(std::string text);
 
-        //! Sets the visual style to `value` and returns this button.
+        //! Sets the visual style to `value`, derives its look from the palette on screen and returns this button.
         Button *kind(Kind value);
 
         //! Sets the glyph drawn before the label and returns this button. \ref Glyphs::Glyph::Empty shows none.
@@ -98,14 +131,19 @@ namespace ttk {
         //! runs, otherwise sleeps until the next dot step when busy.
         bool advance(double now) override;
 
+    protected:
+        //! Called when the \ref Theme has changed. Derives the look of the kind again.
+        void restyle() override;
+
     private:
-        [[nodiscard]] BLRgba32 ink() const;
+        void derive_look();
 
         std::string _text;
         Glyphs::Glyph _glyph{};
         std::function<void()> _clicked;
 
         Kind _kind = Kind::Default;
+        Look _look{};
         bool _compact = false;
         bool _busy = false;
 

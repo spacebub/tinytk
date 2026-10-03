@@ -45,11 +45,6 @@ namespace ttk {
             .shadow = BLRgba32{0xa8000000},
             .scrim = BLRgba32{0xbe030509},
 
-            .statusLaunching = BLRgba32{0xffff9422},
-            .statusRunning = BLRgba32{0xff52d18b},
-            .statusFailing = BLRgba32{0xffff5470},
-            .statusIdle = BLRgba32{0xffa6b4cd},
-
             .headingWeight = 700,
             .dark = true,
         };
@@ -84,11 +79,6 @@ namespace ttk {
 
             .shadow = BLRgba32{0x5212203a},
             .scrim = BLRgba32{0x780c1420},
-
-            .statusLaunching = BLRgba32{0xffa83606},
-            .statusRunning = BLRgba32{0xff0a7d4e},
-            .statusFailing = BLRgba32{0xffc22a45},
-            .statusIdle = BLRgba32{0xff46536a},
 
             .headingWeight = 600,
             .dark = false,
@@ -178,9 +168,13 @@ namespace ttk {
 
         Tone::Tone(BLRgba32 Palette::*const slot) : _slot(slot), _colour(palette().*slot) {}
 
+        Tone::Tone(BLRgba32 (*const derive)(const Palette &)) : _derive(derive), _colour(derive(palette())) {}
+
         void Tone::restyle() {
             if (_slot != nullptr) {
                 _colour = palette().*_slot;
+            } else if (_derive != nullptr) {
+                _colour = _derive(palette());
             }
         }
 

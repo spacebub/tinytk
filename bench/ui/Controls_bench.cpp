@@ -50,6 +50,9 @@ namespace {
         return out;
     }
 
+    constexpr const ttk::Button::Kind *BUTTON_KINDS[] = {&ttk::Button::Kind::Default, &ttk::Button::Kind::Primary,
+                                                         &ttk::Button::Kind::Danger, &ttk::Button::Kind::Ghost};
+
     std::unique_ptr<ttk::Button> button(const ttk::Button::Kind kind) {
         auto made = std::make_unique<ttk::Button>("Launch", [] {});
 
@@ -190,7 +193,7 @@ namespace {
 
     void Button_paint(benchmark::State &state) {
         ttk::Button *made =
-            bench::mount(sheet(), button(static_cast<ttk::Button::Kind>(state.range(0))));
+            bench::mount(sheet(), button(*BUTTON_KINDS[state.range(0)]));
 
         for ([[maybe_unused]] auto step : state) {
             benchmark::DoNotOptimize(bench::paint_once(sheet(), *made));
@@ -198,10 +201,7 @@ namespace {
     }
 
     BENCHMARK(Button_paint)
-        ->Arg(static_cast<int>(ttk::Button::Kind::Default))
-        ->Arg(static_cast<int>(ttk::Button::Kind::Primary))
-        ->Arg(static_cast<int>(ttk::Button::Kind::Danger))
-        ->Arg(static_cast<int>(ttk::Button::Kind::Ghost));
+        ->DenseRange(0, 3);
 
     void Check_paint(benchmark::State &state) {
         ttk::Check *made = bench::mount(sheet(), std::make_unique<ttk::Check>([](bool) {}));

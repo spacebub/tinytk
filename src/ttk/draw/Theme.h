@@ -82,15 +82,6 @@ namespace ttk::Theme {
         //! Translucent fill laid over the window behind a dialog.
         BLRgba32 scrim;
 
-        //! Status dot colour of something starting up.
-        BLRgba32 statusLaunching;
-        //! Status dot colour of something running.
-        BLRgba32 statusRunning;
-        //! Status dot colour of something stopping or failed.
-        BLRgba32 statusFailing;
-        //! Status dot colour of something idle or closed.
-        BLRgba32 statusIdle;
-
         //! Font weight of headings, such as 600 or 700.
         int headingWeight;
         //! True for a dark palette.
@@ -202,16 +193,46 @@ namespace ttk::Theme {
     //! Widgets compare it with the value they last saw to know when to call \ref Widget::restyle().
     inline std::uint32_t revision() { return detail::revision; }
 
-    //! Colour that is either a palette slot, which follows palette changes, or a fixed colour, which does not.
+    //! Colour slots a program adds beside \ref Palette, one set for the dark palettes and one for the light.
+    //!
+    //! `Slots` is any struct of colours. Read it through \ref of() from a function given to a \ref Tone or a
+    //! \ref Button::Kind, so it follows palette changes as the built-in slots do.
+    //!
+    //! \code
+    //! struct Brand { BLRgba32 tint; };
+    //!
+    //! constexpr Theme::Extension<Brand> BRAND{.dark = {.tint = BLRgba32{0xff80c0ff}},
+    //!                                         .light = {.tint = BLRgba32{0xff1a5fa0}}};
+    //!
+    //! Theme::Tone tint([](const Theme::Palette &palette) { return BRAND.of(palette).tint; });
+    //! \endcode
+    template <class Slots>
+    struct Extension {
+        //! Slots shown with a palette whose \ref Palette::dark is true.
+        Slots dark;
+        //! Slots shown with a palette whose \ref Palette::dark is false.
+        Slots light;
+
+        //! Returns the set of slots that goes with `palette`.
+        [[nodiscard]] constexpr const Slots &of(const Palette &palette) const {
+            return palette.dark ? dark : light;
+        }
+    };
+
+    //! Colour that is a palette slot or derived from the palette, both of which follow palette changes, or a fixed
+    //! colour, which does not.
     class Tone {
     public:
         //! Creates a tone that follows `slot` of the palette, taking its colour from the palette on screen.
         Tone(BLRgba32 Palette::*slot);
 
+        //! Creates a tone that `derive` computes from the palette on screen, such as a slot of an \ref Extension.
+        Tone(BLRgba32 (*derive)(const Palette &palette));
+
         //! Creates a tone fixed at `colour`.
         explicit Tone(const BLRgba32 colour) : _colour(colour) {}
 
-        //! Reads the slot again from the palette on screen. Does nothing for a fixed colour.
+        //! Reads the slot or derives the colour again from the palette on screen. Does nothing for a fixed colour.
         //!
         //! Call it from \ref Widget::restyle() of the widget holding the tone.
         void restyle();
@@ -221,6 +242,7 @@ namespace ttk::Theme {
 
     private:
         BLRgba32 Palette::*_slot = nullptr;
+        BLRgba32 (*_derive)(const Palette &) = nullptr;
         BLRgba32 _colour{};
     };
 

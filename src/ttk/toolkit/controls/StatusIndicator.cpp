@@ -8,6 +8,7 @@
  */
 #include "ttk/toolkit/controls/StatusIndicator.h"
 
+#include <cstdint>
 #include <string_view>
 
 #include "ttk/draw/Theme.h"
@@ -25,23 +26,38 @@ namespace ttk {
         constexpr double GAP = 6.0;
         constexpr double TEXT = PAD + (DOT * 2.0) + GAP;
 
+        StatusIndicator::Tones palette_tones(const Theme::Palette &palette) {
+            return {.launching = palette.accentHover,
+                    .running = palette.success,
+                    .failing = palette.danger,
+                    .idle = palette.muted};
+        }
+
+        StatusIndicator::Tones (*deriveTones)(const Theme::Palette &) = &palette_tones;
+
+        StatusIndicator::Tones derived{};
+        std::uint32_t derivedAt = 0;
+
         BLRgba32 tone_of(const StatusIndicator::Status status) {
-            const Theme::Palette &palette = Theme::palette();
+            if (derivedAt != Theme::revision()) {
+                derived = deriveTones(Theme::palette());
+                derivedAt = Theme::revision();
+            }
 
             switch (status) {
                 case StatusIndicator::Status::Launching:
-                    return palette.statusLaunching;
+                    return derived.launching;
                 case StatusIndicator::Status::Running:
-                    return palette.statusRunning;
+                    return derived.running;
                 case StatusIndicator::Status::Stopping:
                 case StatusIndicator::Status::Failed:
-                    return palette.statusFailing;
+                    return derived.failing;
                 case StatusIndicator::Status::Empty:
                 case StatusIndicator::Status::Closed:
                     break;
             }
 
-            return palette.statusIdle;
+            return derived.idle;
         }
 
         std::string_view label_of(const StatusIndicator::Status status) {
@@ -62,6 +78,11 @@ namespace ttk {
             return "Closed";
         }
 
+    }
+
+    void StatusIndicator::set_tones(Tones (*const derive)(const Theme::Palette &)) {
+        deriveTones = derive;
+        derivedAt = 0;
     }
 
     bool StatusIndicator::beats(const Status status) {
