@@ -36,6 +36,8 @@ namespace ttk {
 
             .mutedSoft = BLRgba32{0xff212a37},
             .success = BLRgba32{0xff52d18b},
+            .successHover = BLRgba32{0xff6fdd9f},
+            .successText = BLRgba32{0xff04170d},
             .successSoft = BLRgba32{0xff0f2b1e},
             .warning = BLRgba32{0xffffc44d},
             .warningSoft = BLRgba32{0xff332609},
@@ -71,6 +73,8 @@ namespace ttk {
 
             .mutedSoft = BLRgba32{0xffdde4ef},
             .success = BLRgba32{0xff0a7d4e},
+            .successHover = BLRgba32{0xff086640},
+            .successText = BLRgba32{0xffffffff},
             .successSoft = BLRgba32{0xffe0f6ec},
             .warning = BLRgba32{0xff8a5a08},
             .warningSoft = BLRgba32{0xfffcf0d8},

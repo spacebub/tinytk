@@ -64,6 +64,8 @@ namespace ttk {
             static const Kind Default;
             //! Filled with the accent colour, for the main action of a view.
             static const Kind Primary;
+            //! Filled with the success colour, for an action that brings something up to date.
+            static const Kind Success;
             //! Danger coloured text and border, for a destructive action.
             static const Kind Danger;
             //! No border and accent coloured text, with a soft accent wash on hover.

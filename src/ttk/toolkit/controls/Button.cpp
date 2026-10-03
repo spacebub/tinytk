@@ -69,6 +69,16 @@ namespace ttk {
                     .dots = palette.accentText};
         }
 
+        Button::Look success_look(const Theme::Palette &palette) {
+            return {.ground = palette.success,
+                    .lit = palette.successHover,
+                    .down = Theme::darker(palette.success, 0.15),
+                    .edge = {},
+                    .edgeLit = {},
+                    .ink = palette.successText,
+                    .dots = palette.successText};
+        }
+
         Button::Look danger_look(const Theme::Palette &palette) {
             return {.ground = palette.raised,
                     .lit = palette.dangerSoft,
@@ -93,6 +103,7 @@ namespace ttk {
 
     constinit const Button::Kind Button::Kind::Default{&default_look};
     constinit const Button::Kind Button::Kind::Primary{&primary_look};
+    constinit const Button::Kind Button::Kind::Success{&success_look};
     constinit const Button::Kind Button::Kind::Danger{&danger_look};
     constinit const Button::Kind Button::Kind::Ghost{&ghost_look};
 

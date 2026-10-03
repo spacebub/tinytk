@@ -64,8 +64,12 @@ namespace ttk::Theme {
 
         //! Pale neutral background of neutral badges.
         BLRgba32 mutedSoft;
-        //! Colour of success messages and states.
+        //! Colour of success messages and states, and the fill of success buttons.
         BLRgba32 success;
+        //! Fill of a success button under the pointer.
+        BLRgba32 successHover;
+        //! Text and glyph colour drawn on \ref success.
+        BLRgba32 successText;
         //! Pale tint of \ref success for backgrounds.
         BLRgba32 successSoft;
         //! Colour of warnings.

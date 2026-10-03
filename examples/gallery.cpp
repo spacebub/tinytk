@@ -117,9 +117,10 @@ namespace {
         bool disclosed = false;
     };
 
-    constexpr const char *KINDS[] = {"Default", "Primary", "Danger", "Ghost"};
+    constexpr const char *KINDS[] = {"Default", "Primary", "Success", "Danger", "Ghost"};
     constexpr const ttk::Button::Kind *BUTTON_KINDS[] = {&ttk::Button::Kind::Default, &ttk::Button::Kind::Primary,
-                                                         &ttk::Button::Kind::Danger, &ttk::Button::Kind::Ghost};
+                                                         &ttk::Button::Kind::Success, &ttk::Button::Kind::Danger,
+                                                         &ttk::Button::Kind::Ghost};
     constexpr const char *STATES[] = {"", "Starting", "Running", "Stopping", "Closed", "Failed"};
     constexpr const char *BADGES[] = {"Accent", "Muted", "Success", "Warning", "Danger"};
 
@@ -289,7 +290,7 @@ namespace {
             gallery.button->busy(true);
 
             gallery.shell.after(1.0, [&gallery] {
-                gallery.kind = (gallery.kind + 1) % 4;
+                gallery.kind = (gallery.kind + 1) % static_cast<int>(std::size(KINDS));
                 gallery.button->busy(false);
                 gallery.button->kind(*BUTTON_KINDS[gallery.kind]);
                 gallery.button->set_text(KINDS[gallery.kind]);
