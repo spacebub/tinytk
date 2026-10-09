@@ -136,6 +136,11 @@ namespace ttk {
                 {.outline = nullptr,
                  .solid = "M 3.4 1.6 L 11.6 6.5 L 3.4 11.4 Z", .box = 0.0F, .solidBox = 13.0F, .pen = PEN,});
 
+            set(Glyphs::Glyph::Globe,
+                {.outline = "M 12.2 7 A 5.2 5.2 0 1 1 1.8 7 A 5.2 5.2 0 1 1 12.2 7 M 2.5 7 L 11.5 7"
+                            " M 9.2 7 A 2.2 4.5 0 1 1 4.8 7 A 2.2 4.5 0 1 1 9.2 7",
+                 .solid = nullptr, .box = 14.0F, .solidBox = 0.0F, .pen = 1.4F,});
+
             // These draw in a 15 unit box of their own.
             set(Glyphs::Glyph::File,
                 {.outline = "M 3 1.5 L 9.5 1.5 L 12.5 4.8 L 12.5 13.5 L 3 13.5 Z M 9.3 1.7 L 9.3 5 L 12.3 5",

@@ -65,6 +65,8 @@ namespace ttk::Glyphs {
         File,
         //! Filled folder for file lists, drawn in a slightly larger viewbox than \ref Folder.
         FileFolder,
+        //! Globe of a circle crossed by its equator and a meridian.
+        Globe,
         //! Three dots in a row.
         Dots,
         //! Drag handle of two columns of three dots.
