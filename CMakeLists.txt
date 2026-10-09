@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 project(tinytk
-        VERSION 1.2.3
+        VERSION 1.3.0
         DESCRIPTION "A small system and interface toolkit"
         HOMEPAGE_URL "https://github.com/spacebub/tinytk"
         LANGUAGES C CXX)
