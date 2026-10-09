@@ -130,17 +130,17 @@ namespace ttk {
         //! less one row. Home goes to the first non-blank character of the row, then to the row's start. End goes
         //! to the row's end. Ctrl+Home and Ctrl+End go to either end of the text. Shift extends the selection.
         //! Backspace and Delete remove the selection, or else a character, or a word with Ctrl. Return inserts a line
-        //! break that keeps the current line's indent. Tab inserts spaces up to the next tab stop, and Shift+Tab
-        //! is consumed and does nothing. Ctrl+A, Ctrl+C, Ctrl+X and Ctrl+V select all, copy, cut and paste.
-        //! Ctrl+Z undoes, and Ctrl+Shift+Z and Ctrl+Y redo. A run of typing undoes as one step, and up to 256
-        //! steps are kept. Ctrl+Tab, and Return and Tab while read-only, are not consumed.
+        //! break that keeps the current line's indent. Tab inserts spaces up to the next tab stop. Ctrl+A,
+        //! Ctrl+C, Ctrl+X and Ctrl+V select all, copy, cut and paste. Ctrl+Z undoes, and Ctrl+Shift+Z and Ctrl+Y
+        //! redo. A run of typing undoes as one step, and up to 256 steps are kept. Tab with any modifier, and Return
+        //! and Tab while read-only, are not consumed, so Shift+Tab and Ctrl+Tab leave the editor.
         bool key(const Key &pressed) override;
 
         //! Replaces the selection with `text`, in UTF-8, or inserts it at the caret. Ignored when read-only.
         void wrote(const std::string &text) override;
 
-        //! Tests whether the editor can receive keyboard focus, which it can while enabled.
-        [[nodiscard]] bool takes_focus() const override { return enabled(); }
+        //! Tests whether the editor shows its own focus, which it does with the caret and the accent outline.
+        [[nodiscard]] bool paints_focus() const override { return true; }
 
         //! Called when the editor receives focus. Shows the caret, starts it blinking and repaints.
         void gained_focus() override;

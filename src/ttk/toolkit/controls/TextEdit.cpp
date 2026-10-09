@@ -1111,13 +1111,11 @@ namespace ttk {
             }
 
             case Code::Tab:
-                if (_readOnly || pressed.ctrl) {
+                if (_readOnly || pressed.ctrl || pressed.shift || pressed.alt) {
                     return false;
                 }
 
-                if (!pressed.shift) {
-                    insert(std::string(TAB - (column_of(from) % TAB), ' '));
-                }
+                insert(std::string(TAB - (column_of(from) % TAB), ' '));
                 return true;
 
             default:

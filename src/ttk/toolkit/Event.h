@@ -109,6 +109,8 @@ namespace ttk {
         bool shift = false;
         //! Whether Alt was held.
         bool alt = false;
+        //! Whether the press is the key being held down rather than struck.
+        bool repeat = false;
     };
 }
 

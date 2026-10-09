@@ -69,9 +69,6 @@ namespace ttk {
         //! Called when the pointer moves off the switch. Repaints it with the normal track border.
         void leave() override;
 
-        //! Tests whether the switch can receive keyboard focus, which it can while enabled.
-        [[nodiscard]] bool takes_focus() const override { return enabled(); }
-
         //! Handles Return and Space, which call the `toggled` callback with the opposite of \ref checked when the
         //! switch is enabled. Returns false for other keys.
         bool key(const Key &pressed) override;

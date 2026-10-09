@@ -76,6 +76,10 @@ namespace ttk {
         //! nothing when `at` is outside the switch or between words.
         void release(const Pointer &at) override;
 
+        //! Handles Left and Right, which call the selection callback with the neighbouring choice, and Home and
+        //! End, which call it with the first and last. Return and Space are consumed and do nothing.
+        bool key(const Key &pressed) override;
+
         //! Tracks the word under the pointer and repaints when it changes.
         void hover(const Pointer &at) override;
 

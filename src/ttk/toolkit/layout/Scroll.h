@@ -42,7 +42,7 @@ namespace ttk {
         //!
         //! Does nothing when `wanted` is already fully in view. A box taller than the view ends up with its top
         //! or bottom edge on the edge of the view it was crossing.
-        void reveal(const BLRect &wanted);
+        void reveal(const BLRect &wanted) override;
 
         //! Returns the height of the content in pixels, which the offset range and the bar are measured against.
         //!
@@ -81,6 +81,9 @@ namespace ttk {
         //! Starts or extends a smooth scroll of 52 pixels per notch and returns true. A positive `steps` scrolls
         //! toward the top. Returns false when not \ref scrollable(), so the wheel goes to the parent.
         bool wheel(double steps, const Pointer &at) override;
+
+        //! Returns false. The bar takes presses, but Tab passes the scroller by for its content.
+        [[nodiscard]] bool takes_focus() const override { return false; }
 
         //! Handles a press in the bar lane and returns true when it was taken.
         //!

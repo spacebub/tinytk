@@ -6,6 +6,7 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <algorithm>
 #include <utility>
 
 #include "ttk/draw/Typeface.h"
@@ -151,6 +152,36 @@ namespace ttk {
                 return;
             }
         }
+    }
+
+    bool MultistateSwitch::key(const Key &pressed) {
+        const int last = static_cast<int>(_options.size()) - 1;
+        const auto found = _current ? std::ranges::find(_options, *_current, &Choice::value) : _options.end();
+        const int at = found == _options.end() ? -1 : static_cast<int>(found - _options.begin());
+        const int to = [&] {
+            switch (pressed.code) {
+                case Code::Left:
+                    return std::max(at - 1, 0);
+                case Code::Right:
+                    return std::min(at + 1, last);
+                case Code::Home:
+                    return 0;
+                case Code::End:
+                    return last;
+                default:
+                    return -1;
+            }
+        }();
+
+        if (to < 0) {
+            return pressed.code == Code::Return || pressed.code == Code::Space;
+        }
+
+        if (to != at && to <= last && _selected) {
+            _selected(_options[to].value);
+        }
+
+        return true;
     }
 
     void MultistateSwitch::hover(const Pointer &at) {

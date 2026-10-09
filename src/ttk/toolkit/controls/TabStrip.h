@@ -73,6 +73,10 @@ namespace ttk {
         //! Calls the `selected` callback with the index of the tab under `at`, if any.
         void release(const Pointer &at) override;
 
+        //! Handles Left and Right, which call the `selected` callback with the neighbouring tab, and Home and End,
+        //! which call it with the first and last. Return and Space are consumed and do nothing.
+        bool key(const Key &pressed) override;
+
         //! Highlights the name of the tab under `at`.
         void hover(const Pointer &at) override;
 

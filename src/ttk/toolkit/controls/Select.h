@@ -98,9 +98,6 @@ namespace ttk {
         //! Called when the pointer moves off the field. Fades the hover tint.
         void leave() override;
 
-        //! Tests whether the select can receive keyboard focus, which it can while enabled.
-        [[nodiscard]] bool takes_focus() const override { return enabled(); }
-
         //! Handles Return and Space, which open or close the list, and Down and Up, which call the `selected`
         //! callback with the next or previous index. Returns false for other keys and at either end of the
         //! options, where the top end is the placeholder row of a \ref clearable() select.

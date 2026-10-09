@@ -114,9 +114,6 @@ namespace ttk {
         //! Handles Ctrl+A, which selects all, and Ctrl+C, which copies the selection. Returns false for other keys.
         bool key(const Key &pressed) override;
 
-        //! Tests whether the view can receive keyboard focus, which it always can.
-        [[nodiscard]] bool takes_focus() const override { return true; }
-
         //! Called when the view loses keyboard focus. Clears the selection.
         void lost_focus() override;
 

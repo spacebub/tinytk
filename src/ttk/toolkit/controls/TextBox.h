@@ -94,8 +94,8 @@ namespace ttk {
         //! Replaces the selection with `text`, in UTF-8, or inserts it at the caret. Ignored when read-only.
         void wrote(const std::string &text) override;
 
-        //! Tests whether the field can receive keyboard focus, which it can while enabled.
-        [[nodiscard]] bool takes_focus() const override { return enabled(); }
+        //! Tests whether the field shows its own focus, which it does with the caret.
+        [[nodiscard]] bool paints_focus() const override { return true; }
 
         //! Called when the field receives focus. Shows the caret, starts it blinking and repaints the parent, which
         //! may draw a focus border around the field.

@@ -86,6 +86,9 @@ namespace ttk {
         //! while it grows.
         void paint(const Painter &painter) override;
 
+        //! Returns false. The scrim takes presses only to sink them.
+        [[nodiscard]] bool takes_focus() const override { return false; }
+
         //! Takes every press and notes whether it landed on the scrim.
         bool press(const Pointer &at) override;
         //! Calls \ref dismissed when both the press and `at` are outside the card.

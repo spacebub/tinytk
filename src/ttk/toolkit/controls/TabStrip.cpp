@@ -6,6 +6,7 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <algorithm>
 #include <utility>
 
 #include "ttk/draw/Theme.h"
@@ -136,6 +137,34 @@ namespace ttk {
         if (const int index = at_point(at.x, at.y); index >= 0 && _selected) {
             _selected(index);
         }
+    }
+
+    bool TabStrip::key(const Key &pressed) {
+        const int last = static_cast<int>(_tabs.size()) - 1;
+        const int to = [&] {
+            switch (pressed.code) {
+                case Code::Left:
+                    return std::max(_current - 1, 0);
+                case Code::Right:
+                    return std::min(_current + 1, last);
+                case Code::Home:
+                    return 0;
+                case Code::End:
+                    return last;
+                default:
+                    return -1;
+            }
+        }();
+
+        if (to < 0) {
+            return pressed.code == Code::Return || pressed.code == Code::Space;
+        }
+
+        if (to != _current && to <= last && _selected) {
+            _selected(to);
+        }
+
+        return true;
     }
 
     void TabStrip::hover(const Pointer &at) {

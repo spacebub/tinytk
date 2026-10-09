@@ -60,6 +60,9 @@ namespace ttk {
                 _scroll = append(std::make_unique<Scroll>());
             }
 
+            // The select keeps focus and drives the list from the keyboard.
+            [[nodiscard]] bool takes_focus() const override { return false; }
+
             // Opens on the picked option.
             void settle() const {
                 const int shift = _clearable ? 1 : 0;

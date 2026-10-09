@@ -8,6 +8,7 @@
  */
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 #include "ttk/draw/Theme.h"
 #include "ttk/toolkit/Root.h"
@@ -86,9 +87,9 @@ namespace ttk {
             }
         }
 
-        bool above(const ttk::Widget *leaf, const ttk::Widget *up) {
-            for (; leaf != nullptr; leaf = leaf->parent()) {
-                if (leaf == up) {
+        bool under(const ttk::Widget *who, const ttk::Widget *of) {
+            for (; who != nullptr; who = who->parent()) {
+                if (who == of) {
                     return true;
                 }
             }
@@ -272,6 +273,10 @@ namespace ttk {
         for (Page &over : _layers) {
             over.paint(painter);
         }
+
+        if (_focusShown && _focused != nullptr && _focused->visible() && !_focused->paints_focus()) {
+            painter.outline(_focused->box(), Theme::radiusSmall, 1.0, Theme::palette().accent);
+        }
     }
 
     Widget *Root::pick(const double x, const double y) {
@@ -309,14 +314,14 @@ namespace ttk {
         // The containers hear it only where the two paths part.
         for (Widget *up = was == nullptr ? nullptr : was->parent(); up != nullptr;
              up = up->parent()) {
-            if (!above(who, up)) {
+            if (!under(who, up)) {
                 up->within(false);
             }
         }
 
         for (Widget *up = who == nullptr ? nullptr : who->parent(); up != nullptr;
              up = up->parent()) {
-            if (!above(was, up)) {
+            if (!under(was, up)) {
                 up->within(true);
             }
         }
@@ -349,6 +354,14 @@ namespace ttk {
     void Root::press(const Pointer &at) {
         _pointer = at;
 
+        if (_focusShown) {
+            _focusShown = false;
+
+            if (_focused != nullptr) {
+                _focused->invalidate();
+            }
+        }
+
         Widget *who = pick(at.x, at.y);
 
         _justDismissed = false;
@@ -363,14 +376,8 @@ namespace ttk {
 
             _justDismissed = true;
 
-            if (who == nullptr) {
+            if (who == nullptr || under(who, owner)) {
                 return;
-            }
-
-            for (const Widget *up = who; up != nullptr; up = up->parent()) {
-                if (up == owner) {
-                    return;
-                }
             }
         }
 
@@ -429,11 +436,33 @@ namespace ttk {
         hover_to(nullptr, Pointer{.x = -1.0, .y = -1.0});
     }
 
-    bool Root::key(const Key &pressed) const {
+    bool Root::key(const Key &pressed) {
         for (Widget *up = _focused; up != nullptr; up = up->parent()) {
             if (up->key(pressed)) {
                 return true;
             }
+        }
+
+        if (pressed.code == Code::Tab && !pressed.alt) {
+            if (!pressed.repeat) {
+                focus_next(pressed.shift);
+            }
+
+            return true;
+        }
+
+        if ((pressed.code == Code::Return || pressed.code == Code::Space) && _focused != nullptr
+            && _focused->takes_focus()) {
+            if (!pressed.repeat) {
+                const BLRect box = _focused->box();
+                const Pointer at{.x = box.x + (box.w / 2.0), .y = box.y + (box.h / 2.0)};
+
+                if (_focused->press(at)) {
+                    _focused->release(at);
+                }
+            }
+
+            return true;
         }
 
         return false;
@@ -453,6 +482,7 @@ namespace ttk {
         Widget *was = _focused;
 
         _focused = who;
+        _focusShown = false;
 
         if (was != nullptr) {
             was->lost_focus();
@@ -467,49 +497,95 @@ namespace ttk {
         }
     }
 
-    void Root::gather(const Widget *from, std::vector<Widget *> &out) {
+    void Root::gather(Widget *from, const int inherited, std::vector<Stop> &out) {
+        if (!from->visible() || !from->enabled()) {
+            return;
+        }
+
+        const int own = from->tab_index();
+        int index = own > 0 ? own : inherited;
+
+        if (own < 0 || inherited < 0) {
+            index = -1;
+        }
+
+        if (from->takes_focus()) {
+            out.push_back({.who = from, .index = index});
+        }
+
         for (const Widget::Ptr &child : from->children()) {
-            if (!child->visible() || !child->enabled()) {
-                continue;
-            }
-
-            if (child->takes_focus()) {
-                out.push_back(child.get());
-            }
-
-            gather(child.get(), out);
+            gather(child.get(), index, out);
         }
     }
 
-    void Root::focus_next(const bool backwards) {
-        std::vector<Widget *> order;
+    Widget *Root::next_stop(const bool backwards) {
+        std::vector<Stop> order;
 
         // A dialog or a popup owns the keyboard while it is up.
         for (size_t index = LAYERS; index > 0 && order.empty(); --index) {
-            gather(&_layers[index - 1], order);
+            gather(&_layers[index - 1], 0, order);
         }
 
         if (order.empty()) {
-            gather(&_page, order);
+            gather(&_page, 0, order);
         }
 
         if (order.empty()) {
+            return nullptr;
+        }
+
+        if (std::ranges::any_of(order, [](const Stop &stop) { return stop.index > 0; })) {
+            std::ranges::stable_sort(order, {}, [](const Stop &stop) {
+                return std::pair{stop.index <= 0, std::max(stop.index, 0)};
+            });
+        }
+
+        const size_t count = order.size();
+        const auto found = std::ranges::find(order, _focused, &Stop::who);
+
+        // Skipped widgets stay in the order so focus taken by a click on one moves on
+        // from where it sits.
+        size_t at = found != order.end() ? static_cast<size_t>(found - order.begin())
+                                         : (backwards ? 0 : count - 1);
+
+        for (size_t step = 0; step < count; ++step) {
+            at = backwards ? (at + count - 1) % count : (at + 1) % count;
+
+            if (order[at].index >= 0) {
+                return order[at].who;
+            }
+        }
+
+        return nullptr;
+    }
+
+    void Root::focus_next(const bool backwards) {
+        Widget *next = next_stop(backwards);
+
+        if (next == nullptr) {
             return;
         }
 
-        const auto found = std::ranges::find(order, _focused);
+        // A popup hangs off the control that opened it, so it closes when focus leaves that control.
+        if (_dismiss && !under(next, _owner) && !under(next, &_layers[POPUPS])) {
+            dismiss();
 
-        if (found == order.end()) {
-            focus(backwards ? order.back() : order.front());
+            // Closing may have rebuilt the tree the first pass pointed into.
+            next = next_stop(backwards);
 
-            return;
+            if (next == nullptr) {
+                return;
+            }
         }
 
-        const size_t at = static_cast<size_t>(found - order.begin());
-        const size_t next = backwards ? (at + order.size() - 1) % order.size()
-                                      : (at + 1) % order.size();
+        focus(next);
 
-        focus(order[next]);
+        for (Widget *up = next->parent(); up != nullptr; up = up->parent()) {
+            up->reveal(next->drawn());
+        }
+
+        _focusShown = true;
+        next->invalidate();
     }
 
     void Root::forget(const Widget *who) {

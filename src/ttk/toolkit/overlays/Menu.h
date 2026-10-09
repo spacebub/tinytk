@@ -82,6 +82,9 @@ namespace ttk {
         //! Paints the menu's panel and rows, highlighting the row under the pointer.
         void paint(const Painter &painter) override;
 
+        //! Returns false. The control the menu dropped from keeps focus while it is open.
+        [[nodiscard]] bool takes_focus() const override { return false; }
+
         //! Takes a press inside the menu's box.
         bool press(const Pointer &at) override;
         //! Calls the trigger callback with the action of the row at the height of `at`, unless that row is a rule,

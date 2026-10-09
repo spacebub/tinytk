@@ -117,7 +117,8 @@ namespace ttk {
         //! Returns the moves accepted by \ref shift() since the last call and clears them.
         std::vector<Shift> take_shifts();
 
-        //! Paints the page and then every layer, clipped to `clip`.
+        //! Paints the page and then every layer, clipped to `clip`, and over them a ring inside the box of the
+        //! focused widget while it holds focus from the keyboard and does not \ref Widget::paints_focus().
         void paint(BLContext &context, const BLRectI &clip);
 
         //! \}
@@ -136,7 +137,7 @@ namespace ttk {
         //! A press outside the \ref POPUPS layer while a popup is open dismisses it first, and goes no further when
         //! it lands on nothing or on the popup's owner, see \ref set_dismiss(). The press is then offered to the
         //! widget under the pointer and its ancestors until one takes it, which then holds the press. A press that
-        //! nothing takes clears keyboard focus.
+        //! nothing takes clears keyboard focus. Any press hides the focus ring.
         void press(const Pointer &at);
         //! Handles a button release. The widget holding the press receives \ref Widget::release() and the hover
         //! moves to whatever is under `at`. Does nothing when no widget holds the press.
@@ -171,24 +172,33 @@ namespace ttk {
         //! \{
 
         //! Offers `pressed` to the focused widget and then its ancestors, and returns true when one consumed it.
-        //! Returns false when nothing has focus.
-        bool key(const Key &pressed) const;
+        //!
+        //! Tab that no widget consumed, with or without Shift and Ctrl, moves focus through \ref focus_next() and
+        //! counts as consumed, though a held key moves it once. Alt+Tab is left alone. Return and Space that no
+        //! widget consumed press and release the focused control at its centre, so any control activates from the
+        //! keyboard, and count as consumed, though a held key acts once. Returns false for any other key nothing
+        //! consumed.
+        bool key(const Key &pressed);
         //! Passes `text`, in UTF-8, to the focused widget. Ignored when nothing has focus.
         void wrote(const std::string &text) const;
 
         //! Gives keyboard focus to `who`, or clears it when `who` is null. Does nothing when `who` already has it.
         //!
         //! Calls \ref Widget::lost_focus() on the old widget and \ref Widget::gained_focus() on the new one, then
-        //! \ref composing.
+        //! \ref composing. Hides the focus ring, which only \ref focus_next() shows.
         void focus(Widget *who);
         //! Returns the widget with keyboard focus, or null.
         Widget *focused() const { return _focused; }
 
         //! Moves focus to the next widget that takes focus, or the previous one when `backwards` is true.
         //!
-        //! Only visible and enabled widgets count, in tree order, and the order wraps around. The candidates are
-        //! taken from the topmost layer that has any, otherwise from the page, so an open dialog keeps focus to
-        //! itself. Without a focused candidate, focus goes to the first one, or the last when `backwards` is true.
+        //! Only visible and enabled widgets that \ref Widget::takes_focus() count, in tree order unless
+        //! \ref Widget::set_tab_index() says otherwise, and the order wraps around. The candidates are taken from
+        //! the topmost visible and enabled layer that has any, otherwise from the page, so an open dialog keeps
+        //! focus to itself. Without a focused candidate, focus goes to the first one, or the last when `backwards`
+        //! is true. A popup registered through \ref set_dismiss() is dismissed when focus moves off its owner, or
+        //! off the \ref POPUPS layer when it has no owner. The widget focused is brought into view through
+        //! \ref Widget::reveal() on its ancestors and shown with a focus ring until the next press.
         void focus_next(bool backwards);
 
         //! Called after every focus change with the \ref Widget::takes_focus() of the newly focused widget, or false
@@ -271,7 +281,14 @@ namespace ttk {
 
         void hover_to(Widget *who, const Pointer &at);
 
-        static void gather(const Widget *from, std::vector<Widget *> &out);
+        struct Stop {
+            Widget *who;
+            int index;
+        };
+
+        static void gather(Widget *from, int inherited, std::vector<Stop> &out);
+
+        Widget *next_stop(bool backwards);
 
         // A layer over the page. Its children are stretched to the window unless it
         // floats them: a popup is anchored to the control it dropped from and keeps
@@ -309,6 +326,7 @@ namespace ttk {
         Widget *_hovered = nullptr;
         Widget *_grabbed = nullptr;
         Widget *_focused = nullptr;
+        bool _focusShown = false;
 
         std::function<void()> _dismiss;
         const Widget *_owner = nullptr;

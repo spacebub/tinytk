@@ -122,9 +122,6 @@ namespace ttk {
         //! Called when the pointer moves off the button. Fades out the hover highlight.
         void leave() override;
 
-        //! Tests whether the button can receive keyboard focus, which is whenever it is enabled.
-        [[nodiscard]] bool takes_focus() const override { return enabled(); }
-
         //! Consumes Return and Space and clicks the button on them when it is enabled and not busy. Returns false
         //! for every other key.
         bool key(const Key &pressed) override;

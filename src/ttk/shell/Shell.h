@@ -115,8 +115,9 @@ namespace ttk {
         //! Called when the mouse forward side button is released. Side buttons never reach the widgets.
         std::function<void()> forward;
 
-        //! Called with each key press that neither the focused widget nor any of its ancestors consumed, for the
-        //! shortcuts the whole window owns. It returns true when it handled the key.
+        //! Called with each key press that neither the focused widget, its ancestors nor \ref Root::key() consumed,
+        //! for the shortcuts the whole window owns, so Tab arrives only with Alt held. It returns true when it
+        //! handled the key.
         std::function<bool(const ttk::Key &)> shortcut;
 
         //! Called once per turn of the loop, after events, posted functions and timers, and before the frame is

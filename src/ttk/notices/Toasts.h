@@ -70,6 +70,9 @@ namespace ttk {
         //! animation.
         void paint(const ttk::Painter &painter) override;
 
+        //! Returns false. A toast takes presses only to sink them.
+        [[nodiscard]] bool takes_focus() const override { return false; }
+
         //! Takes every press inside the box, so presses do not reach what lies under the toast.
         bool press(const ttk::Pointer &at) override { return holds(at.x, at.y); }
 

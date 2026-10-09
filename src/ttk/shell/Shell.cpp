@@ -669,6 +669,7 @@ namespace ttk {
                     .ctrl = (event.key.mod & SDL_KMOD_CTRL) != 0,
                     .shift = (event.key.mod & SDL_KMOD_SHIFT) != 0,
                     .alt = (event.key.mod & SDL_KMOD_ALT) != 0,
+                    .repeat = event.key.repeat,
                 };
 
                 if (_root->key(pressed)) {

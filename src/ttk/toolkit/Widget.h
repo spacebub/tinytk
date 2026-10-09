@@ -240,14 +240,29 @@ namespace ttk {
         //! Handles text input, in UTF-8, while the widget has focus.
         virtual void wrote(const std::string &text);
 
-        //! Tests whether the widget can receive keyboard focus. The default implementation returns false.
-        [[nodiscard]] virtual bool takes_focus() const { return false; }
+        //! Tests whether the widget can receive keyboard focus.
+        //!
+        //! The default implementation returns true while the widget answers the pointer and is enabled, so every
+        //! control is a Tab stop without asking. A widget that takes presses only to sink them, such as a scroller
+        //! or a scrim, returns false.
+        [[nodiscard]] virtual bool takes_focus() const { return _takesPointer && _enabled; }
 
         //! Called when the widget receives keyboard focus. The default implementation repaints it.
         virtual void gained_focus();
 
         //! Called when the widget loses keyboard focus. The default implementation repaints it.
         virtual void lost_focus();
+
+        //! Returns the place of the widget in Tab order, see \ref set_tab_index(). Zero by default.
+        [[nodiscard]] int tab_index() const { return _tabIndex; }
+
+        //! Sets the place of the widget in Tab order.
+        //!
+        //! Widgets with a positive index come first, in ascending order across the whole page or layer, and the
+        //! rest follow in tree order, as do equal indices. Zero, the default, takes the index of the nearest
+        //! ancestor that has one, so a form moves as a whole. A negative index takes the widget and everything
+        //! under it out of Tab order, though a click still focuses them.
+        void set_tab_index(const int value) { _tabIndex = value; }
 
         //! Returns the deepest visible and enabled widget at `[x, y]` that takes the pointer or has a \ref hint,
         //! or null when there is none. Later children are tested first, as they are painted on top.
@@ -290,6 +305,22 @@ namespace ttk {
         //! rebuild anything derived from theme colours.
         virtual void restyle() {}
 
+    public:
+        // Declared after every older virtual so the vtable slots above keep their place.
+
+        //! Tests whether the widget shows keyboard focus by itself, with a caret or an accent border.
+        //!
+        //! The default implementation returns false, and the root then draws a ring inside \ref box() while the
+        //! widget holds focus it got from the keyboard.
+        [[nodiscard]] virtual bool paints_focus() const { return false; }
+
+        //! Brings `wanted`, in window coordinates, into view, for a container that can move its content.
+        //!
+        //! The default implementation does nothing. The root calls it on every ancestor of a widget that Tab
+        //! focused, nearest first.
+        virtual void reveal(const BLRect & /*wanted*/) {}
+
+    protected:
         //! Whether \ref at() returns this widget for a point inside it. A control that answers the pointer sets
         //! it in its constructor. A plain container leaves it false so the pointer reaches what is under it.
         bool _takesPointer = false;
@@ -305,6 +336,8 @@ namespace ttk {
         Widget *_parent = nullptr;
         Root *_root = nullptr;
         std::uint32_t _revision;
+
+        int _tabIndex = 0;
 
         bool _visible = true;
         bool _enabled = true;
