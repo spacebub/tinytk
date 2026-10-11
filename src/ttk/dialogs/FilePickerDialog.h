@@ -301,6 +301,9 @@ namespace ttk {
         };
 
         Shape _shape;
+
+        // Rows drawn as marked, since moving the only mark leaves the layout as it was.
+        std::vector<size_t> _shownMarks;
     };
 }
 

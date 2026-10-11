@@ -183,12 +183,26 @@ namespace ttk {
             .rows = pick.entries.size(),
         };
 
+        std::vector<size_t> marks;
+
+        for (size_t index = 0; index < pick.entries.size(); ++index) {
+            if (pick.entries[index].marked) {
+                marks.push_back(index);
+            }
+        }
+
+        const bool remarked = marks != _shownMarks;
+
+        _shownMarks = std::move(marks);
+
         if (shape != _shape) {
             _shape = shape;
 
             if (root() != nullptr) {
                 root()->relayout();
             }
+        } else if (remarked) {
+            _rows->invalidate();
         }
     }
 
