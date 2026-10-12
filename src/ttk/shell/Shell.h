@@ -32,7 +32,8 @@ namespace ttk {
     //! Set the icon and minimum size, call \ref start() to open the window, fill \ref ui() and the callbacks,
     //! then call \ref run(). The window is borderless and draws its own title bar. While no widget animates, no
     //! area needs repainting, no timer is due and nothing called \ref nudge(), the loop blocks until an event, a
-    //! \ref post() or the next timer, and the process stays idle.
+    //! \ref post() or the next timer, and the process stays idle. While the window is hidden, minimized or
+    //! occluded, nothing is drawn and animations wait until it is shown again.
     //! Drawing is paced to the display's refresh rate, divided down to at most 200 frames per second.
     class Shell : public Clock, public Window {
     public:
@@ -191,7 +192,10 @@ namespace ttk {
 
         void errands();
 
-        [[nodiscard]] int sleep_for(double at) const;
+        [[nodiscard]] int sleep_for(double at, bool unseen) const;
+
+        // True while the desktop shows none of the window: hidden, minimized or occluded.
+        [[nodiscard]] bool unseen() const;
 
         // True once the display has had time to show the last frame. A desktop drives
         // its resize loop as fast as we return, so unpaced it gets frames nothing shows.

@@ -495,6 +495,18 @@ namespace ttk {
         }
     }
 
+    void Root::set_active(const bool active) {
+        if (_active == active) {
+            return;
+        }
+
+        _active = active;
+
+        if (_focused != nullptr) {
+            _focused->wake();
+        }
+    }
+
     void Root::gather(Widget *from, const int inherited, std::vector<Stop> &out) {
         if (!from->visible() || !from->enabled()) {
             return;

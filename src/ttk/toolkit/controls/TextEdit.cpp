@@ -546,7 +546,7 @@ namespace ttk {
         }
 
         _typing = false;
-        _showCaret = true;
+        _showCaret = root() == nullptr || root()->active();
         _blinked = now();
 
         keep_caret();
@@ -1147,6 +1147,18 @@ namespace ttk {
 
     bool TextEdit::advance(const double now) {
         if (!focused() || _readOnly) {
+            return false;
+        }
+
+        // Hidden rather than frozen, and due to come back on the first frame the window is active again.
+        if (!root()->active()) {
+            if (_showCaret) {
+                invalidate();
+            }
+
+            _showCaret = false;
+            _blinked = now - BLINK;
+
             return false;
         }
 

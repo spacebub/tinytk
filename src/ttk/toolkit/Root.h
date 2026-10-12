@@ -208,6 +208,13 @@ namespace ttk {
         //! when focus was cleared. The shell turns the platform's text input on or off with it.
         std::function<void(bool)> composing;
 
+        //! Sets whether the window holds the desktop's keyboard focus, and wakes the focused widget when that
+        //! changes. The shell keeps it current. A caret neither shows nor blinks in an inactive window.
+        void set_active(bool active);
+
+        //! Tests whether the window holds the desktop's keyboard focus. True until \ref set_active() says otherwise.
+        [[nodiscard]] bool active() const { return _active; }
+
         //! \}
 
         //! \name Animation
@@ -341,6 +348,7 @@ namespace ttk {
         Widget *_grabbed = nullptr;
         Widget *_focused = nullptr;
         bool _focusShown = false;
+        bool _active = true;
 
         std::function<void()> _dismiss;
         const Widget *_owner = nullptr;

@@ -194,7 +194,7 @@ namespace ttk {
             _anchor = _caret;
         }
 
-        _showCaret = true;
+        _showCaret = root() == nullptr || root()->active();
         _blinked = now();
 
         if (root() != nullptr) {
@@ -477,6 +477,18 @@ namespace ttk {
 
     bool TextBox::advance(const double now) {
         if (!focused()) {
+            return false;
+        }
+
+        // Hidden rather than frozen, and due to come back on the first frame the window is active again.
+        if (!root()->active()) {
+            if (_showCaret) {
+                invalidate();
+            }
+
+            _showCaret = false;
+            _blinked = now - BLINK;
+
             return false;
         }
 

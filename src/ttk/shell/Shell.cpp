@@ -412,8 +412,15 @@ namespace ttk {
         return _frameGap == 0 || SDL_GetTicksNS() - _painted >= _frameGap;
     }
 
-    int Shell::sleep_for(const double at) const {
-        double soonest = _root->waking();
+    bool Shell::unseen() const {
+        return (SDL_GetWindowFlags(_window)
+                & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_OCCLUDED)) != 0;
+    }
+
+    int Shell::sleep_for(const double at, const bool unseen) const {
+        // Nothing on screen to step: widget wake-ups wait, and the frame that shows the
+        // window again catches every animation up at once.
+        double soonest = unseen ? -1.0 : _root->waking();
 
         for (const Alarm &alarm : _alarms) {
             if (soonest < 0.0 || alarm.due < soonest) {
@@ -597,6 +604,12 @@ namespace ttk {
 
                 break;
 
+            case SDL_EVENT_WINDOW_FOCUS_GAINED:
+            case SDL_EVENT_WINDOW_FOCUS_LOST:
+                _root->set_active(event.type == SDL_EVENT_WINDOW_FOCUS_GAINED);
+
+                break;
+
             case SDL_EVENT_SYSTEM_THEME_CHANGED:
                 Theme::set_system_dark(system_dark());
 
@@ -718,6 +731,8 @@ namespace ttk {
 
         SDL_ShowWindow(_window);
 
+        _root->set_active((SDL_GetWindowFlags(_window) & SDL_WINDOW_INPUT_FOCUS) != 0);
+
         // The frame above went into a hidden window, where the blit goes nowhere. This
         // is the one the desktop actually shows.
         _surface.damage_all();
@@ -730,9 +745,11 @@ namespace ttk {
         while (_running) {
             SDL_Event event;
 
-            // Nothing in flight: block until the desktop or an alarm has something to
-            // say. This is where the idle cost goes to nothing at all.
-            if (!_nudged && !_root->busy() && !_root->dirty() && SDL_WaitEventTimeout(&event, sleep_for(now()))) {
+            // Nothing in flight, or nothing anyone can see: block until the desktop or an
+            // alarm has something to say. This is where the idle cost goes to nothing at all.
+            if (const bool hidden = unseen();
+                !_nudged && (hidden || (!_root->busy() && !_root->dirty()))
+                && SDL_WaitEventTimeout(&event, sleep_for(now(), hidden))) {
                 handle(event);
             }
 
@@ -755,6 +772,11 @@ namespace ttk {
             }
 
             set_cursor(_root->cursor());
+
+            // The damage stands, and the expose that brings the window back draws it.
+            if (unseen()) {
+                continue;
+            }
 
             // Waking on an event is not a reason to draw sooner than the display can
             // show it: a pointer reports many times a frame, and a turn that comes
