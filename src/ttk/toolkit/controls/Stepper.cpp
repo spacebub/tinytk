@@ -64,8 +64,8 @@ namespace ttk {
         return this;
     }
 
-    Stepper *Stepper::tooltip(std::string text) {
-        hint = std::move(text);
+    Stepper *Stepper::tooltip(const std::string_view text) {
+        hint = text;
 
         return this;
     }
@@ -119,7 +119,8 @@ namespace ttk {
         painter.outline(_frame, Theme::radiusSmall, 1.0,
                         Theme::alpha(hovered() ? palette.borderStrong : palette.border, dim));
 
-        const std::string said = unset() ? _placeholder : std::to_string(_value);
+        const std::string number = unset() ? std::string() : std::to_string(_value);
+        const std::string_view said = unset() ? std::string_view(_placeholder) : std::string_view(number);
 
         painter.label(painter.font(Typeface::pick(unset() ? 400 : 600, !unset()), Theme::fontBody),
                       _frame, Align::Centre, said,

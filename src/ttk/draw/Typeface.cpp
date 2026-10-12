@@ -364,8 +364,8 @@ namespace ttk {
         return held.width;
     }
 
-    std::string Typeface::elide(const BLFont &font, const std::string_view run, const float room,
-                                const float tracking) {
+    const std::string &Typeface::elide(const BLFont &font, const std::string_view run, const float room,
+                                       const float tracking) {
         // The answer is kept, not the candidates: a label elides to the same string every
         // paint, and putting the candidates in the shape cache would evict what is drawn.
         Cache::evict_oldest(_elided, ELIDED);

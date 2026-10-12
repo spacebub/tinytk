@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ttk/toolkit/Widget.h"
@@ -79,7 +80,7 @@ namespace ttk {
         [[nodiscard]] bool editable() const { return !_readOnly; }
 
         //! Sets the text shown in a faint colour while the editor is empty, and returns this.
-        TextEdit *placeholder(std::string text);
+        TextEdit *placeholder(std::string_view text);
 
         //! Returns the selected text, or an empty string when nothing is selected.
         [[nodiscard]] std::string selection() const;

@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/toolkit/Widget.h"
 
@@ -93,7 +94,7 @@ namespace ttk {
         //!
         //! Does nothing when both are unchanged. Restarts the blink on its full phase and wakes the widget when
         //! `status` blinks. The widget is not laid out again, so a change of width shows after the next layout.
-        void set(Status status, std::string reason = {});
+        void set(Status status, std::string_view reason = {});
 
         //! Makes the pill clickable, calling `clicked` on a click, and returns this.
         //!

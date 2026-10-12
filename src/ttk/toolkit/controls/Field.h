@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/toolkit/controls/Button.h"
 #include "ttk/toolkit/controls/GlyphButton.h"
@@ -33,10 +34,10 @@ namespace ttk {
         Field(std::string label, std::function<void(const std::string &)> edited);
 
         //! Sets the text shown in the empty input and returns this field.
-        Field *placeholder(std::string text);
+        Field *placeholder(std::string_view text);
 
         //! Sets the input text to `text` without calling the edit callback and returns this field.
-        Field *value(const std::string &text);
+        Field *value(std::string_view text);
 
         //! Sets the glyph drawn at the left of the frame and returns this field. \ref Glyphs::Glyph::Empty shows
         //! none. Takes effect at the next layout.
@@ -56,30 +57,30 @@ namespace ttk {
         Field *secret(bool value = true);
 
         //! Sets the wrapped note shown below the input and returns this field. Empty hides the note.
-        Field *note(std::string text);
+        Field *note(std::string_view text);
 
         //! Shows `text` as a badge of style `kind` at the right of the caption row and returns this field. Empty
         //! hides the badge.
-        Field *badge(std::string text, Pill::Kind kind);
+        Field *badge(std::string_view text, Pill::Kind kind);
 
         //! Adds a 30 pixel glyph button inside the right end of the frame and returns this field.
         //!
         //! The button shows `glyph`, has `text` as its tooltip and calls `pressed` when clicked. Call it once per
         //! field, as only the last button added is managed by \ref set_icon_visible() and \ref set_icon_hint().
-        Field *icon(Glyphs::Glyph glyph, std::string text, std::function<void()> pressed);
+        Field *icon(Glyphs::Glyph glyph, std::string_view text, std::function<void()> pressed);
 
         //! Adds a compact \ref Button labelled `label` beside the frame that calls `pressed` when clicked, and
         //! returns this field.
         Field *action(std::string label, std::function<void()> pressed);
 
         //! Sets the input text to `text` without calling the edit callback.
-        void set_text(const std::string &text) const;
+        void set_text(std::string_view text) const;
 
         //! Shows or hides the glyph button added by \ref icon(). Does nothing when there is none.
         void set_icon_visible(bool value) const;
 
         //! Sets the tooltip of the glyph button added by \ref icon(). Does nothing when there is none.
-        void set_icon_hint(std::string text) const;
+        void set_icon_hint(std::string_view text) const;
 
         //! Returns the input text.
         [[nodiscard]] const std::string &text() const { return _input->text(); }

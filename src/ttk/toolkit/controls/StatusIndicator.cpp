@@ -138,13 +138,13 @@ namespace ttk {
         return box;
     }
 
-    void StatusIndicator::set(const Status status, std::string reason) {
+    void StatusIndicator::set(const Status status, const std::string_view reason) {
         if (_status == status && _reason == reason) {
             return;
         }
 
         _status = status;
-        _reason = std::move(reason);
+        _reason = reason;
         _dim = false;
 
         retell();

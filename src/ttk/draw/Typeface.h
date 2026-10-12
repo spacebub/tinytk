@@ -82,8 +82,10 @@ namespace ttk {
         //!
         //! Returns an empty string when not even the ellipsis fits. A positive `tracking` measures as
         //! \ref width_tracked() does. Results are cached by font, run, `room` to a quarter pixel and `tracking`.
-        std::string elide(const BLFont &font, std::string_view run, float room,
-                          float tracking = 0.0F);
+        //! The string returned is the cache entry, valid until it is evicted, which takes thousands of further calls.
+        //! Copy it to keep it longer.
+        const std::string &elide(const BLFont &font, std::string_view run, float room,
+                                 float tracking = 0.0F);
 
         //! Draws `run` in `tone` with the top-left of its line box at `top`. Does nothing when `run` is empty.
         //!

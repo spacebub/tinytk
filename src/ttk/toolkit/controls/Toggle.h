@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/draw/Anim.h"
 #include "ttk/toolkit/Widget.h"
@@ -42,7 +43,7 @@ namespace ttk {
         void set_checked(bool value);
 
         //! Sets the label to `text` and repaints. The area that takes the pointer follows at the next layout.
-        void set_text(std::string text);
+        void set_text(std::string_view text);
 
         //! Returns \ref Widget::fixedWidth when it is set, otherwise the width of the track and the label.
         double natural_width(Typeface &type) override;

@@ -200,17 +200,16 @@ namespace ttk {
         _dirty.emplace_back(0.0, 0.0, _width, _height);
     }
 
-    std::vector<BLRect> Root::take() {
-        std::vector<BLRect> taken;
-
-        taken.swap(_dirty);
+    const std::vector<BLRect> &Root::take() {
+        _taken.swap(_dirty);
+        _dirty.clear();
         _crowded = false;
 
-        if (taken.size() > 1) {
-            coalesce(taken);
+        if (_taken.size() > 1) {
+            coalesce(_taken);
         }
 
-        return taken;
+        return _taken;
     }
 
     bool Root::shift(const Widget *who, const BLRect &region, const int dy) {
@@ -257,25 +256,24 @@ namespace ttk {
         return true;
     }
 
-    std::vector<Root::Shift> Root::take_shifts() {
-        std::vector<Shift> taken;
+    const std::vector<Root::Shift> &Root::take_shifts() {
+        _shifted.swap(_shifts);
+        _shifts.clear();
 
-        taken.swap(_shifts);
-
-        return taken;
+        return _shifted;
     }
 
     void Root::paint(BLContext &context, const BLRectI &clip) {
-        const Painter painter(context, _type, clip);
+        _painter.aim(context, clip);
 
-        _page.paint(painter);
+        _page.paint(_painter);
 
         for (Page &over : _layers) {
-            over.paint(painter);
+            over.paint(_painter);
         }
 
         if (_focusShown && _focused != nullptr && _focused->visible() && !_focused->paints_focus()) {
-            painter.outline(_focused->box(), Theme::radiusSmall, 1.0, Theme::palette().accent);
+            _painter.outline(_focused->box(), Theme::radiusSmall, 1.0, Theme::palette().accent);
         }
     }
 
@@ -593,7 +591,7 @@ namespace ttk {
             return;
         }
 
-        _live.erase(const_cast<Widget *>(who));
+        std::erase(_live, who);
 
         std::erase_if(_sleeping, [who](const Sleeper &kept) { return kept.who == who; });
 
@@ -619,7 +617,7 @@ namespace ttk {
     }
 
     void Root::live(Widget *who) {
-        _live.insert(who);
+        enliven(who);
 
         std::erase_if(_sleeping, [who](const Sleeper &kept) { return kept.who == who; });
     }
@@ -651,7 +649,7 @@ namespace ttk {
     void Root::advance(const double now) {
         for (size_t at = _sleeping.size(); at > 0; --at) {
             if (const Sleeper &kept = _sleeping[at - 1]; kept.due <= now) {
-                _live.insert(kept.who);
+                enliven(kept.who);
                 _sleeping.erase(_sleeping.begin() + static_cast<ptrdiff_t>(at - 1));
             }
         }
@@ -660,12 +658,19 @@ namespace ttk {
             return;
         }
 
-        std::vector<Widget *> const running(_live.begin(), _live.end());
+        // An advance may make widgets live or drop them, so the pass runs over a copy.
+        _running.assign(_live.begin(), _live.end());
 
-        for (Widget *who : running) {
+        for (Widget *who : _running) {
             if (!who->advance(now)) {
-                _live.erase(who);
+                std::erase(_live, who);
             }
+        }
+    }
+
+    void Root::enliven(Widget *who) {
+        if (std::ranges::find(_live, who) == _live.end()) {
+            _live.push_back(who);
         }
     }
 

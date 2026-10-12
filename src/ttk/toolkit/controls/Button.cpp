@@ -115,12 +115,12 @@ namespace ttk {
         derive_look();
     }
 
-    void Button::set_text(std::string text) {
+    void Button::set_text(const std::string_view text) {
         if (_text == text) {
             return;
         }
 
-        _text = std::move(text);
+        _text = text;
 
         invalidate();
     }
@@ -168,8 +168,8 @@ namespace ttk {
         return this;
     }
 
-    Button *Button::tooltip(std::string text) {
-        hint = std::move(text);
+    Button *Button::tooltip(const std::string_view text) {
+        hint = text;
 
         return this;
     }

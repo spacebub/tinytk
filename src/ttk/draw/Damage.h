@@ -21,7 +21,7 @@ namespace ttk {
     class Damage {
     public:
         //! Number of rectangles above which \ref add() merges all of them into their bounding rectangle.
-        static constexpr size_t CROWDED = 12;
+        static constexpr size_t CROWDED = 32;
 
         //! Sets the frame size to `width` by `height` pixels and clears all rectangles.
         void resize(int width, int height);

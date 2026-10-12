@@ -24,12 +24,12 @@ namespace ttk {
         hint = std::move(about);
     }
 
-    void Chip::set_text(std::string text) {
+    void Chip::set_text(const std::string_view text) {
         if (_text == text) {
             return;
         }
 
-        _text = std::move(text);
+        _text = text;
 
         invalidate();
     }

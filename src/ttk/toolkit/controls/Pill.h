@@ -11,6 +11,7 @@
 
 
 #include <string>
+#include <string_view>
 
 #include "ttk/draw/Theme.h"
 #include "ttk/draw/Glyphs.h"
@@ -42,7 +43,7 @@ namespace ttk {
         explicit Pill(std::string text = {});
 
         //! Sets the text to `text` and repaints. The layout is not redone, so the width stays as it was.
-        void set_text(std::string text);
+        void set_text(std::string_view text);
 
         //! Returns the strong tone of `kind` in the current palette, before the darkening a pill applies to it in
         //! a light palette.

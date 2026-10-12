@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ttk/draw/Anim.h"
@@ -40,13 +41,17 @@ namespace ttk {
         //!
         //! \ref current() is kept as is, and an index out of range shows the placeholder. A list already open
         //! keeps the options it was opened with.
-        void set_options(std::vector<std::string> options);
+        void set_options(const std::vector<std::string> &options);
+        //! As above, taking `options` over instead of copying them when they differ.
+        void set_options(std::vector<std::string> &&options);
 
         //! Sets a short tag drawn at the right of each option, matched to the options by index.
         //!
         //! An option with no entry, because `badges` is shorter than the options, or with an empty string has no
         //! badge. The badge of \ref current() is also drawn in the field.
-        void set_badges(std::vector<std::string> badges);
+        void set_badges(const std::vector<std::string> &badges);
+        //! As above, taking `badges` over instead of copying them when they differ.
+        void set_badges(std::vector<std::string> &&badges);
 
         //! Sets the index of the option shown in the field without calling the `selected` callback.
         //!
@@ -57,7 +62,7 @@ namespace ttk {
         [[nodiscard]] int current() const { return _current; }
 
         //! Sets the text shown in the field while no option is current, `(Default)` unless set, and returns this.
-        Select *placeholder(std::string text);
+        Select *placeholder(std::string_view text);
 
         //! Sets whether the list starts with the placeholder as a row of its own, and returns this.
         //!
@@ -66,7 +71,7 @@ namespace ttk {
         Select *clearable(bool value = true);
 
         //! Sets \ref Widget::hint to `text` and returns this.
-        Select *tooltip(std::string text);
+        Select *tooltip(std::string_view text);
 
         //! Tests whether the option list is open.
         [[nodiscard]] bool open() const { return _list != nullptr; }

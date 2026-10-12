@@ -63,13 +63,13 @@ namespace ttk {
         _note->set_visible(false);
     }
 
-    Field *Field::placeholder(std::string text) {
-        _input->placeholder(std::move(text));
+    Field *Field::placeholder(const std::string_view text) {
+        _input->placeholder(text);
 
         return this;
     }
 
-    Field *Field::value(const std::string &text) {
+    Field *Field::value(const std::string_view text) {
         _input->set_text(text);
 
         return this;
@@ -105,17 +105,17 @@ namespace ttk {
         return this;
     }
 
-    Field *Field::note(std::string text) {
-        _note->set_text(std::move(text));
+    Field *Field::note(const std::string_view text) {
+        _note->set_text(text);
         _note->set_visible(!_note->text().empty());
 
         return this;
     }
 
-    Field *Field::badge(std::string text, const Pill::Kind kind) {
+    Field *Field::badge(const std::string_view text, const Pill::Kind kind) {
         const bool shown = !text.empty();
 
-        _badge->set_text(std::move(text));
+        _badge->set_text(text);
         _badge->kind(kind);
         _badge->set_visible(shown);
 
@@ -124,9 +124,9 @@ namespace ttk {
         return this;
     }
 
-    Field *Field::icon(Glyphs::Glyph glyph, std::string text, std::function<void()> pressed) {
+    Field *Field::icon(Glyphs::Glyph glyph, const std::string_view text, std::function<void()> pressed) {
         _icon = _row->append(std::make_unique<GlyphButton>(glyph, std::move(pressed)));
-        _icon->size(30.0)->tooltip(std::move(text));
+        _icon->size(30.0)->tooltip(text);
         _icon->fixedWidth = 30.0;
         _icon->fixedHeight = 30.0;
 
@@ -140,7 +140,7 @@ namespace ttk {
         return this;
     }
 
-    void Field::set_text(const std::string &text) const {
+    void Field::set_text(const std::string_view text) const {
         _input->set_text(text);
     }
 
@@ -150,9 +150,9 @@ namespace ttk {
         }
     }
 
-    void Field::set_icon_hint(std::string text) const {
+    void Field::set_icon_hint(const std::string_view text) const {
         if (_icon != nullptr) {
-            _icon->tooltip(std::move(text));
+            _icon->tooltip(text);
         }
     }
 

@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/toolkit/controls/Label.h"
 #include "ttk/toolkit/layout/Box.h"
@@ -24,7 +25,7 @@ namespace ttk {
         Fact(std::string label, std::string value);
 
         //! Sets the value text to `value`, as \ref Label::set_text() does.
-        void set_value(std::string value) const;
+        void set_value(std::string_view value) const;
 
         //! Sets whether the value is shown as a file path, as \ref Label::path() does, and returns this fact.
         Fact *path(bool value = true);

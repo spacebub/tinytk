@@ -37,10 +37,10 @@ namespace ttk {
         //!
         //! The caret is kept where it was, clamped to the end of the new text, and the selection is cleared. Does
         //! nothing when `text` equals the current text.
-        void set_text(std::string text);
+        void set_text(std::string_view text);
 
         //! Sets the text shown in a faint colour while the field is empty, and returns this.
-        TextBox *placeholder(std::string text);
+        TextBox *placeholder(std::string_view text);
 
         //! Sets whether the text is drawn in the fixed-width face, and returns this.
         TextBox *mono(bool value = true);

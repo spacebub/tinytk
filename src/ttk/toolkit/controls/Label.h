@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/draw/Theme.h"
 #include "ttk/toolkit/Widget.h"
@@ -33,7 +34,7 @@ namespace ttk {
         //!
         //! A wrapped label asks for a new layout when its height at the current width changes. Any other label
         //! keeps its box, so a longer text is elided until the next layout.
-        void set_text(std::string text);
+        void set_text(std::string_view text);
 
         //! Sets the font weight, such as 400 or 600, and the size in pixels, and returns this label.
         Label *font(int weight, float size);
@@ -106,7 +107,10 @@ namespace ttk {
 
     private:
         // What paint() puts on the screen, which for a path is the shortened form.
-        double reach(Typeface &type) const;
+        double reach(Typeface &type);
+
+        // The path shortened to fit the box, remeasured only when the room or the text changes.
+        const std::string &fitted(Typeface &type, const BLFont &face);
 
         std::string _text;
 
@@ -121,6 +125,9 @@ namespace ttk {
 
         // What a tracked label draws, upper-cased once rather than per measure.
         std::string _upper;
+
+        std::string _fitted;
+        int _fittedRoom = -1;
 
         bool _wrap = false;
         bool _tracked = false;

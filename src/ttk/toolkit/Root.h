@@ -13,12 +13,12 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include <blend2d/blend2d.h>
 
 #include "ttk/draw/Typeface.h"
+#include "ttk/toolkit/Painter.h"
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
@@ -30,7 +30,7 @@ namespace ttk {
     class Root {
     public:
         //! Creates an empty root whose widgets lay text out with `type`, which must outlive the root.
-        explicit Root(Typeface &type) : _type(type) { _layers[POPUPS].floats(); }
+        explicit Root(Typeface &type) : _type(type), _painter(type) { _layers[POPUPS].floats(); }
 
         //! \name Window
         //! \{
@@ -92,8 +92,9 @@ namespace ttk {
 
         //! Returns the pending regions and clears them.
         //!
-        //! Regions are merged where repainting their bounding rectangle costs less than repainting them apart.
-        std::vector<BLRect> take();
+        //! Regions are merged where repainting their bounding rectangle costs less than repainting them apart. The
+        //! list is owned by the root and overwritten by the next call.
+        const std::vector<BLRect> &take();
 
         //! Tests whether any region is pending.
         bool dirty() const { return !_dirty.empty(); }
@@ -115,7 +116,9 @@ namespace ttk {
         bool shift(const Widget *who, const BLRect &region, int dy);
 
         //! Returns the moves accepted by \ref shift() since the last call and clears them.
-        std::vector<Shift> take_shifts();
+        //!
+        //! The list is owned by the root and overwritten by the next call.
+        const std::vector<Shift> &take_shifts();
 
         //! Paints the page and then every layer, clipped to `clip`, and over them a ring inside the box of the
         //! focused widget while it holds focus from the keyboard and does not \ref Widget::paints_focus().
@@ -290,6 +293,8 @@ namespace ttk {
 
         Widget *next_stop(bool backwards);
 
+        void enliven(Widget *who);
+
         // A layer over the page. Its children are stretched to the window unless it
         // floats them: a popup is anchored to the control it dropped from and keeps
         // the box it was placed at.
@@ -305,6 +310,9 @@ namespace ttk {
 
         Typeface &_type;
 
+        // One for every region of every frame, so its scratch is allocated once.
+        Painter _painter;
+
         Page _page;
         Page _layers[LAYERS];
 
@@ -312,7 +320,13 @@ namespace ttk {
         std::vector<Shift> _shifts;
         bool _crowded = false;
 
-        std::unordered_set<Widget *> _live;
+        // What the takes handed out last, swapped with the pending lists so neither gives its capacity up.
+        std::vector<BLRect> _taken;
+        std::vector<Shift> _shifted;
+
+        // Scanned in full, which is cheap for the handful that animate at once.
+        std::vector<Widget *> _live;
+        std::vector<Widget *> _running;
 
         struct Sleeper {
             Widget *who;

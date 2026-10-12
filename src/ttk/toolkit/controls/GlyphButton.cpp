@@ -70,8 +70,8 @@ namespace ttk {
         return this;
     }
 
-    GlyphButton *GlyphButton::tooltip(std::string text) {
-        hint = std::move(text);
+    GlyphButton *GlyphButton::tooltip(const std::string_view text) {
+        hint = text;
 
         return this;
     }

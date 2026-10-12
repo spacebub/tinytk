@@ -15,12 +15,13 @@
 #include "ttk/util/Format.h"
 
 namespace ttk {
-    void Label::set_text(std::string text) {
+    void Label::set_text(const std::string_view text) {
         if (_text == text) {
             return;
         }
 
-        _text = std::move(text);
+        _text = text;
+        _fittedRoom = -1;
 
         if (_tracked) {
             _upper = Text::upper(_text);
@@ -119,7 +120,20 @@ namespace ttk {
         Widget::leave();
     }
 
-    double Label::reach(Typeface &type) const {
+    const std::string &Label::fitted(Typeface &type, const BLFont &face) {
+        // A fixed width face, so what fits is a division.
+        const double unit = type.width(face, "M");
+        const int room = unit > 0.0 ? std::max(1, static_cast<int>(_box.w / unit)) : 0;
+
+        if (room != _fittedRoom) {
+            _fitted = Format::fit_path(_text, room);
+            _fittedRoom = room;
+        }
+
+        return _fitted;
+    }
+
+    double Label::reach(Typeface &type) {
         const BLFont &face = type.at(face_weight(), _size);
 
         if (_wrap) {
@@ -127,10 +141,7 @@ namespace ttk {
         }
 
         if (_path) {
-            const double unit = type.width(face, "M");
-            const int room = unit > 0.0 ? std::max(1, static_cast<int>(_box.w / unit)) : 0;
-
-            return type.width(face, Format::fit_path(_text, room));
+            return type.width(face, fitted(type, face));
         }
 
         return _tracked ? type.width_tracked(face, _upper, 0.9F) : type.width(face, _text);
@@ -195,11 +206,7 @@ namespace ttk {
         const BLRgba32 ink = _clicked && hovered() ? Theme::palette().accent : _tone.colour();
 
         if (_path) {
-            // A fixed width face, so what fits is a division.
-            const double unit = painter.width(face, "M");
-            const int room = unit > 0.0 ? std::max(1, static_cast<int>(_box.w / unit)) : 0;
-
-            painter.label(face, _box, _place, Format::fit_path(_text, room), ink);
+            painter.label(face, _box, _place, fitted(painter.type(), face), ink);
 
             return;
         }

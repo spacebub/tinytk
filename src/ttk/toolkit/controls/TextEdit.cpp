@@ -101,8 +101,8 @@ namespace ttk {
         return this;
     }
 
-    TextEdit *TextEdit::placeholder(std::string text) {
-        _placeholder = std::move(text);
+    TextEdit *TextEdit::placeholder(const std::string_view text) {
+        _placeholder = text;
 
         return this;
     }

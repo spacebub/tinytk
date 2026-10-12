@@ -105,9 +105,9 @@ namespace ttk {
                         painter.round(line, Theme::radiusSmall, palette.hover);
                     }
 
-                    const std::string badge = at >= 0 && std::cmp_less(at, _badges.size())
-                        ? _badges[static_cast<size_t>(at)]
-                        : std::string();
+                    const std::string_view badge = at >= 0 && std::cmp_less(at, _badges.size())
+                        ? std::string_view(_badges[static_cast<size_t>(at)])
+                        : std::string_view();
 
                     double room = line.w - 20.0;
 
@@ -214,7 +214,17 @@ namespace ttk {
 
     }
 
-    void Select::set_options(std::vector<std::string> options) {
+    void Select::set_options(const std::vector<std::string> &options) {
+        if (_options == options) {
+            return;
+        }
+
+        _options = options;
+
+        invalidate();
+    }
+
+    void Select::set_options(std::vector<std::string> &&options) {
         if (_options == options) {
             return;
         }
@@ -224,7 +234,17 @@ namespace ttk {
         invalidate();
     }
 
-    void Select::set_badges(std::vector<std::string> badges) {
+    void Select::set_badges(const std::vector<std::string> &badges) {
+        if (_badges == badges) {
+            return;
+        }
+
+        _badges = badges;
+
+        invalidate();
+    }
+
+    void Select::set_badges(std::vector<std::string> &&badges) {
         if (_badges == badges) {
             return;
         }
@@ -244,8 +264,8 @@ namespace ttk {
         invalidate();
     }
 
-    Select *Select::placeholder(std::string text) {
-        _placeholder = std::move(text);
+    Select *Select::placeholder(const std::string_view text) {
+        _placeholder = text;
 
         return this;
     }
@@ -256,8 +276,8 @@ namespace ttk {
         return this;
     }
 
-    Select *Select::tooltip(std::string text) {
-        hint = std::move(text);
+    Select *Select::tooltip(const std::string_view text) {
+        hint = text;
 
         return this;
     }
@@ -418,12 +438,12 @@ namespace ttk {
                                             : Theme::mix(palette.border, palette.borderStrong, lit),
                                      dim));
 
-        const std::string shown = _current >= 0 && std::cmp_less(_current, _options.size())
-            ? _options[static_cast<size_t>(_current)]
-            : std::string();
-        const std::string badge = _current >= 0 && std::cmp_less(_current, _badges.size())
-            ? _badges[static_cast<size_t>(_current)]
-            : std::string();
+        const std::string_view shown = _current >= 0 && std::cmp_less(_current, _options.size())
+            ? std::string_view(_options[static_cast<size_t>(_current)])
+            : std::string_view();
+        const std::string_view badge = _current >= 0 && std::cmp_less(_current, _badges.size())
+            ? std::string_view(_badges[static_cast<size_t>(_current)])
+            : std::string_view();
 
         double room = _frame.w - 12.0 - 32.0;
 
@@ -441,7 +461,7 @@ namespace ttk {
 
         painter.label(painter.font(400, Theme::fontBody),
                       BLRect{_frame.x + 12.0, _frame.y, room, _frame.h}, Align::Start,
-                      shown.empty() ? _placeholder : shown,
+                      shown.empty() ? std::string_view(_placeholder) : shown,
                       Theme::alpha(shown.empty() ? palette.faint : palette.text, dim));
 
         constexpr float weight = 1.0F;

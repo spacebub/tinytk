@@ -33,20 +33,20 @@ namespace ttk {
         cursor = Cursor::Text;
     }
 
-    void TextBox::set_text(std::string text) {
+    void TextBox::set_text(const std::string_view text) {
         if (_text == text) {
             return;
         }
 
-        _text = std::move(text);
+        _text = text;
         _caret = std::min(_caret, _text.size());
         _anchor = _caret;
 
         invalidate();
     }
 
-    TextBox *TextBox::placeholder(std::string text) {
-        _placeholder = std::move(text);
+    TextBox *TextBox::placeholder(const std::string_view text) {
+        _placeholder = text;
 
         return this;
     }

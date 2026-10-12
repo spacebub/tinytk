@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/draw/Anim.h"
 #include "ttk/draw/Glyphs.h"
@@ -76,7 +77,7 @@ namespace ttk {
         Button(std::string text, std::function<void()> clicked);
 
         //! Sets the label to `text` and repaints. The layout is not redone, so the width stays as it was.
-        void set_text(std::string text);
+        void set_text(std::string_view text);
 
         //! Sets the visual style to `value`, derives its look from the palette on screen and returns this button.
         Button *kind(Kind value);
@@ -95,7 +96,7 @@ namespace ttk {
         Button *busy(bool value);
 
         //! Sets the tooltip, \ref Widget::hint, to `text` and returns this button.
-        Button *tooltip(std::string text);
+        Button *tooltip(std::string_view text);
 
         //! Returns the width of the glyph and label plus padding, never less than \ref Theme::buttonWidth unless
         //! the button is compact. Returns \ref fixedWidth when it is set.

@@ -142,8 +142,10 @@ namespace ttk {
 
         std::vector<BLRectI> _moved;
 
-        // Handed over each frame, kept so a frame allocates nothing.
+        // Scratch for presenting and shifting, kept so a frame allocates nothing.
         std::vector<BLRectI> _presented;
+        std::vector<SDL_Rect> _rects;
+        std::vector<BLRectI> _pending;
 
         int _width = 0;
         int _height = 0;

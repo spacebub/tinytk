@@ -29,15 +29,7 @@ namespace ttk {
     }
 
     void Toasts::set_messages(const std::vector<Notice> &messages) {
-        std::vector<int> wanted;
-
-        wanted.reserve(messages.size());
-
-        for (const Notice &message : messages) {
-            wanted.push_back(message.id);
-        }
-
-        if (wanted == _shown) {
+        if (std::ranges::equal(messages, _shown, {}, &Notice::id)) {
             return;
         }
 
@@ -47,7 +39,7 @@ namespace ttk {
 
         for (const Ptr &child : children()) {
             if (const int id = dynamic_cast<const Toast *>(child.get())->id();
-                std::ranges::find(wanted, id) == wanted.end()) {
+                std::ranges::find(messages, id, &Notice::id) == messages.end()) {
                 gone.push_back(child.get());
             }
         }
@@ -70,7 +62,11 @@ namespace ttk {
             }));
         }
 
-        _shown = std::move(wanted);
+        _shown.clear();
+
+        for (const Notice &message : messages) {
+            _shown.push_back(message.id);
+        }
 
         if (root() != nullptr) {
             root()->relayout();

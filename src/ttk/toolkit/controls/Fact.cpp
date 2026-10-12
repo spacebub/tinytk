@@ -21,8 +21,8 @@ namespace ttk {
         _value->font(600, Theme::fontBody)->tone(&Theme::Palette::text);
     }
 
-    void Fact::set_value(std::string value) const {
-        _value->set_text(std::move(value));
+    void Fact::set_value(const std::string_view value) const {
+        _value->set_text(value);
     }
 
     Fact *Fact::path(const bool value) {

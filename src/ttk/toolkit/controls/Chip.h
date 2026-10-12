@@ -11,6 +11,7 @@
 
 
 #include <string>
+#include <string_view>
 
 #include "ttk/draw/Theme.h"
 #include "ttk/toolkit/Widget.h"
@@ -27,7 +28,7 @@ namespace ttk {
 
         //! Sets the text to `text` and repaints. The layout is not redone, so a longer text is elided to the
         //! current box until the next layout.
-        void set_text(std::string text);
+        void set_text(std::string_view text);
 
         //! Sets whether the chip is drawn in the warning colours, such as for an exhausted budget, and repaints.
         void set_tight(bool value);

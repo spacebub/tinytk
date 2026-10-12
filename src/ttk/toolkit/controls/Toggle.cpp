@@ -40,12 +40,12 @@ namespace ttk {
         wake();
     }
 
-    void Toggle::set_text(std::string text) {
+    void Toggle::set_text(const std::string_view text) {
         if (_text == text) {
             return;
         }
 
-        _text = std::move(text);
+        _text = text;
 
         invalidate();
     }

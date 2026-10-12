@@ -53,17 +53,29 @@ namespace ttk {
 
     //! Drawing interface handed to \ref Widget::paint(): shapes, text and clipping over a Blend2D context.
     //!
-    //! A painter is made for one damaged rectangle at a time, \ref clip(), and the context is already clipped to it.
+    //! A painter draws one damaged rectangle at a time, \ref clip(), and the context is already clipped to it.
     //! All coordinates are in window pixels and all text is UTF-8. \ref fill(), \ref round(), \ref outline() and
     //! \ref circle() draw nothing for an empty box or a fully transparent `tone`.
     class Painter {
     public:
         //! Creates a painter drawing into `context` with fonts from `type`, for the damaged rectangle `clip`.
         Painter(BLContext &context, Typeface &type, const BLRectI &clip)
-            : _context(context), _type(type), _clip(clip) {}
+            : _context(&context), _type(type), _clip(clip) {}
+
+        //! Creates a painter with fonts from `type` that draws nowhere until \ref aim() is called.
+        explicit Painter(Typeface &type) : _type(type) {}
+
+        //! Points the painter at `context` for the damaged rectangle `clip`, dropping any \ref push() left unmatched.
+        //!
+        //! Lets one painter serve every rectangle of every frame, keeping what it allocates for drawing.
+        void aim(BLContext &context, const BLRectI &clip) {
+            _context = &context;
+            _clip = clip;
+            _held.clear();
+        }
 
         //! Returns the Blend2D context, for drawing the painter does not cover. Restore any state changed on it.
-        BLContext &context() const { return _context; }
+        BLContext &context() const { return *_context; }
 
         //! Returns the typeface fonts are taken from.
         Typeface &type() const { return _type; }
@@ -106,8 +118,9 @@ namespace ttk {
         double line_height(const BLFont &font) const;
 
         //! Returns `run` shortened to fit `room` pixels in `font`, ending in an ellipsis where anything was cut.
-        //! Returns `run` unchanged when it fits.
-        std::string elide(const BLFont &font, std::string_view run, double room) const;
+        //! Returns `run` unchanged when it fits. The string is the cache entry of \ref Typeface::elide() and lives as
+        //! long.
+        const std::string &elide(const BLFont &font, std::string_view run, double room) const;
 
         //! Draws `run` on one line with `top` at the top-left of the line box. The baseline comes from the font.
         //!
@@ -150,10 +163,10 @@ namespace ttk {
         void pop() const;
 
     private:
-        BLContext &_context;
+        BLContext *_context = nullptr;
         Typeface &_type;
 
-        mutable BLRectI _clip;
+        mutable BLRectI _clip{};
         mutable std::vector<BLRectI> _held;
 
         // Kept between outlines, so one allocates nothing.

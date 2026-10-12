@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "ttk/draw/Anim.h"
@@ -108,8 +109,8 @@ namespace ttk {
 
         //! Sets the status text shown in the heading after the pill to `text`, in the warning colour when
         //! `warning` is true and faint otherwise.
-        void set_said(std::string text, const bool warning) const {
-            _said->set_text(std::move(text));
+        void set_said(const std::string_view text, const bool warning) const {
+            _said->set_text(text);
             _said->tone(warning ? &Theme::Palette::warning : &Theme::Palette::faint);
         }
 
@@ -314,7 +315,7 @@ namespace ttk {
         }
 
         //! Sets the faint status text shown after the title to `text`.
-        void set_said(std::string text) const { _said->set_text(std::move(text)); }
+        void set_said(const std::string_view text) const { _said->set_text(text); }
 
         //! Returns the heading row height plus the gap and body height scaled by how far the body has slid
         //! open. While closing, the body height is the one measured when the close began.

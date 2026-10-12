@@ -158,6 +158,11 @@ namespace ttk {
         // Where the badges were last drawn, so one can be rested on.
         std::vector<BLRect> _pills;
 
+        // The file as last shortened, so a repaint does not shorten it again.
+        std::string _fittedFrom;
+        std::string _fitted;
+        int _fittedRoom = -1;
+
         Anim::Tween _slideX;
         Anim::Tween _slideY;
     };

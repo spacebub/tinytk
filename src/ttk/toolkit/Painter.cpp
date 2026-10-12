@@ -179,7 +179,7 @@ namespace ttk {
 
     void Painter::fill(const BLRect &box, const BLRgba32 tone) const {
         if (box.w > 0.0 && box.h > 0.0 && tone.a() != 0) {
-            _context.fill_rect(box, tone);
+            _context->fill_rect(box, tone);
         }
     }
 
@@ -191,12 +191,12 @@ namespace ttk {
         const double corner = std::min(radius, std::min(box.w, box.h) / 2.0);
 
         if (corner <= 0.0) {
-            _context.fill_rect(box, tone);
+            _context->fill_rect(box, tone);
 
             return;
         }
 
-        _context.fill_round_rect(box, corner, corner, tone);
+        _context->fill_round_rect(box, corner, corner, tone);
     }
 
     void Painter::outline(const BLRect &box, const double radius, const double width,
@@ -221,25 +221,25 @@ namespace ttk {
                                          box.h - (width * 2.0), inner, inner),
                              BL_GEOMETRY_DIRECTION_CCW);
 
-        _context.fill_path(_ring, tone);
+        _context->fill_path(_ring, tone);
     }
 
     void Painter::circle(const BLPoint centre, const double radius, const BLRgba32 tone) const {
         if (radius > 0.0 && tone.a() != 0) {
-            _context.fill_circle(centre.x, centre.y, radius, tone);
+            _context->fill_circle(centre.x, centre.y, radius, tone);
         }
     }
 
     void Painter::path(const BLPath &shape, const BLRgba32 tone) const {
-        _context.fill_path(shape, tone);
+        _context->fill_path(shape, tone);
     }
 
     void Painter::stroke(const BLPath &shape, const double width, const BLRgba32 tone) const {
-        _context.set_stroke_width(width);
-        _context.set_stroke_cap(BL_STROKE_CAP_POSITION_START, BL_STROKE_CAP_ROUND);
-        _context.set_stroke_cap(BL_STROKE_CAP_POSITION_END, BL_STROKE_CAP_ROUND);
-        _context.set_stroke_join(BL_STROKE_JOIN_ROUND);
-        _context.stroke_path(shape, tone);
+        _context->set_stroke_width(width);
+        _context->set_stroke_cap(BL_STROKE_CAP_POSITION_START, BL_STROKE_CAP_ROUND);
+        _context->set_stroke_cap(BL_STROKE_CAP_POSITION_END, BL_STROKE_CAP_ROUND);
+        _context->set_stroke_join(BL_STROKE_JOIN_ROUND);
+        _context->stroke_path(shape, tone);
     }
 
     const BLFont &Painter::font(const int weight, const float size) const {
@@ -254,14 +254,14 @@ namespace ttk {
         return _type.line_height(font);
     }
 
-    std::string Painter::elide(const BLFont &font, const std::string_view run,
-                               const double room) const {
+    const std::string &Painter::elide(const BLFont &font, const std::string_view run,
+                                      const double room) const {
         return _type.elide(font, run, static_cast<float>(room));
     }
 
     void Painter::text(const BLFont &font, const BLPoint top, const std::string_view run,
                        const BLRgba32 tone) const {
-        _type.draw(_context, font, top, run, tone);
+        _type.draw(*_context, font, top, run, tone);
     }
 
     void Painter::label(const BLFont &font, const BLRect &box, const Align align,
@@ -270,7 +270,7 @@ namespace ttk {
             return;
         }
 
-        const std::string shown = _type.elide(font, run, static_cast<float>(box.w));
+        const std::string &shown = _type.elide(font, run, static_cast<float>(box.w));
         const double taken = _type.width(font, shown);
 
         double x = box.x;
@@ -281,7 +281,7 @@ namespace ttk {
             x = box.x + box.w - taken;
         }
 
-        _type.draw_centred(_context, font, BLPoint{x, box.y}, static_cast<float>(box.h), shown, tone);
+        _type.draw_centred(*_context, font, BLPoint{x, box.y}, static_cast<float>(box.h), shown, tone);
     }
 
     void Painter::row(const BLFont &font, const BLRect &box, const std::string_view run,
@@ -293,12 +293,12 @@ namespace ttk {
         const BLFontMetrics metrics = font.metrics();
         const double top = box.y + ((box.h - (metrics.ascent + metrics.descent)) / 2.0);
 
-        _type.draw_once(_context, font, BLPoint{box.x, top}, run, tone, box.w);
+        _type.draw_once(*_context, font, BLPoint{box.x, top}, run, tone, box.w);
     }
 
     void Painter::tracked(const BLFont &font, const BLPoint top, const std::string_view run,
                           const BLRgba32 tone, const double spacing) const {
-        _type.draw_tracked(_context, font, top, run, tone, static_cast<float>(spacing));
+        _type.draw_tracked(*_context, font, top, run, tone, static_cast<float>(spacing));
     }
 
     double Painter::paragraph(const BLFont &font, const BLRect &box, const std::string_view run,
@@ -307,7 +307,7 @@ namespace ttk {
         double y = box.y;
 
         for (const Fold &line : fold_spans(_type, font, run, box.w)) {
-            _type.draw(_context, font, BLPoint{box.x, y}, line.text, tone);
+            _type.draw(*_context, font, BLPoint{box.x, y}, line.text, tone);
 
             y += step;
         }
@@ -333,12 +333,12 @@ namespace ttk {
         // Whole pixels, and the same ones `needed` answers for. A box off the grid,
         // which any odd window width gives, leaves a fractional clip that a blit of
         // a sprite through it lands skewed against.
-        _context.save();
-        _context.clip_to_rect(_clip);
+        _context->save();
+        _context->clip_to_rect(_clip);
     }
 
     void Painter::pop() const {
-        _context.restore();
+        _context->restore();
 
         if (!_held.empty()) {
             _clip = _held.back();

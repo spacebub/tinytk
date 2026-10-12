@@ -46,7 +46,9 @@ namespace ttk {
 
         //! Replaces the choices with `options`, repaints and asks for a new layout. Does nothing when `options`
         //! equals the current choices.
-        void set_options(std::vector<Choice> options);
+        void set_options(const std::vector<Choice> &options);
+        //! As above, taking `options` over instead of copying them when they differ.
+        void set_options(std::vector<Choice> &&options);
 
         //! Makes the choice whose value is `value` current and slides the marker to it. Does not call the
         //! selection callback.
@@ -91,9 +93,12 @@ namespace ttk {
         bool advance(double now) override;
 
     private:
-        std::vector<BLRect> lanes(Typeface &type) const;
+        void measure_lanes(Typeface &type);
+
+        void options_changed();
 
         std::vector<Choice> _options;
+        std::vector<BLRect> _lanes;
         std::optional<int> _current;
 
         std::function<void(int)> _selected;

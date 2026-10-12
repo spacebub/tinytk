@@ -126,12 +126,12 @@ namespace ttk {
         invalidate();
     }
 
-    void TextView::set_run(std::string run) {
+    void TextView::set_run(const std::string_view run) {
         if (_wrapped && _run == run) {
             return;
         }
 
-        _run = std::move(run);
+        _run = run;
         _wrapped = true;
         _folded = -1.0;
 

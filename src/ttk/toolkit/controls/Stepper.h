@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/toolkit/controls/GlyphButton.h"
 #include "ttk/toolkit/controls/Label.h"
@@ -44,7 +45,7 @@ namespace ttk {
         Stepper *clearable(int offValue, std::string placeholder);
 
         //! Sets \ref Widget::hint to `text` and returns this.
-        Stepper *tooltip(std::string text);
+        Stepper *tooltip(std::string_view text);
 
         //! Sets the value shown in the field without calling the `stepped` callback, and repaints.
         //!

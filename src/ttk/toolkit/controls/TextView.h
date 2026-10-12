@@ -69,7 +69,7 @@ namespace ttk {
         //!
         //! Rows break at `\n` and at spaces, and a word wider than the view is cut between characters. The
         //! selection is cleared. Does nothing when `run` equals the run already set.
-        void set_run(std::string run);
+        void set_run(std::string_view run);
 
         //! Sets the face to `weight` at `size` and returns this. A run is folded again at the next layout.
         TextView *face(int weight, float size);

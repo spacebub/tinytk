@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "ttk/draw/Anim.h"
 #include "ttk/draw/Theme.h"
@@ -54,7 +55,7 @@ namespace ttk {
         GlyphButton *spin(double degrees = 45.0);
 
         //! Sets the tooltip, \ref Widget::hint, to `text` and returns this button.
-        GlyphButton *tooltip(std::string text);
+        GlyphButton *tooltip(std::string_view text);
 
         //! Returns \ref fixedWidth when it is set, otherwise the side set by \ref size().
         double natural_width(Typeface &type) override;

@@ -20,19 +20,38 @@ namespace ttk {
         cursor = Cursor::Pointer;
     }
 
-    void MultistateSwitch::set_options(std::vector<Choice> options) {
+    void MultistateSwitch::set_options(const std::vector<Choice> &options) {
+        if (options == _options) {
+            return;
+        }
+
+        _options = options;
+
+        options_changed();
+    }
+
+    void MultistateSwitch::set_options(std::vector<Choice> &&options) {
         if (options == _options) {
             return;
         }
 
         _options = std::move(options);
+
+        options_changed();
+    }
+
+    void MultistateSwitch::options_changed() {
         _marked = false;
 
-        invalidate();
-
+        // Hit testing reads the lanes before the relayout comes round, so they follow the options now.
         if (root() != nullptr) {
+            measure_lanes(root()->type());
             root()->relayout();
+        } else {
+            _lanes.clear();
         }
+
+        invalidate();
     }
 
     void MultistateSwitch::set_current(const int value) {
@@ -46,21 +65,20 @@ namespace ttk {
         wake();
     }
 
-    std::vector<BLRect> MultistateSwitch::lanes(Typeface &type) const {
-        std::vector<BLRect> out;
+    void MultistateSwitch::measure_lanes(Typeface &type) {
         const BLFont &face = type.at(400, Theme::fontBody);
 
         double x = _box.x + 4.0;
 
+        _lanes.clear();
+
         for (const Choice &option : _options) {
             const double wide = type.width(face, option.label) + 34.0;
 
-            out.emplace_back(x, _box.y + 4.0, wide, _box.h - 8.0);
+            _lanes.emplace_back(x, _box.y + 4.0, wide, _box.h - 8.0);
 
             x += wide;
         }
-
-        return out;
     }
 
     double MultistateSwitch::natural_width(Typeface &type) {
@@ -81,9 +99,9 @@ namespace ttk {
     // The marker is placed against the lanes every time they move, so a resize does
     // not leave it where the control used to be.
     void MultistateSwitch::arrange(Typeface &type) {
-        const std::vector<BLRect> boxes = lanes(type);
+        measure_lanes(type);
 
-        for (size_t at = 0; at < boxes.size(); ++at) {
+        for (size_t at = 0; at < _lanes.size(); ++at) {
             if (_options[at].value != _current) {
                 continue;
             }
@@ -91,8 +109,8 @@ namespace ttk {
             if (!_marked || !_markX.live()) {
                 _marked = true;
 
-                _markX.set(static_cast<float>(boxes[at].x));
-                _markWidth.set(static_cast<float>(boxes[at].w));
+                _markX.set(static_cast<float>(_lanes[at].x));
+                _markWidth.set(static_cast<float>(_lanes[at].w));
             }
 
             return;
@@ -109,8 +127,6 @@ namespace ttk {
         painter.round(_box, radius, palette.sunken);
         painter.outline(_box, radius, 1.0, palette.border);
 
-        const std::vector<BLRect> boxes = lanes(painter.type());
-
         if (_markWidth.value() > 0.0) {
             const BLRect mark{_markX.value(), _box.y + 4.0, _markWidth.value(), _box.h - 8.0};
 
@@ -118,18 +134,19 @@ namespace ttk {
             painter.outline(mark, mark.h / 2.0, 1.0, Theme::alpha(palette.accent, 0.45));
         }
 
-        for (size_t at = 0; at < boxes.size(); ++at) {
+        for (size_t at = 0; at < _lanes.size(); ++at) {
             const bool active = _options[at].value == _current;
             const BLRgba32 ink = active ? palette.accent
                                : std::cmp_equal(at, _over) ? palette.text
                                                                : palette.muted;
 
-            painter.label(painter.font(active ? 600 : 400, Theme::fontBody), boxes[at], Align::Centre,
+            const BLRect &lane = _lanes[at];
+
+            painter.label(painter.font(active ? 600 : 400, Theme::fontBody), lane, Align::Centre,
                           _options[at].label, ink);
 
             if (_options[at].badge) {
-                painter.circle(BLPoint{boxes[at].x + boxes[at].w - 11.0, boxes[at].y + 10.0}, 3.0,
-                               palette.accent);
+                painter.circle(BLPoint{lane.x + lane.w - 11.0, lane.y + 10.0}, 3.0, palette.accent);
             }
         }
     }
@@ -139,14 +156,12 @@ namespace ttk {
     }
 
     void MultistateSwitch::release(const Pointer &at) {
-        if (!holds(at.x, at.y) || root() == nullptr) {
+        if (!holds(at.x, at.y)) {
             return;
         }
 
-        const std::vector<BLRect> boxes = lanes(root()->type());
-
-        for (size_t index = 0; index < boxes.size(); ++index) {
-            if (at.x >= boxes[index].x && at.x < boxes[index].x + boxes[index].w && _selected) {
+        for (size_t index = 0; index < _lanes.size(); ++index) {
+            if (at.x >= _lanes[index].x && at.x < _lanes[index].x + _lanes[index].w && _selected) {
                 _selected(_options[index].value);
 
                 return;
@@ -185,15 +200,10 @@ namespace ttk {
     }
 
     void MultistateSwitch::hover(const Pointer &at) {
-        if (root() == nullptr) {
-            return;
-        }
-
-        const std::vector<BLRect> boxes = lanes(root()->type());
         int over = -1;
 
-        for (size_t index = 0; index < boxes.size(); ++index) {
-            if (at.x >= boxes[index].x && at.x < boxes[index].x + boxes[index].w) {
+        for (size_t index = 0; index < _lanes.size(); ++index) {
+            if (at.x >= _lanes[index].x && at.x < _lanes[index].x + _lanes[index].w) {
                 over = static_cast<int>(index);
             }
         }
@@ -212,23 +222,18 @@ namespace ttk {
     }
 
     bool MultistateSwitch::advance(const double now) {
-        if (root() != nullptr) {
-            const std::vector<BLRect> boxes = lanes(root()->type());
+        for (size_t at = 0; at < _lanes.size(); ++at) {
+            if (_options[at].value != _current) {
+                continue;
+            }
 
-            for (size_t at = 0; at < boxes.size(); ++at) {
-                if (_options[at].value != _current) {
-                    continue;
-                }
-
-                if (!_marked) {
-                    _marked = true;
-                    _markX.set(static_cast<float>(boxes[at].x));
-                    _markWidth.set(static_cast<float>(boxes[at].w));
-                } else {
-                    _markX.toward(static_cast<float>(boxes[at].x), now, 0.18, Anim::Curve::CubicOut);
-                    _markWidth.toward(static_cast<float>(boxes[at].w), now, 0.18,
-                                      Anim::Curve::CubicOut);
-                }
+            if (!_marked) {
+                _marked = true;
+                _markX.set(static_cast<float>(_lanes[at].x));
+                _markWidth.set(static_cast<float>(_lanes[at].w));
+            } else {
+                _markX.toward(static_cast<float>(_lanes[at].x), now, 0.18, Anim::Curve::CubicOut);
+                _markWidth.toward(static_cast<float>(_lanes[at].w), now, 0.18, Anim::Curve::CubicOut);
             }
         }
 

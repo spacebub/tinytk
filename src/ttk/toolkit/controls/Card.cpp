@@ -86,8 +86,14 @@ namespace ttk {
             const double unit = painter.width(mono, "M");
             const int room = unit > 0.0 ? static_cast<int>((_box.w - 32.0) / unit) : 0;
 
-            painter.label(mono, BLRect{_box.x + 16.0, _box.y + 46.0, _box.w - 32.0, 18.0}, Align::Start,
-                          Format::fit_path(file, room), palette.faint);
+            if (room != _fittedRoom || file != _fittedFrom) {
+                _fittedFrom = file;
+                _fitted = Format::fit_path(file, room);
+                _fittedRoom = room;
+            }
+
+            painter.label(mono, BLRect{_box.x + 16.0, _box.y + 46.0, _box.w - 32.0, 18.0}, Align::Start, _fitted,
+                          palette.faint);
         }
 
         const double line = _row->box().y - 26.0;
@@ -159,18 +165,16 @@ namespace ttk {
     }
 
     void Card::hover(const Pointer &at) {
-        std::string said;
-
         for (size_t which = 0; which < _pills.size() && which < tags.size(); ++which) {
             if (const BLRect &pill = _pills[which];
                 at.x >= pill.x && at.x < pill.x + pill.w && at.y >= pill.y && at.y < pill.y + pill.h) {
-                said = tags[which].hint;
+                hint = tags[which].hint;
 
-                break;
+                return;
             }
         }
 
-        hint = said;
+        hint.clear();
     }
 
     void Card::leave() {

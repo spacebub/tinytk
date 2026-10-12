@@ -265,9 +265,10 @@ namespace ttk {
         }
 
         // Whatever was due a repaint inside has gone with the pixels.
-        const std::vector<BLRectI> pending = _damage.regions();
+        // Copied first: damage() below grows the list, or replaces it when crowded.
+        _pending.assign(_damage.regions().begin(), _damage.regions().end());
 
-        for (const BLRectI &held : pending) {
+        for (const BLRectI &held : _pending) {
             if (held.x < region.x + region.w && held.x + held.w > region.x
                 && held.y < region.y + region.h && held.y + held.h > region.y) {
                 damage(BLRect{static_cast<double>(held.x), static_cast<double>(held.y + dy),
@@ -346,19 +347,17 @@ namespace ttk {
             return;
         }
 
-        std::vector<SDL_Rect> rects;
-
-        rects.reserve(_damage.regions().size() + _moved.size());
+        _rects.clear();
 
         for (const BLRectI &region : _damage.regions()) {
-            rects.push_back({.x = region.x, .y = region.y, .w = region.w, .h = region.h});
+            _rects.push_back({.x = region.x, .y = region.y, .w = region.w, .h = region.h});
         }
 
         for (const BLRectI &region : _moved) {
-            rects.push_back({.x = region.x, .y = region.y, .w = region.w, .h = region.h});
+            _rects.push_back({.x = region.x, .y = region.y, .w = region.w, .h = region.h});
         }
 
-        SDL_UpdateWindowSurfaceRects(window, rects.data(), static_cast<int>(rects.size()));
+        SDL_UpdateWindowSurfaceRects(window, _rects.data(), static_cast<int>(_rects.size()));
 
         _damage.clear();
         _moved.clear();
