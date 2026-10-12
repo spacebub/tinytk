@@ -31,7 +31,8 @@ namespace ttk {
     //!
     //! Set the icon and minimum size, call \ref start() to open the window, fill \ref ui() and the callbacks,
     //! then call \ref run(). The window is borderless and draws its own title bar. While no widget animates, no
-    //! area needs repainting and no timer is due, the loop blocks waiting for events and the process stays idle.
+    //! area needs repainting, no timer is due and nothing called \ref nudge(), the loop blocks until an event, a
+    //! \ref post() or the next timer, and the process stays idle.
     //! Drawing is paced to the display's refresh rate, divided down to at most 200 frames per second.
     class Shell : public Clock, public Window {
     public:
@@ -149,6 +150,13 @@ namespace ttk {
         //! Safe to call from any thread. Queued functions run in the order they were posted.
         void post(std::function<void()> what) override;
 
+        //! Asks for one more turn of the loop, with its \ref settle, without waiting for an event.
+        //!
+        //! Call it when something changed that no event, timer or \ref post() will report, such as state touched
+        //! while a frame was drawn. A call made before \ref settle runs in a turn is answered by that turn. Call it
+        //! on the interface thread only: \ref post() is the way in from another thread.
+        void nudge() { _nudged = true; }
+
         //! Shows `wanted` as the pointer cursor over the window. Does nothing when it is already shown.
         //!
         //! \ref run() calls it every turn with the cursor of the widget under the pointer. System cursors are
@@ -222,6 +230,7 @@ namespace ttk {
         bool _running = true;
         bool _maximized = false;
         bool _ready = false;
+        bool _nudged = false;
 
         Uint64 _frameGap = 0;
         Uint64 _painted = 0;

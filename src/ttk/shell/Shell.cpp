@@ -7,7 +7,9 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -420,10 +422,14 @@ namespace ttk {
         }
 
         if (soonest < 0.0) {
-            return 1000;
+            return -1;
         }
 
-        return std::clamp(static_cast<int>((soonest - at) * 1000.0), 0, 1000);
+        // Rounded up: a wait cut short of the alarm comes back to a turn with nothing due,
+        // and a zero wait polls until it is.
+        const double wait = std::ceil((soonest - at) * 1000.0);
+
+        return static_cast<int>(std::clamp(wait, 0.0, static_cast<double>(std::numeric_limits<int>::max())));
     }
 
     void Shell::relayout() {
@@ -700,6 +706,8 @@ namespace ttk {
 
         // The page holds nothing until settle fills it, and the first frame is drawn
         // here.
+        _nudged = false;
+
         if (settle) {
             settle();
         }
@@ -724,10 +732,8 @@ namespace ttk {
 
             // Nothing in flight: block until the desktop or an alarm has something to
             // say. This is where the idle cost goes to nothing at all.
-            if (!_root->busy() && !_root->dirty()) {
-                if (SDL_WaitEventTimeout(&event, sleep_for(now()))) {
-                    handle(event);
-                }
+            if (!_nudged && !_root->busy() && !_root->dirty() && SDL_WaitEventTimeout(&event, sleep_for(now()))) {
+                handle(event);
             }
 
             while (SDL_PollEvent(&event)) {
@@ -740,6 +746,9 @@ namespace ttk {
 
             errands();
             alarms(at);
+
+            // Whatever was touched up to here is settled now. A touch from here on is owed a turn.
+            _nudged = false;
 
             if (settle) {
                 settle();
