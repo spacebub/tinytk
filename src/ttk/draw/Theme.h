@@ -228,10 +228,11 @@ namespace ttk::Theme {
     class Tone {
     public:
         //! Creates a tone that follows `slot` of the palette, taking its colour from the palette on screen.
+        // NOLINTNEXTLINE(misc-explicit-constructor): callers pass a slot such as &Palette::faint where a tone is taken.
         Tone(BLRgba32 Palette::*slot);
 
         //! Creates a tone that `derive` computes from the palette on screen, such as a slot of an \ref Extension.
-        Tone(BLRgba32 (*derive)(const Palette &palette));
+        explicit Tone(BLRgba32 (*derive)(const Palette &palette));
 
         //! Creates a tone fixed at `colour`.
         explicit Tone(const BLRgba32 colour) : _colour(colour) {}

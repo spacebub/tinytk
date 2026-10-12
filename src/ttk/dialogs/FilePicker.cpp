@@ -113,7 +113,7 @@ namespace ttk {
 
     FilePicker::FilePicker(Notifier *notifier) : _notifier(notifier) {}
 
-    void FilePicker::touch() {
+    void FilePicker::touch() const {
         if (changed) {
             changed();
         }

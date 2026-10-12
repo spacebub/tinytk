@@ -186,7 +186,7 @@ namespace ttk::Json {
         return true;
     }
 
-    yyjson_val *obj_get(yyjson_val *obj, const char *key) {
+    yyjson_val *obj_get(const yyjson_val *obj, const char *key) {
         if (obj == nullptr || !yyjson_is_obj(obj)) {
             return nullptr;
         }
@@ -194,11 +194,11 @@ namespace ttk::Json {
         return yyjson_obj_get(obj, key);
     }
 
-    std::string obj_get_string(yyjson_val *obj, const char *key, const std::string &def) {
+    std::string obj_get_string(const yyjson_val *obj, const char *key, const std::string &def) {
         return as_string(obj_get(obj, key), def);
     }
 
-    int obj_get_int(yyjson_val *obj, const char *key, const int def) {
+    int obj_get_int(const yyjson_val *obj, const char *key, const int def) {
         return as_int(obj_get(obj, key), def);
     }
 

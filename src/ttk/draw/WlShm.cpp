@@ -155,6 +155,7 @@ namespace ttk {
 
         pollfd waiting{.fd = wl_display_get_fd(display), .events = POLLIN, .revents = 0};
 
+        // NOLINTNEXTLINE(bugprone-signed-bitwise): poll() reports its events as a signed short.
         if (::poll(&waiting, 1, 0) > 0 && (waiting.revents & POLLIN) != 0) {
             wl_display_read_events(display);
         } else {

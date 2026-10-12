@@ -49,70 +49,61 @@ namespace ttk {
         //! The picker writes it and then calls \ref FilePicker::changed. The dialog writes \ref editing and
         //! \ref optionSet itself.
         struct State {
-            //! Whether the picker is open. Set by \ref FilePicker::open() and \ref FilePicker::open_save(), cleared
-            //! by \ref FilePicker::dismiss().
-            bool open = false;
             //! Title shown at the top of the dialog.
             std::string title;
-            //! Whether a directory is being picked. Files are left out of the listing.
-            bool directories = false;
-
-            //! Whether a folder can be marked and chosen as well as entered.
-            bool folders = false;
-
-            //! Number of marked paths that are directories.
-            int markedFolders = 0;
-            //! Whether several paths can be marked at once.
-            bool multiple = false;
-
             //! Label of a checkbox shown beside the pick button. Empty for no checkbox.
             std::string option;
             //! Tooltip of the option checkbox.
             std::string optionHint;
-            //! Whether the option checkbox is ticked. Cleared on open and passed to the \ref FilePicker::Chosen
-            //! callback.
-            bool optionSet = false;
-
             //! Directory being listed. Left as it was while the drive list is shown.
             std::string path;
             //! Non-empty components of \ref path, in order.
             std::vector<std::string> parts;
-            //! Whether \ref path starts with a slash. A Windows drive path does not.
-            bool rooted = false;
-
-            //! Whether the listing shows the Windows drives instead of a directory.
-            bool drives = false;
-
             //! Listing of \ref path: directories first, then the files that match the filters, each group sorted
             //! case-insensitively with digit runs compared by value. Hidden entries are included only while
             //! \ref hiddenShown is set.
             std::vector<Row> entries;
-            //! Number of marked paths, including those marked in other directories during a multiple pick.
-            int marked = 0;
-
-            //! Whether hidden entries are listed.
-            bool hiddenShown = false;
-
             //! Message to show when \ref entries is empty.
             std::string nothing;
-
-            //! Whether the user is typing a path instead of browsing.
-            bool editing = false;
-            //! Whether the picker was opened by \ref FilePicker::open_save().
-            bool saving = false;
-
             //! File name the picker last offered for saving.
             //!
             //! The name field belongs to the user once it is filled, so a dialog copies this in only when
             //! \ref nameSeed changes.
             std::string name;
-            //! Counter bumped each time a \ref name is offered, so offering the same name twice is still seen.
-            int nameSeed = 0;
-
             //! Full path the current name would save to, or empty when the name is empty.
             //!
             //! When the name does not end in the suffix of any filter, the suffix of the first filter is added.
             std::string target;
+
+            //! Number of marked paths that are directories.
+            int markedFolders = 0;
+            //! Number of marked paths, including those marked in other directories during a multiple pick.
+            int marked = 0;
+            //! Counter bumped each time a \ref name is offered, so offering the same name twice is still seen.
+            int nameSeed = 0;
+
+            //! Whether the picker is open. Set by \ref FilePicker::open() and \ref FilePicker::open_save(), cleared
+            //! by \ref FilePicker::dismiss().
+            bool open = false;
+            //! Whether a directory is being picked. Files are left out of the listing.
+            bool directories = false;
+            //! Whether a folder can be marked and chosen as well as entered.
+            bool folders = false;
+            //! Whether several paths can be marked at once.
+            bool multiple = false;
+            //! Whether the option checkbox is ticked. Cleared on open and passed to the \ref FilePicker::Chosen
+            //! callback.
+            bool optionSet = false;
+            //! Whether \ref path starts with a slash. A Windows drive path does not.
+            bool rooted = false;
+            //! Whether the listing shows the Windows drives instead of a directory.
+            bool drives = false;
+            //! Whether hidden entries are listed.
+            bool hiddenShown = false;
+            //! Whether the user is typing a path instead of browsing.
+            bool editing = false;
+            //! Whether the picker was opened by \ref FilePicker::open_save().
+            bool saving = false;
             //! Whether \ref target names an existing regular file.
             bool replacing = false;
         };
@@ -135,7 +126,7 @@ namespace ttk {
         std::function<void()> changed;
 
         //! Calls \ref changed when it is set.
-        void touch();
+        void touch() const;
 
         //! Hooks through which the application keeps what the picker remembers between runs.
         //!

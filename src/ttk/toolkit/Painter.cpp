@@ -42,7 +42,7 @@ namespace ttk {
         auto [held, fresh] = Cache::run_entry(
             folds, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
                                   .at = std::lround(room * 4.0),
-                                  .run = run});
+                                  .run = run,});
 
         held.used = ++asked;
 
@@ -104,7 +104,7 @@ namespace ttk {
                     std::vector<size_t> cuts;
 
                     for (size_t cut = 1; cut < line.size(); ++cut) {
-                        if ((static_cast<unsigned char>(line[cut]) & 0xc0) != 0x80) {
+                        if ((static_cast<unsigned char>(line[cut]) & 0xc0U) != 0x80U) {
                             cuts.push_back(cut);
                         }
                     }

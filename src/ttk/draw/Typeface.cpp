@@ -129,10 +129,12 @@ namespace ttk {
         // since a build for size leaves the loop scalar and a screen is a hundred
         // thousand of these.
         void merge(std::uint8_t *into, const std::uint8_t *from) {
-#if defined(TTK_MERGE_SSE2)
-            _mm_storeu_si128(reinterpret_cast<__m128i *>(into),
-                             _mm_max_epu8(_mm_loadu_si128(reinterpret_cast<const __m128i *>(into)),
-                                          _mm_loadu_si128(reinterpret_cast<const __m128i *>(from))));
+#ifdef TTK_MERGE_SSE2
+            const __m128i held = _mm_loadu_si128(reinterpret_cast<const __m128i *>(into));
+            const __m128i added = _mm_loadu_si128(reinterpret_cast<const __m128i *>(from));
+
+            // NOLINTNEXTLINE(portability-simd-intrinsics): x86 fast path, the portable loop below is the fallback.
+            _mm_storeu_si128(reinterpret_cast<__m128i *>(into), _mm_max_epu8(held, added));
 #else
             for (int at = 0; at < CHUNK; ++at) {
                 into[at] = std::max(into[at], from[at]);
@@ -292,10 +294,10 @@ namespace ttk {
             const BLFontMetrics face = font.metrics();
             const double rise = std::max({static_cast<double>(face.ascent),
                                           std::abs(static_cast<double>(face.y_min)),
-                                          std::abs(static_cast<double>(face.y_max))});
+                                          std::abs(static_cast<double>(face.y_max)),});
             const double fall = std::max({static_cast<double>(face.descent),
                                           std::abs(static_cast<double>(face.y_min)),
-                                          std::abs(static_cast<double>(face.y_max))});
+                                          std::abs(static_cast<double>(face.y_max)),});
 
             const int left = static_cast<int>(std::floor(made.ink.x0)) - 1;
             const int top = -static_cast<int>(std::ceil(rise)) - 1;
@@ -370,13 +372,13 @@ namespace ttk {
         // paint, and putting the candidates in the shape cache would evict what is drawn.
         Cache::evict_oldest(_elided, ELIDED);
 
-        const auto wide = static_cast<std::int64_t>(std::lround(room * 4.0));
+        const auto wide = static_cast<std::uint64_t>(std::lround(room * 4.0));
         const auto space = static_cast<std::uint32_t>(std::lround(tracking * 16.0));
 
         auto [held, fresh] = Cache::run_entry(
             _elided, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
-                                    .at = (wide << 32) | space,
-                                    .run = run});
+                                    .at = static_cast<std::int64_t>((wide << 32U) | space),
+                                    .run = run,});
 
         held.used = ++_asked;
 
@@ -642,7 +644,7 @@ namespace ttk {
         auto [made, fresh] = Cache::run_entry(
             _rows, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
                                   .at = std::lround(room * 4.0),
-                                  .run = run});
+                                  .run = run,});
 
         made.used = ++_asked;
 
@@ -667,10 +669,10 @@ namespace ttk {
         // ascent and its tallest glyph reaches further, and a pixel each way.
         const double rise = std::max({static_cast<double>(face.ascent),
                                       std::abs(static_cast<double>(face.y_min)),
-                                      std::abs(static_cast<double>(face.y_max))});
+                                      std::abs(static_cast<double>(face.y_max)),});
         const double fall = std::max({static_cast<double>(face.descent),
                                       std::abs(static_cast<double>(face.y_min)),
-                                      std::abs(static_cast<double>(face.y_max))});
+                                      std::abs(static_cast<double>(face.y_max)),});
         const int above = static_cast<int>(std::ceil(rise)) + 1;
         const int tall = above + static_cast<int>(std::ceil(fall)) + 1;
         const double reach = std::min(room, cut.made ? _pens[cut.shown] + cut.dotWide : _pens.back());
@@ -702,7 +704,7 @@ namespace ttk {
 
         const auto stamp = [&](const std::uint32_t id, const double pen, const int lift) {
             const double whole = std::floor(pen);
-            auto shift = static_cast<std::uint32_t>(((pen - whole) * SHIFTS) + 0.5);
+            auto shift = static_cast<std::uint32_t>(std::lround((pen - whole) * SHIFTS));
             int column = static_cast<int>(whole) + SLACK;
 
             if (shift == SHIFTS) {

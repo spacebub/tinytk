@@ -572,6 +572,7 @@ namespace ttk::Process {
         }
 
         if (output != nullptr) {
+            // NOLINTNEXTLINE(bugprone-signed-bitwise): fcntl() takes and returns its flags as int.
             fcntl(pty[0], F_SETFL, fcntl(pty[0], F_GETFL, 0) | O_NONBLOCK);
 
             *output = pty[0];
@@ -623,6 +624,7 @@ namespace ttk::Process {
 
         for (const int end : ends) {
             fcntl(end, F_SETFD, FD_CLOEXEC);
+            // NOLINTNEXTLINE(bugprone-signed-bitwise): fcntl() takes and returns its flags as int.
             fcntl(end, F_SETFL, fcntl(end, F_GETFL, 0) | O_NONBLOCK);
         }
 

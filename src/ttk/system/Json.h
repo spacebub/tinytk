@@ -57,6 +57,7 @@ namespace ttk::Json {
         size_t idx = 0;
         size_t max = 0;
         yyjson_val *key = nullptr;
+        // NOLINTNEXTLINE(misc-const-correctness): visitors may take a mutable pointer, as yyjson hands them out.
         yyjson_val *val = nullptr;
 
         yyjson_obj_foreach(obj, idx, max, key, val) {
@@ -73,6 +74,7 @@ namespace ttk::Json {
 
         size_t idx = 0;
         size_t max = 0;
+        // NOLINTNEXTLINE(misc-const-correctness): visitors may take a mutable pointer, as yyjson hands them out.
         yyjson_val *item = nullptr;
 
         yyjson_arr_foreach(arr, idx, max, item) {
@@ -82,13 +84,13 @@ namespace ttk::Json {
 
     //! Returns the value of the field `key` of the object `obj`, or null when `obj` is null, not an object, or has no
     //! such field.
-    yyjson_val *obj_get(yyjson_val *obj, const char *key);
+    yyjson_val *obj_get(const yyjson_val *obj, const char *key);
 
     //! Returns the field `key` of the object `obj` read by \ref as_string(), or `def` when it is missing.
-    std::string obj_get_string(yyjson_val *obj, const char *key, const std::string &def = {});
+    std::string obj_get_string(const yyjson_val *obj, const char *key, const std::string &def = {});
 
     //! Returns the field `key` of the object `obj` read by \ref as_int(), or `def` when it is missing.
-    int obj_get_int(yyjson_val *obj, const char *key, int def = 0);
+    int obj_get_int(const yyjson_val *obj, const char *key, int def = 0);
 
     //! Parsed, read-only JSON document that owns its yyjson document. Movable, not copyable.
     //!

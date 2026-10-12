@@ -60,7 +60,9 @@ namespace ttk {
             static V set1(const short value) { return _mm256_set1_epi16(value); }
             static V load(const void *at) { return _mm256_loadu_si256(static_cast<const V *>(at)); }
             static void store(void *at, const V v) { _mm256_storeu_si256(static_cast<V *>(at), v); }
+            // NOLINTNEXTLINE(portability-simd-intrinsics): the blur's vector path, the scalar one is the fallback.
             static V add(const V a, const V b) { return _mm256_add_epi16(a, b); }
+            // NOLINTNEXTLINE(portability-simd-intrinsics): the blur's vector path, the scalar one is the fallback.
             static V sub(const V a, const V b) { return _mm256_sub_epi16(a, b); }
             static V mulhi(const V a, const V b) { return _mm256_mulhi_epu16(a, b); }
             static V mullo(const V a, const V b) { return _mm256_mullo_epi16(a, b); }
@@ -117,7 +119,9 @@ namespace ttk {
             static V set1(const short value) { return _mm_set1_epi16(value); }
             static V load(const void *at) { return _mm_loadu_si128(static_cast<const V *>(at)); }
             static void store(void *at, const V v) { _mm_storeu_si128(static_cast<V *>(at), v); }
+            // NOLINTNEXTLINE(portability-simd-intrinsics): the blur's vector path, the scalar one is the fallback.
             static V add(const V a, const V b) { return _mm_add_epi16(a, b); }
+            // NOLINTNEXTLINE(portability-simd-intrinsics): the blur's vector path, the scalar one is the fallback.
             static V sub(const V a, const V b) { return _mm_sub_epi16(a, b); }
             static V mulhi(const V a, const V b) { return _mm_mulhi_epu16(a, b); }
             static V mullo(const V a, const V b) { return _mm_mullo_epi16(a, b); }
@@ -173,7 +177,7 @@ namespace ttk {
         Divider divider(const int span) {
             return {.magic = Lane::set1(static_cast<short>((65536 + span - 1) / span)),
                     .span = Lane::set1(static_cast<short>(span)),
-                    .one = Lane::set1(1)};
+                    .one = Lane::set1(1),};
         }
 
         V divide(const V x, const Divider &d) {
@@ -467,7 +471,7 @@ namespace ttk {
 #ifdef TTK_BLUR_SIMD
         // The sprite's rows are exactly as wide as asked, so the last few pixels of
         // one go through a vector of their own.
-        const int whole = across & ~(Lane::WORDS - 1);
+        const int whole = (across / Lane::WORDS) * Lane::WORDS;
 #else
         const std::array<uint32_t, 256> tone = tone_of(tint);
 #endif

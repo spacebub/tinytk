@@ -53,7 +53,7 @@ namespace ttk {
         //! palette. The look is derived again whenever the palette on screen changes.
         struct Kind {
             //! Creates a kind whose look `derive` computes from a palette. A null `derive` paints as \ref Default.
-            constexpr explicit Kind(Look (*const derive)(const Theme::Palette &palette)) : look(derive) {}
+            constexpr explicit Kind(Look (*const derive)(const Theme::Palette &palette)) noexcept : look(derive) {}
 
             //! Returns the look of the kind under `palette`.
             Look (*look)(const Theme::Palette &palette);

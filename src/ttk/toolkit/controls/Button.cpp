@@ -56,7 +56,7 @@ namespace ttk {
                     .edge = palette.borderStrong,
                     .edgeLit = palette.accent,
                     .ink = palette.text,
-                    .dots = palette.accent};
+                    .dots = palette.accent,};
         }
 
         Button::Look primary_look(const Theme::Palette &palette) {
@@ -66,7 +66,7 @@ namespace ttk {
                     .edge = {},
                     .edgeLit = {},
                     .ink = palette.accentText,
-                    .dots = palette.accentText};
+                    .dots = palette.accentText,};
         }
 
         Button::Look success_look(const Theme::Palette &palette) {
@@ -76,7 +76,7 @@ namespace ttk {
                     .edge = {},
                     .edgeLit = {},
                     .ink = palette.successText,
-                    .dots = palette.successText};
+                    .dots = palette.successText,};
         }
 
         Button::Look danger_look(const Theme::Palette &palette) {
@@ -86,7 +86,7 @@ namespace ttk {
                     .edge = Theme::alpha(palette.danger, 0.5),
                     .edgeLit = Theme::alpha(palette.danger, 0.5),
                     .ink = palette.danger,
-                    .dots = palette.accent};
+                    .dots = palette.accent,};
         }
 
         Button::Look ghost_look(const Theme::Palette &palette) {
@@ -96,7 +96,7 @@ namespace ttk {
                     .edge = {},
                     .edgeLit = {},
                     .ink = palette.accent,
-                    .dots = palette.accent};
+                    .dots = palette.accent,};
         }
 
     }

@@ -145,7 +145,7 @@ namespace ttk {
 
         size_t back = at - 1;
 
-        while (back > 0 && (static_cast<unsigned char>(_text[back]) & 0xc0) == 0x80) {
+        while (back > 0 && (static_cast<unsigned char>(_text[back]) & 0xc0U) == 0x80U) {
             --back;
         }
 

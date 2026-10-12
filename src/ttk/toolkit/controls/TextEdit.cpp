@@ -34,7 +34,7 @@ namespace ttk {
         }
 
         bool is_continuation(const char letter) {
-            return (static_cast<unsigned char>(letter) & 0xc0) == 0x80;
+            return (static_cast<unsigned char>(letter) & 0xc0U) == 0x80U;
         }
 
         std::string without_returns(std::string text) {

@@ -30,7 +30,7 @@ namespace ttk {
             return {.launching = palette.accentHover,
                     .running = palette.success,
                     .failing = palette.danger,
-                    .idle = palette.muted};
+                    .idle = palette.muted,};
         }
 
         StatusIndicator::Tones (*deriveTones)(const Theme::Palette &) = &palette_tones;
