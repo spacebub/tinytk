@@ -127,12 +127,13 @@ namespace ttk {
                         continue;
                     }
 
+                    // Inset so neighbouring marks stay apart.
+                    const BLRect lit{line.x, line.y + 1.0, line.w - 6.0, line.h - 2.0};
+
                     if (entry.marked) {
-                        painter.round(BLRect{line.x, line.y, line.w - 6.0, line.h},
-                                      Theme::radiusSmall - 2.0, palette.accentSoft);
+                        painter.round(lit, Theme::radiusSmall - 2.0, palette.accentSoft);
                     } else if (std::cmp_equal(index, _over)) {
-                        painter.round(BLRect{line.x, line.y, line.w - 6.0, line.h},
-                                      Theme::radiusSmall - 2.0, palette.hover);
+                        painter.round(lit, Theme::radiusSmall - 2.0, palette.hover);
                     }
 
                     constexpr double side = 15.0 * 1.2;
