@@ -1,0 +1,5 @@
+ttk_test(toolkit_root Root.cpp Probe.h)
+ttk_test(toolkit_input Input.cpp Probe.h)
+ttk_test(toolkit_compose Compose.cpp Probe.h)
+ttk_test(toolkit_painter Painter.cpp)
+ttk_test(toolkit_widget Widget.cpp Probe.h)

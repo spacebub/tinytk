@@ -1,0 +1,6 @@
+ttk_test(layout_box Box.cpp Blocks.h)
+ttk_test(layout_flow Wrap.cpp Pair.cpp Blocks.h)
+ttk_test(layout_parts Spacer.cpp Rule.cpp Picture.cpp Panel.cpp Blocks.h)
+ttk_test(layout_scroll Scroll.cpp Blocks.h)
+ttk_test(layout_grid ReorderGrid.cpp CardGrid.cpp Blocks.h)
+ttk_test(layout_collapsible Collapsible.cpp Blocks.h)

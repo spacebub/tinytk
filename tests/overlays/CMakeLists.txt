@@ -1,0 +1,7 @@
+ttk_test(overlays_dialog Dialog.cpp DialogLayer.cpp Overlays.h)
+ttk_test(overlays_prompts ConfirmDialog.cpp PromptDialog.cpp Overlays.h)
+ttk_test(overlays_menu Menu.cpp Overlays.h)
+ttk_test(overlays_tips Tips.cpp Overlays.h)
+ttk_test(overlays_notices Notifier.cpp Toasts.cpp Overlays.h)
+ttk_test(overlays_picker FilePicker.cpp Tree.h)
+ttk_test(overlays_picker_dialog FilePickerDialog.cpp Overlays.h Tree.h)

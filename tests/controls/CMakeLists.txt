@@ -1,0 +1,6 @@
+ttk_test(controls_textbox TextBox.cpp Mount.h)
+ttk_test(controls_textedit TextEdit.cpp Mount.h)
+ttk_test(controls_textview TextView.cpp Mount.h)
+ttk_test(controls_field Field.cpp Mount.h)
+ttk_test(controls_select Select.cpp Mount.h)
+ttk_test(controls_choices Stepper.cpp TabStrip.cpp MultistateSwitch.cpp Toggle.cpp Check.cpp Mount.h)

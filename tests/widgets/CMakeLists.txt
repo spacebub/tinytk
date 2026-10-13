@@ -1,0 +1,8 @@
+ttk_test(widgets_button Button.cpp)
+ttk_test(widgets_glyph_button GlyphButton.cpp)
+ttk_test(widgets_label Label.cpp)
+ttk_test(widgets_chip Chip.cpp)
+ttk_test(widgets_fact Fact.cpp)
+ttk_test(widgets_pill Pill.cpp)
+ttk_test(widgets_status_indicator StatusIndicator.cpp)
+ttk_test(widgets_card Card.cpp)
