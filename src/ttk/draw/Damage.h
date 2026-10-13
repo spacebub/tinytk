@@ -46,7 +46,8 @@ public:
 
     //! Also damages where the parts of pending rectangles inside `region` land when its pixels move down by
     //! `dy` pixels, or up when `dy` is negative. The pending rectangles stay, and the strip the move uncovers is
-    //! left for the caller to damage.
+    //! left for the caller to damage. A move of at least the height of `region` lands nothing inside it and
+    //! adds nothing.
     void shift(const BLRectI &region, int dy);
 
     //! Removes all rectangles.

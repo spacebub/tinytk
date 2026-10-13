@@ -34,8 +34,8 @@ constexpr size_t MOST = 4;
 // How long a frame waits on a release, in milliseconds, about one at 60 Hz.
 constexpr uint64_t PATIENCE = 16;
 
-int stride_for(const int width) {
-    return ((width * 4) + ALIGN - 1) / ALIGN * ALIGN;
+int64_t stride_for(const int width) {
+    return ((int64_t{width} * 4) + ALIGN - 1) / ALIGN * ALIGN;
 }
 
 // Rows of `region` from one buffer to another of the same layout. Measured
@@ -62,6 +62,10 @@ void copy_rows(uint8_t *to, const uint8_t *from, const size_t stride, const int 
 
 struct Buffer {
     wl_buffer *buffer = nullptr;
+
+    // Kept so the buffer can be taken back under a new wl_buffer on the same memory.
+    wl_shm_pool *pool = nullptr;
+
     uint8_t *pixels = nullptr;
     size_t bytes = 0;
 
@@ -99,6 +103,10 @@ struct WlShm::Impl {
 
     [[nodiscard]] std::unique_ptr<Buffer> make(int width, int height) const;
 
+    // Puts a new wl_buffer on the memory of `buffer` while the compositor holds the old one. Its release
+    // then lands on a proxy that is gone, rather than freeing the buffer while the compositor holds it again.
+    [[nodiscard]] static bool renew(Buffer &buffer);
+
     void destroy(Buffer &buffer);
 
     wl_display *display = nullptr;
@@ -111,6 +119,9 @@ struct WlShm::Impl {
 
     // Drawn into, not yet presented.
     Buffer *held = nullptr;
+
+    // Whether the held buffer shows nothing of the frame on screen.
+    bool fresh = false;
 
     // Presented last, so the one holding the frame on screen.
     Buffer *last = nullptr;
@@ -168,18 +179,22 @@ bool WlShm::Impl::poll(const int timeout) const {
 }
 
 std::unique_ptr<Buffer> WlShm::Impl::make(const int width, const int height) const {
+    constexpr int64_t most = std::numeric_limits<int32_t>::max();
+    const int64_t stride = stride_for(width);
+
+    // A pool is sized in int32, and so is the stride of a buffer in it.
+    if (stride > most || stride * height > most) {
+        return nullptr;
+    }
+
     auto made = std::make_unique<Buffer>();
 
     made->width = width;
     made->height = height;
     made->owed.resize(width, height);
     made->owed.all();
-    made->stride = stride_for(width);
-    made->bytes = static_cast<size_t>(made->stride) * static_cast<size_t>(height);
-
-    if (made->bytes > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
-        return nullptr;
-    }
+    made->stride = static_cast<int>(stride);
+    made->bytes = static_cast<size_t>(stride * height);
 
     const int fd = memfd_create("ttk-frame", MFD_CLOEXEC | MFD_ALLOW_SEALING);
 
@@ -209,22 +224,21 @@ std::unique_ptr<Buffer> WlShm::Impl::make(const int width, const int height) con
 
     made->pixels = static_cast<uint8_t *>(mapped);
 
-    wl_shm_pool *pool = wl_shm_create_pool(shm, fd, static_cast<int32_t>(made->bytes));
+    made->pool = wl_shm_create_pool(shm, fd, static_cast<int32_t>(made->bytes));
 
     // The request carries a duplicate.
     ::close(fd);
 
-    if (pool == nullptr) {
+    if (made->pool == nullptr) {
         munmap(made->pixels, made->bytes);
 
         return nullptr;
     }
 
-    made->buffer = wl_shm_pool_create_buffer(pool, 0, width, height, made->stride, WL_SHM_FORMAT_XRGB8888);
-
-    wl_shm_pool_destroy(pool);
+    made->buffer = wl_shm_pool_create_buffer(made->pool, 0, width, height, made->stride, WL_SHM_FORMAT_XRGB8888);
 
     if (made->buffer == nullptr) {
+        wl_shm_pool_destroy(made->pool);
         munmap(made->pixels, made->bytes);
 
         return nullptr;
@@ -233,6 +247,23 @@ std::unique_ptr<Buffer> WlShm::Impl::make(const int width, const int height) con
     wl_buffer_add_listener(made->buffer, &BUFFER_LISTENER, made.get());
 
     return made;
+}
+
+bool WlShm::Impl::renew(Buffer &buffer) {
+    wl_buffer *made = wl_shm_pool_create_buffer(
+            buffer.pool, 0, buffer.width, buffer.height, buffer.stride, WL_SHM_FORMAT_XRGB8888);
+
+    if (made == nullptr) {
+        return false;
+    }
+
+    wl_buffer_destroy(buffer.buffer);
+    wl_buffer_add_listener(made, &BUFFER_LISTENER, &buffer);
+
+    buffer.buffer = made;
+    buffer.busy = false;
+
+    return true;
 }
 
 void WlShm::Impl::destroy(Buffer &buffer) {
@@ -248,11 +279,16 @@ void WlShm::Impl::destroy(Buffer &buffer) {
         wl_buffer_destroy(buffer.buffer);
     }
 
+    if (buffer.pool != nullptr) {
+        wl_shm_pool_destroy(buffer.pool);
+    }
+
     if (buffer.pixels != nullptr) {
         munmap(buffer.pixels, buffer.bytes);
     }
 
     buffer.buffer = nullptr;
+    buffer.pool = nullptr;
     buffer.pixels = nullptr;
 }
 
@@ -289,19 +325,24 @@ bool WlShm::available(SDL_Window *window) {
 }
 
 bool WlShm::open(SDL_Window *window) {
-    close();
-
-    Impl &impl = *_impl;
     const SDL_PropertiesID props = SDL_GetWindowProperties(window);
 
-    impl.display =
-            static_cast<wl_display *>(SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr));
-    impl.surface =
-            static_cast<wl_surface *>(SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr));
+    return open(
+            static_cast<wl_display *>(SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr)),
+            static_cast<wl_surface *>(SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr)));
+}
 
-    if (impl.display == nullptr || impl.surface == nullptr) {
+bool WlShm::open(wl_display *display, wl_surface *surface) {
+    close();
+
+    if (display == nullptr || surface == nullptr) {
         return false;
     }
+
+    Impl &impl = *_impl;
+
+    impl.display = display;
+    impl.surface = surface;
 
     // A queue of our own: SDL dispatches the default one, and nothing of ours
     // should turn up inside its handlers or wait on its loop.
@@ -377,7 +418,7 @@ bool WlShm::acquire(const int width, const int height, const bool whole, Target 
     const bool connected = impl.poll(0);
 
     if (impl.held != nullptr && impl.held->width == width && impl.held->height == height) {
-        target = {.pixels = impl.held->pixels, .stride = impl.held->stride, .fresh = false};
+        target = {.pixels = impl.held->pixels, .stride = impl.held->stride, .fresh = impl.fresh};
 
         return true;
     }
@@ -448,8 +489,10 @@ bool WlShm::acquire(const int width, const int height, const bool whole, Target 
             chosen = made.get();
 
             impl.buffers.push_back(std::move(made));
-        } else {
+        } else if (Impl::renew(*oldest)) {
             chosen = oldest;
+        } else {
+            return false;
         }
     }
 
@@ -472,6 +515,7 @@ bool WlShm::acquire(const int width, const int height, const bool whole, Target 
     chosen->owed.clear();
 
     impl.held = chosen;
+    impl.fresh = fresh;
 
     target = {.pixels = chosen->pixels, .stride = chosen->stride, .fresh = fresh};
 

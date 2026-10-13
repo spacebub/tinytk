@@ -164,7 +164,7 @@ void Damage::all() {
 }
 
 void Damage::shift(const BLRectI &region, const int dy) {
-    if (dy == 0 || whole()) {
+    if (dy == 0 || dy >= region.h || dy <= -region.h || whole()) {
         return;
     }
 

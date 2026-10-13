@@ -742,16 +742,18 @@ TEST(Damage, ShiftMovesOnlyThePartInsideItsRegion) {
     EXPECT_EQ(area(damage), 25000U);
 }
 
-TEST(Damage, ShiftByTheWholeRegionAddsNothing) {
+TEST(Damage, ShiftByTheWholeRegionOrMoreAddsNothing) {
     ttk::Damage damage;
 
     damage.resize(1000, 1000);
     damage.add(rect(100, 300, 20, 10));
-    damage.shift({0, 200, 1000, 300}, 300);
-    damage.shift({0, 200, 1000, 300}, -300);
 
-    ASSERT_EQ(damage.regions().size(), 1U);
-    EXPECT_TRUE(same(damage.regions()[0], {100, 300, 20, 10}));
+    for (const int dy : {300, -300, 301, -301, std::numeric_limits<int>::max(), std::numeric_limits<int>::min()}) {
+        damage.shift({0, 200, 1000, 300}, dy);
+
+        ASSERT_EQ(damage.regions().size(), 1U) << "dy " << dy;
+        EXPECT_TRUE(same(damage.regions()[0], {100, 300, 20, 10})) << "dy " << dy;
+    }
 }
 
 TEST(Damage, ShiftBeforeASizeDoesNothing) {

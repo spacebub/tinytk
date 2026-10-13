@@ -24,6 +24,10 @@ bool WlShm::open(SDL_Window * /*unused*/) {
     return false;
 }
 
+bool WlShm::open(wl_display * /*unused*/, wl_surface * /*unused*/) {
+    return false;
+}
+
 void WlShm::close() {
 }
 
