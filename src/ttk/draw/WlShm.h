@@ -62,12 +62,14 @@ namespace ttk {
 
         //! Stores in `target` the buffer the next frame of `width` by `height` pixels is drawn into.
         //!
-        //! Takes the free buffer presented most recently. With none free it makes a new one while there are fewer
-        //! than four, and otherwise takes back the one presented longest ago. Buffers of another size are freed once
-        //! the compositor releases them. Unless `whole` is true, the buffer is first brought up to date with the
-        //! frame on screen, or \ref Target::fresh is set when there is none to copy. The buffer stays held until
-        //! \ref present(), so a second call at the same size returns it again. Returns false when not opened,
-        //! for a non-positive size, or when no buffer can be made.
+        //! Takes the free buffer presented most recently. With none free and four buffers kept, counting those of
+        //! another size not yet released, it first waits up to 16 ms for the compositor to release one. Still with
+        //! none free it makes a new one while fewer than four are of this size, and otherwise takes back the one
+        //! presented longest ago, which can tear. Buffers of another size are freed once the compositor releases
+        //! them. Unless `whole` is true, the buffer is first brought up to date with the frame on screen, or
+        //! \ref Target::fresh is set when there is none to copy. The buffer stays held until \ref present(), so a
+        //! second call at the same size returns it again. Returns false when not opened, for a non-positive size,
+        //! or when no buffer can be made.
         bool acquire(int width, int height, bool whole, Target &target) ;
 
         //! Attaches the held buffer to the surface, damages `regions` in buffer pixels, commits and flushes.

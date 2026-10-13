@@ -186,7 +186,7 @@ namespace ttk {
 
         void handle(const SDL_Event &event);
         void draw();
-        void relayout();
+        bool relayout();
 
         bool alarms(double at);
 

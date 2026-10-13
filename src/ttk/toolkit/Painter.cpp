@@ -33,16 +33,23 @@ namespace ttk {
         std::vector<Fold> fold_once(Typeface &type, const BLFont &font, std::string_view run,
                                    double room);
 
+        // BLMatrix2D::type() classifies the matrix out of line, where the identity is told apart inline.
+        bool transformed(const BLContext &context) {
+            const BLMatrix2D &at = context.final_transform();
+
+            return at.m00 != 1.0 || at.m01 != 0.0 || at.m10 != 0.0 || at.m11 != 1.0 || at.m20 != 0.0 || at.m21 != 0.0;
+        }
     }
 
     const std::vector<Fold> &fold_spans(Typeface &type, const BLFont &font, const std::string_view run,
                                        const double room) {
-        Cache::evict_oldest(folds, KEPT);
-
-        auto [held, fresh] = Cache::run_entry(
-            folds, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
-                                  .at = std::lround(room * 4.0),
-                                  .run = run,});
+        auto [held, fresh] = Cache::run_entry(folds,
+                                              Cache::RunView{
+                                                      .font = reinterpret_cast<std::uintptr_t>(&font),
+                                                      .at = std::lround(room * 4.0),
+                                                      .run = run,
+                                              },
+                                              KEPT);
 
         held.used = ++asked;
 
@@ -173,18 +180,27 @@ namespace ttk {
     }
 
     bool Painter::needed(const BLRect &box) const {
-        return box.x < _clip.x + _clip.w && box.x + box.w > _clip.x && box.y < _clip.y + _clip.h
-            && box.y + box.h > _clip.y;
+        if (box.w <= 0.0 || box.h <= 0.0) {
+            return false;
+        }
+
+        if (box.x < _clip.x + _clip.w && box.x + box.w > _clip.x && box.y < _clip.y + _clip.h
+            && box.y + box.h > _clip.y) {
+            return true;
+        }
+
+        // The clip is in window pixels and `box` is not while a transform is set.
+        return _context != nullptr && transformed(*_context);
     }
 
     void Painter::fill(const BLRect &box, const BLRgba32 tone) const {
-        if (box.w > 0.0 && box.h > 0.0 && tone.a() != 0) {
+        if (tone.a() != 0 && needed(box)) {
             _context->fill_rect(box, tone);
         }
     }
 
     void Painter::round(const BLRect &box, const double radius, const BLRgba32 tone) const {
-        if (box.w <= 0.0 || box.h <= 0.0 || tone.a() == 0) {
+        if (tone.a() == 0 || !needed(box)) {
             return;
         }
 
@@ -201,7 +217,7 @@ namespace ttk {
 
     void Painter::outline(const BLRect &box, const double radius, const double width,
                           const BLRgba32 tone) const {
-        if (box.w <= width * 2.0 || box.h <= width * 2.0 || tone.a() == 0) {
+        if (box.w <= width * 2.0 || box.h <= width * 2.0 || width <= 0.0 || tone.a() == 0 || !needed(box)) {
             return;
         }
 
@@ -225,16 +241,22 @@ namespace ttk {
     }
 
     void Painter::circle(const BLPoint centre, const double radius, const BLRgba32 tone) const {
-        if (radius > 0.0 && tone.a() != 0) {
+        if (radius > 0.0 && tone.a() != 0
+            && needed(BLRect{centre.x - radius, centre.y - radius, radius * 2.0, radius * 2.0})) {
             _context->fill_circle(centre.x, centre.y, radius, tone);
         }
     }
 
     void Painter::path(const BLPath &shape, const BLRgba32 tone) const {
-        _context->fill_path(shape, tone);
+        if (tone.a() != 0) {
+            _context->fill_path(shape, tone);
+        }
     }
 
     void Painter::stroke(const BLPath &shape, const double width, const BLRgba32 tone) const {
+        if (tone.a() == 0 || width <= 0.0) {
+            return;
+        }
         _context->set_stroke_width(width);
         _context->set_stroke_cap(BL_STROKE_CAP_POSITION_START, BL_STROKE_CAP_ROUND);
         _context->set_stroke_cap(BL_STROKE_CAP_POSITION_END, BL_STROKE_CAP_ROUND);
@@ -271,7 +293,7 @@ namespace ttk {
         }
 
         const std::string &shown = _type.elide(font, run, static_cast<float>(box.w));
-        const double taken = _type.width(font, shown);
+        const double taken = align == Align::Start ? 0.0 : _type.width(font, shown);
 
         double x = box.x;
 
@@ -304,15 +326,35 @@ namespace ttk {
     double Painter::paragraph(const BLFont &font, const BLRect &box, const std::string_view run,
                               const BLRgba32 tone) const {
         const double step = _type.line_height(font);
-        double y = box.y;
+        const std::vector<Fold> &lines = fold_spans(_type, font, run, box.w);
+        const double height = static_cast<double>(lines.size()) * step;
 
-        for (const Fold &line : fold_spans(_type, font, run, box.w)) {
-            _type.draw(*_context, font, BLPoint{box.x, y}, line.text, tone);
-
-            y += step;
+        if (tone.a() == 0) {
+            return height;
         }
 
-        return y - box.y;
+        size_t first = 0;
+        size_t last = lines.size();
+
+        if (step > 0.0) {
+            const double bleed = Typeface::bleed(font);
+            const auto count = static_cast<double>(lines.size());
+
+            first = static_cast<size_t>(std::clamp(std::floor((_clip.y - box.y - bleed) / step), 0.0, count));
+            last = static_cast<size_t>(std::clamp(std::ceil((_clip.y + _clip.h - box.y + bleed) / step), 0.0, count));
+
+            // The clip is in window pixels and `box` is not while a transform is set.
+            if ((first != 0 || last != lines.size()) && transformed(*_context)) {
+                first = 0;
+                last = lines.size();
+            }
+        }
+
+        for (size_t at = first; at < last; ++at) {
+            _type.draw(*_context, font, BLPoint{box.x, box.y + (static_cast<double>(at) * step)}, lines[at].text, tone);
+        }
+
+        return height;
     }
 
     double Painter::wrap_height(const BLFont &font, const std::string_view run,

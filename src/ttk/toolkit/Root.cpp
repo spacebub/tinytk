@@ -16,77 +16,6 @@
 namespace ttk {
     namespace {
 
-        double area(const BLRect &region) {
-            return region.w * region.h;
-        }
-
-        BLRect enclose(const BLRect &one, const BLRect &two) {
-            const double left = std::min(one.x, two.x);
-            const double top = std::min(one.y, two.y);
-            const double right = std::max(one.x + one.w, two.x + two.w);
-            const double bottom = std::max(one.y + one.h, two.y + two.h);
-
-            return BLRect{left, top, right - left, bottom - top};
-        }
-
-        // Past this many, one rectangle round the lot is cheaper than the walk each of
-        // them costs.
-        constexpr size_t CROWDED = 32;
-
-        // A region of its own costs another walk of the tree, measured at what this many
-        // pixels cost to fill.
-        constexpr double WALK = 128.0 * 1024.0;
-
-        // Worth merging: the rectangle round the two, answered in `round`, wastes less
-        // than the walk that keeping them apart would cost.
-        bool joins(const BLRect &one, const BLRect &two, BLRect &round) {
-            // A pointer reports many times between two frames and asks for the same
-            // rectangle each time, so the one already inside is the case worth taking
-            // before any of the arithmetic.
-            if (two.x >= one.x && two.y >= one.y && two.x + two.w <= one.x + one.w
-                && two.y + two.h <= one.y + one.h) {
-                round = one;
-
-                return true;
-            }
-
-            round = enclose(one, two);
-
-            return area(round) <= area(one) + area(two) + WALK;
-        }
-
-        // The tree is walked once per region, so a card two of them cross is painted
-        // twice. A merge can bring two survivors within reach of each other, so the pass
-        // repeats while it still finds one.
-        void coalesce(std::vector<BLRect> &regions) {
-            for (bool merged = true; merged && regions.size() > 1;) {
-                size_t kept = 0;
-
-                merged = false;
-
-                for (const BLRect &region : regions) {
-                    size_t with = kept;
-                    BLRect round{};
-
-                    while (with > 0 && !joins(regions[with - 1], region, round)) {
-                        --with;
-                    }
-
-                    if (with > 0) {
-                        regions[with - 1] = round;
-                        merged = true;
-
-                        continue;
-                    }
-
-                    regions[kept] = region;
-                    ++kept;
-                }
-
-                regions.resize(kept);
-            }
-        }
-
         bool under(const ttk::Widget *who, const ttk::Widget *of) {
             for (; who != nullptr; who = who->parent()) {
                 if (who == of) {
@@ -126,6 +55,7 @@ namespace ttk {
 
         _width = width;
         _height = height;
+        _dirty.resize(static_cast<int>(std::ceil(width)), static_cast<int>(std::ceil(height)));
         _relayout = true;
 
         // A popup hangs off a control that the new size moves.
@@ -172,42 +102,52 @@ namespace ttk {
             return;
         }
 
-        // Too many to be worth keeping apart: the rest of the frame folds into one.
-        if (_crowded) {
-            _dirty.front() = enclose(_dirty.front(), region);
+        // A pointer reports many times between two frames and asks for the same
+        // rectangle each time, so the one just given is the case worth taking first.
+        if (!_pending.empty()) {
+            const BLRect &last = _pending.back();
 
-            return;
+            if (region.x >= last.x && region.y >= last.y && region.x + region.w <= last.x + last.w
+                && region.y + region.h <= last.y + last.h) {
+                return;
+            }
         }
 
-        _dirty.push_back(region);
-
-        if (_dirty.size() <= CROWDED) {
-            return;
+        if (_pending.size() == Damage::CROWDED) {
+            flush();
         }
 
-        BLRect whole = _dirty.front();
-
-        for (const BLRect &held : _dirty) {
-            whole = enclose(whole, held);
-        }
-
-        _dirty.assign(1, whole);
-        _crowded = true;
+        _pending.push_back(region);
     }
 
     void Root::damage_all() {
-        _dirty.clear();
-        _dirty.emplace_back(0.0, 0.0, _width, _height);
+        _pending.clear();
+        _dirty.all();
+    }
+
+    void Root::flush() {
+        for (const BLRect &region : _pending) {
+            _dirty.add(region);
+        }
+
+        _pending.clear();
+    }
+
+    bool Root::whole() {
+        flush();
+
+        return _dirty.whole();
     }
 
     const std::vector<BLRect> &Root::take() {
-        _taken.swap(_dirty);
-        _dirty.clear();
-        _crowded = false;
+        flush();
+        _taken.clear();
 
-        if (_taken.size() > 1) {
-            coalesce(_taken);
+        for (const BLRectI &region : _dirty.regions()) {
+            _taken.emplace_back(region.x, region.y, region.w, region.h);
         }
+
+        _dirty.clear();
 
         return _taken;
     }
@@ -252,6 +192,11 @@ namespace ttk {
                                   - static_cast<int>(std::ceil(region.y))},
             .dy = dy,
         });
+
+        // Only damage already pending moves with these pixels. The caller adds the
+        // newly exposed strips after this, in their final positions.
+        flush();
+        _dirty.shift(_shifts.back().region, dy);
 
         return true;
     }

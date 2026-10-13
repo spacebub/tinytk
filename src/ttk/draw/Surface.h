@@ -22,9 +22,9 @@
 namespace ttk {
     //! Pixels of a window, drawn into with a Blend2D context and presented by damaged rectangles.
     //!
-    //! On the Windows and X11 video drivers the context draws straight into SDL's window framebuffer. On Wayland,
-    //! where shared memory is available, it draws into buffers handed to the compositor as they are. Elsewhere it
-    //! draws into a buffer of its own whose damaged rectangles are copied to SDL's window surface when presented.
+    //! On the Windows and X11 video drivers the context draws straight into SDL's window framebuffer. On Wayland
+    //! it draws into shared memory buffers handed to the compositor as they are. Elsewhere it draws into a buffer
+    //! of its own whose damaged rectangles are copied to SDL's window surface when presented.
     //! The pixels are 32-bit XRGB and opaque. Sizes and rectangles are in pixels.
     class Surface {
     public:
@@ -47,13 +47,14 @@ namespace ttk {
         //! Calls \ref attach() when nothing is attached or the size changed, takes over a window surface SDL replaced
         //! since the last call, and on Wayland binds the context to a buffer the compositor is not holding. Returns
         //! false when there is nothing to draw into, such as while the window is minimized, and then the surface is
-        //! detached.
+        //! detached. On Wayland it can instead mean no buffer could be made, and the damage then stands for the next
+        //! call.
         bool sync(SDL_Window *window);
 
         //! Releases the target and any Wayland shared memory. Call it before SDL frees the window surface.
         void detach();
 
-        //! Tests whether a target is attached and the context can draw.
+        //! Tests whether a target is attached. A window still needs a successful \ref sync() before each paint.
         [[nodiscard]] bool ready() const { return _ready; }
 
         //! Returns the width of the target in pixels, or 0 when nothing is attached.
@@ -63,7 +64,7 @@ namespace ttk {
         [[nodiscard]] int height() const { return _height; }
 
         //! Returns the context that draws into the target. It can only draw while \ref ready() is true, and
-        //! \ref attach() and \ref sync() can bind it to new pixels.
+        //! a window must have passed \ref sync() for this frame. \ref attach() and \ref sync() can bind new pixels.
         BLContext &context() { return _context; }
 
         //! Returns the image the context draws into, which wraps the window's own pixels when \ref direct() is true
@@ -82,9 +83,9 @@ namespace ttk {
         //! instead of repainting them.
         //!
         //! Damage pending inside the region is also added `dy` further down. The strip the move uncovers is not
-        //! damaged, so the caller must damage it. The region is presented whole by the next \ref present() that has
-        //! damage. When `dy` is at least the height of the region, the region is damaged instead. Does nothing when
-        //! `dy` is zero, nothing is attached or the region lies outside the target.
+        //! damaged, so the caller must damage it. The region is presented whole by the next \ref present().
+        //! When `dy` is at least the height of the region, the region is damaged instead. Does nothing when
+        //! `dy` is zero, nothing is attached, the whole target is damaged or the region lies outside the target.
         void shift(const BLRectI &wanted, int dy);
 
         //! Tests whether anything was damaged or shifted since the last present.
@@ -95,9 +96,10 @@ namespace ttk {
 
         //! Flushes the context, hands the damaged and shifted rectangles to `window` and clears them.
         //!
-        //! Does nothing while no rectangle is damaged, even after \ref shift(). The rectangles are kept for the next
-        //! call when the window is hidden on Wayland, the compositor cannot take the buffer, or the window surface no
-        //! longer matches the target in size.
+        //! Does nothing while no rectangle is damaged or shifted. The rectangles are kept for the next call when the
+        //! window is hidden on Wayland, the compositor cannot take the buffer, or the window surface no longer matches
+        //! the target in size. When SDL fails to update the window, the target is released instead, and the next
+        //! \ref sync() attaches it again damaged whole.
         void present(SDL_Window *window);
 
         //! Flushes the context and clears all damage and shifts, for a target with no window.
@@ -142,10 +144,9 @@ namespace ttk {
 
         std::vector<BLRectI> _moved;
 
-        // Scratch for presenting and shifting, kept so a frame allocates nothing.
-        std::vector<BLRectI> _presented;
+        // Scratch for presenting, kept so a frame allocates nothing.
+        Damage _presented;
         std::vector<SDL_Rect> _rects;
-        std::vector<BLRectI> _pending;
 
         int _width = 0;
         int _height = 0;

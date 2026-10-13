@@ -14,6 +14,26 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
+    namespace {
+
+        // Narrows `region` to `clip`, and answers false when nothing of it is left.
+        bool narrow(BLRect &region, const BLRect &clip) {
+            const double left = std::max(region.x, clip.x);
+            const double top = std::max(region.y, clip.y);
+            const double right = std::min(region.x + region.w, clip.x + clip.w);
+            const double bottom = std::min(region.y + region.h, clip.y + clip.h);
+
+            if (right <= left || bottom <= top) {
+                return false;
+            }
+
+            region = BLRect{left, top, right - left, bottom - top};
+
+            return true;
+        }
+
+    }
+
     Widget::Widget() : _revision(Theme::revision()) {}
 
     Widget *Widget::add(Ptr child) {
@@ -183,23 +203,20 @@ namespace ttk {
         for (const Widget *above = _parent; above != nullptr; above = above->_parent) {
             BLRect limit{};
 
-            if (!above->clips(limit)) {
-                continue;
-            }
-
-            const double left = std::max(wanted.x, limit.x);
-            const double top = std::max(wanted.y, limit.y);
-            const double right = std::min(wanted.x + wanted.w, limit.x + limit.w);
-            const double bottom = std::min(wanted.y + wanted.h, limit.y + limit.h);
-
-            if (right <= left || bottom <= top) {
+            if (above->clips(limit) && !narrow(wanted, limit)) {
                 return;
             }
-
-            wanted = BLRect{left, top, right - left, bottom - top};
         }
 
         _root->damage(wanted);
+    }
+
+    void Widget::invalidate(const BLRect &region, const BLRect &clip) const {
+        BLRect wanted = region;
+
+        if (narrow(wanted, clip)) {
+            invalidate(wanted);
+        }
     }
 
     bool Widget::press(const Pointer & /*unused*/) {

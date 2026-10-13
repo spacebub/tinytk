@@ -6,7 +6,6 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
-#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -18,6 +17,7 @@
 #include <unistd.h>
 #include <wayland-client.h>
 
+#include "ttk/draw/Damage.h"
 #include "ttk/draw/WlShm.h"
 
 namespace ttk {
@@ -26,13 +26,13 @@ namespace ttk {
         // Rows start on a cache line.
         constexpr int ALIGN = 64;
 
-        // Past this many rectangles owed to one buffer, bringing it up whole is cheaper
-        // than the list.
-        constexpr size_t CROWDED = 16;
-
-        // The ring never grows past this. With every one still with the compositor, the
-        // one it has held longest is taken back rather than waiting on it.
+        // With this many buffers, retired ones counted, a frame waits on a release.
+        // Past the wait a new size still gets a buffer, and otherwise the one the
+        // compositor has held longest is taken back.
         constexpr size_t MOST = 4;
+
+        // How long a frame waits on a release, in milliseconds, about one at 60 Hz.
+        constexpr uint64_t PATIENCE = 16;
 
         int stride_for(const int width) {
             return ((width * 4) + ALIGN - 1) / ALIGN * ALIGN;
@@ -78,8 +78,7 @@ namespace ttk {
 
             // What of the frames presented since this one was last drawn into it has
             // not seen, or all of it.
-            std::vector<BLRectI> owed;
-            bool owedAll = true;
+            Damage owed;
 
             // The frame it was last presented in, to pick the least behind.
             uint64_t shown = 0;
@@ -93,8 +92,9 @@ namespace ttk {
         static void on_global_gone(void *held, wl_registry *registry, uint32_t name);
         static void on_release(void *held, wl_buffer *buffer);
 
-        // Picks up what the compositor has sent our queue without waiting for more.
-        void poll() const;
+        // Picks up what the compositor has sent our queue, waiting up to `timeout`
+        // milliseconds for it to send anything. False once the connection has failed.
+        [[nodiscard]] bool poll(int timeout) const;
 
         // Frees the retired buffers the compositor has let go of.
         void sweep();
@@ -148,21 +148,25 @@ namespace ttk {
         static_cast<Buffer *>(held)->busy = false;
     }
 
-    void WlShm::Impl::poll() const {
+    bool WlShm::Impl::poll(const int timeout) const {
         while (wl_display_prepare_read_queue(display, queue) != 0) {
-            wl_display_dispatch_queue_pending(display, queue);
+            if (wl_display_dispatch_queue_pending(display, queue) < 0) {
+                return false;
+            }
         }
 
         pollfd waiting{.fd = wl_display_get_fd(display), .events = POLLIN, .revents = 0};
 
         // NOLINTNEXTLINE(bugprone-signed-bitwise): poll() reports its events as a signed short.
-        if (::poll(&waiting, 1, 0) > 0 && (waiting.revents & POLLIN) != 0) {
-            wl_display_read_events(display);
+        if (::poll(&waiting, 1, timeout) > 0 && (waiting.revents & POLLIN) != 0) {
+            if (wl_display_read_events(display) < 0) {
+                return false;
+            }
         } else {
             wl_display_cancel_read(display);
         }
 
-        wl_display_dispatch_queue_pending(display, queue);
+        return wl_display_dispatch_queue_pending(display, queue) >= 0;
     }
 
     std::unique_ptr<Buffer> WlShm::Impl::make(const int width, const int height) const {
@@ -170,6 +174,8 @@ namespace ttk {
 
         made->width = width;
         made->height = height;
+        made->owed.resize(width, height);
+        made->owed.all();
         made->stride = stride_for(width);
         made->bytes = static_cast<size_t>(made->stride) * static_cast<size_t>(height);
 
@@ -371,7 +377,7 @@ namespace ttk {
             return false;
         }
 
-        impl.poll();
+        const bool connected = impl.poll(0);
 
         if (impl.held != nullptr && impl.held->width == width && impl.held->height == height) {
             target = {.pixels = impl.held->pixels, .stride = impl.held->stride, .fresh = false};
@@ -390,27 +396,51 @@ namespace ttk {
         impl.sweep();
 
         // The free buffer least behind, so the least to bring up.
-        Buffer *chosen = nullptr;
-        Buffer *oldest = nullptr;
-        size_t active = 0;
+        const auto pick = [&impl] {
+            Buffer *found = nullptr;
 
-        for (const std::unique_ptr<Buffer> &buffer : impl.buffers) {
-            if (buffer->retired) {
-                continue;
+            for (const std::unique_ptr<Buffer> &buffer : impl.buffers) {
+                if (!buffer->retired && !buffer->busy && (found == nullptr || buffer->shown > found->shown)) {
+                    found = buffer.get();
+                }
             }
 
-            ++active;
+            return found;
+        };
 
-            if (!buffer->busy && (chosen == nullptr || buffer->shown > chosen->shown)) {
-                chosen = buffer.get();
-            }
+        Buffer *chosen = pick();
 
-            if (oldest == nullptr || buffer->shown < oldest->shown) {
-                oldest = buffer.get();
+        if (connected && chosen == nullptr && impl.buffers.size() >= MOST) {
+            const uint64_t deadline = SDL_GetTicks() + PATIENCE;
+
+            for (uint64_t now = SDL_GetTicks(); now < deadline; now = SDL_GetTicks()) {
+                if (!impl.poll(static_cast<int>(deadline - now))) {
+                    break;
+                }
+
+                impl.sweep();
+                chosen = pick();
+
+                if (chosen != nullptr || impl.buffers.size() < MOST) {
+                    break;
+                }
             }
         }
 
         if (chosen == nullptr) {
+            Buffer *oldest = nullptr;
+            size_t active = 0;
+
+            for (const std::unique_ptr<Buffer> &buffer : impl.buffers) {
+                if (!buffer->retired) {
+                    ++active;
+
+                    if (oldest == nullptr || buffer->shown < oldest->shown) {
+                        oldest = buffer.get();
+                    }
+                }
+            }
+
             if (active < MOST) {
                 std::unique_ptr<Buffer> made = impl.make(width, height);
 
@@ -433,10 +463,10 @@ namespace ttk {
 
             if (last == nullptr || last->retired) {
                 fresh = true;
-            } else if (chosen->owedAll) {
+            } else if (chosen->owed.whole()) {
                 std::memcpy(chosen->pixels, last->pixels, chosen->bytes);
             } else {
-                for (const BLRectI &region : chosen->owed) {
+                for (const BLRectI &region : chosen->owed.regions()) {
                     copy_rows(chosen->pixels, last->pixels, static_cast<size_t>(chosen->stride), width,
                               region);
                 }
@@ -444,7 +474,6 @@ namespace ttk {
         }
 
         chosen->owed.clear();
-        chosen->owedAll = false;
 
         impl.held = chosen;
 
@@ -481,25 +510,17 @@ namespace ttk {
         held->busy = true;
         held->shown = ++impl.frame;
 
-        const bool all = std::ranges::any_of(regions, [&](const BLRectI &region) {
-            return region.x <= 0 && region.y <= 0 && region.x + region.w >= held->width
-                && region.y + region.h >= held->height;
-        });
-
-        // Every other buffer is now that much further behind the screen.
+        // Every other buffer is now that much further behind the screen. A region
+        // covering the frame absorbs the rest, and the buffer then owes it whole.
         for (const std::unique_ptr<Buffer> &buffer : impl.buffers) {
-            if (buffer.get() == held || buffer->retired || buffer->owedAll) {
+            if (buffer.get() == held || buffer->retired || buffer->owed.whole()) {
                 continue;
             }
 
-            if (all || buffer->owed.size() + regions.size() > CROWDED) {
-                buffer->owed.clear();
-                buffer->owedAll = true;
-
-                continue;
+            for (const BLRectI &region : regions) {
+                buffer->owed.add(BLRect{static_cast<double>(region.x), static_cast<double>(region.y),
+                                        static_cast<double>(region.w), static_cast<double>(region.h)});
             }
-
-            buffer->owed.insert(buffer->owed.end(), regions.begin(), regions.end());
         }
 
         impl.last = held;

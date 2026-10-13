@@ -60,3 +60,6 @@ With the defaults, the libcurl headers must be installed.
 
 `TTK_SANITIZE=ON` adds the address and undefined sanitizers. `tools/lint.sh`
 runs clang-tidy over the sources with the checks in `.clang-tidy`.
+
+`TTK_TESTS=ON` builds headless rendering correctness checks. Run them with
+`ctest --test-dir build --output-on-failure`.

@@ -7,6 +7,7 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <cmath>
 
 #include "ttk/draw/Theme.h"
 #include "ttk/draw/Typeface.h"
@@ -275,7 +276,7 @@ namespace ttk {
 
             // The caret belongs to an empty field too, which is where it matters most.
             if (focused() && _showCaret) {
-                painter.fill(BLRect{_box.x, _box.y + 3.0, 1.5, _box.h - 6.0}, palette.accent);
+                painter.fill(caret_box(painter.type(), face), palette.accent);
             }
 
             painter.pop();
@@ -315,9 +316,7 @@ namespace ttk {
         }
 
         if (focused() && _showCaret && from == to) {
-            const double at = left + painter.width(face, shown(0, _caret));
-
-            painter.fill(BLRect{at, _box.y + 3.0, 1.5, _box.h - 6.0}, palette.accent);
+            painter.fill(caret_box(painter.type(), face), palette.accent);
         }
 
         painter.pop();
@@ -475,6 +474,23 @@ namespace ttk {
         _anchor = _caret;
     }
 
+    BLRect TextBox::caret_box(Typeface &type, const BLFont &face) const {
+        // A cut or set_text() can empty the field without scrolling it back.
+        const double x = _text.empty() ? _box.x : _box.x - _shift + type.width(face, shown(0, _caret));
+
+        return BLRect{x, _box.y + 3.0, 1.5, _box.h - 6.0};
+    }
+
+    void TextBox::invalidate_caret() const {
+        if (root() == nullptr || (!_text.empty() && _caret != _anchor)) {
+            return;
+        }
+
+        Typeface &type = root()->type();
+
+        invalidate(caret_box(type, type.at(Typeface::pick(400, _mono), Theme::fontBody)), _box);
+    }
+
     bool TextBox::advance(const double now) {
         if (!focused()) {
             return false;
@@ -483,7 +499,7 @@ namespace ttk {
         // Hidden rather than frozen, and due to come back on the first frame the window is active again.
         if (!root()->active()) {
             if (_showCaret) {
-                invalidate();
+                invalidate_caret();
             }
 
             _showCaret = false;
@@ -496,7 +512,7 @@ namespace ttk {
             _blinked = now;
             _showCaret = !_showCaret;
 
-            invalidate();
+            invalidate_caret();
         }
 
         return sleep_until(_blinked + BLINK);

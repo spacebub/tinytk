@@ -130,6 +130,13 @@ namespace ttk {
         //! Returns the ascent plus the descent of `font`.
         [[nodiscard]] float line_height(const BLFont &font) const;
 
+        //! Returns how far the ink of `font` can reach outside a line box of \ref line_height(), in pixels.
+        //!
+        //! Covers glyphs that rise above the ascent or fall below the descent, the pixel of room each way left for
+        //! antialiasing and the rounding of the baseline to a whole pixel. Pad each side of a line's box by it before
+        //! testing it against a clip.
+        [[nodiscard]] static double bleed(const BLFont &font);
+
     private:
         struct Shaped {
             BLGlyphBuffer buffer;
@@ -172,6 +179,14 @@ namespace ttk {
         };
 
         Shaped &shaped(const BLFont &font, std::string_view run);
+
+        struct MaskRows {
+            int above = 0;
+            int below = 0;
+        };
+
+        // One answer for lay(), compose() and bleed(), which must agree on how far a mask reaches.
+        static MaskRows mask_rows(const BLFont &font);
 
         Glyphs &glyphs(const BLFont &font);
 

@@ -214,7 +214,11 @@ namespace ttk {
 
         [[nodiscard]] size_t hit(double x, double y) const;
 
+        [[nodiscard]] BLRect text_clip(double gutter) const;
+        [[nodiscard]] BLRect caret_box(size_t row, double left) const;
+
         void span(size_t &from, size_t &to) const;
+        void invalidate_caret() const;
 
         void move_to(size_t offset, bool selecting, bool keepGoal = false);
         void keep_caret();

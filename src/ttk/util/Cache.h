@@ -142,11 +142,16 @@ namespace ttk::Cache {
     //! Returns the entry of `held` for `view` and whether it was just created.
     //!
     //! When there is no entry, one is added with a value-initialized `Value` and a copy of the run, and the second
-    //! member is true. A reference stays valid until the entry is removed from `held`.
+    //! member is true. With nonzero `keep`, evicts old entries only on a miss at capacity.
+    //! A reference stays valid until the entry is removed from `held`.
     template <typename Value>
-    std::pair<Value &, bool> run_entry(RunMap<Value> &held, const RunView &view) {
+    std::pair<Value &, bool> run_entry(RunMap<Value> &held, const RunView &view, const size_t keep = 0) {
         if (const auto found = held.find(view); found != held.end()) {
             return {found->second, false};
+        }
+
+        if (keep != 0) {
+            evict_oldest(held, keep);
         }
 
         const auto made = held.emplace(
@@ -156,7 +161,6 @@ namespace ttk::Cache {
 
         return {made.first->second, true};
     }
-
 }
 
 

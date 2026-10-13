@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <string>
 
 #if defined(__SSE2__) || defined(_M_X64)
 #include <emmintrin.h>
@@ -229,31 +230,36 @@ namespace ttk {
     }
 
     Typeface::Shaped &Typeface::shaped(const BLFont &font, const std::string_view run) {
-        if (_maskBytes >= (32U << 20U)) {
-            _shaped.clear();
-            _maskBytes = 0;
-        } else {
+        const auto key = reinterpret_cast<std::uintptr_t>(&font);
+
+        if (_maskBytes < (32U << 20U)) {
+            if (const auto found = _shaped.find(Cache::RunView{.font = key, .run = run}); found != _shaped.end()) {
+                found->second.used = ++_asked;
+
+                return found->second;
+            }
+
             Cache::evict_oldest(_shaped, SHAPED, [this](const Shaped &gone) {
                 _maskBytes -= std::min(_maskBytes, static_cast<size_t>(gone.mask.width())
                                                        * static_cast<size_t>(gone.mask.height()));
             });
+        } else {
+            _shaped.clear();
+            _maskBytes = 0;
         }
 
-        auto [made, fresh] = Cache::run_entry(
-            _shaped, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font), .run = run});
+        Shaped &made = _shaped.try_emplace(Cache::RunKey{.font = key, .run = std::string(run)}).first->second;
 
         made.used = ++_asked;
 
-        if (fresh) {
-            BLTextMetrics metrics{};
+        BLTextMetrics metrics{};
 
-            made.buffer.set_utf8_text(run.data(), run.size());
-            font.shape(made.buffer);
+        made.buffer.set_utf8_text(run.data(), run.size());
+        font.shape(made.buffer);
 
-            if (font.get_text_metrics(made.buffer, metrics) == BL_SUCCESS) {
-                made.width = static_cast<float>(metrics.advance.x);
-                made.ink = metrics.bounding_box;
-            }
+        if (font.get_text_metrics(made.buffer, metrics) == BL_SUCCESS) {
+            made.width = static_cast<float>(metrics.advance.x);
+            made.ink = metrics.bounding_box;
         }
 
         return made;
@@ -288,21 +294,13 @@ namespace ttk {
         if (!made.masked) {
             made.masked = true;
 
-            // The metrics box is only ever sideways. Up and down come from the face,
-            // whichever of its ascent and its tallest glyph reaches further. A pixel of
-            // room each way for the antialiasing to fall into.
-            const BLFontMetrics face = font.metrics();
-            const double rise = std::max({static_cast<double>(face.ascent),
-                                          std::abs(static_cast<double>(face.y_min)),
-                                          std::abs(static_cast<double>(face.y_max)),});
-            const double fall = std::max({static_cast<double>(face.descent),
-                                          std::abs(static_cast<double>(face.y_min)),
-                                          std::abs(static_cast<double>(face.y_max)),});
+            // The metrics box is only ever sideways.
+            const MaskRows rows = mask_rows(font);
 
             const int left = static_cast<int>(std::floor(made.ink.x0)) - 1;
-            const int top = -static_cast<int>(std::ceil(rise)) - 1;
+            const int top = -rows.above;
             const int wide = static_cast<int>(std::ceil(made.ink.x1)) - left + 1;
-            const int tall = static_cast<int>(std::ceil(fall)) - top + 1;
+            const int tall = rows.above + rows.below;
 
             if (wide > 0 && tall > 0 && made.mask.create(wide, tall, BL_FORMAT_A8) == BL_SUCCESS) {
                 BLContext into(made.mask);
@@ -352,10 +350,8 @@ namespace ttk {
             return 0.0F;
         }
 
-        Cache::evict_oldest(_words, WORDS);
-
         auto [held, fresh] = Cache::run_entry(
-            _words, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font), .run = word});
+                _words, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font), .run = word}, WORDS);
 
         held.used = ++_asked;
 
@@ -370,15 +366,16 @@ namespace ttk {
                                        const float tracking) {
         // The answer is kept, not the candidates: a label elides to the same string every
         // paint, and putting the candidates in the shape cache would evict what is drawn.
-        Cache::evict_oldest(_elided, ELIDED);
-
         const auto wide = static_cast<std::uint64_t>(std::lround(room * 4.0));
         const auto space = static_cast<std::uint32_t>(std::lround(tracking * 16.0));
 
-        auto [held, fresh] = Cache::run_entry(
-            _elided, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
-                                    .at = static_cast<std::int64_t>((wide << 32U) | space),
-                                    .run = run,});
+        auto [held, fresh] = Cache::run_entry(_elided,
+                                              Cache::RunView{
+                                                      .font = reinterpret_cast<std::uintptr_t>(&font),
+                                                      .at = static_cast<std::int64_t>((wide << 32U) | space),
+                                                      .run = run,
+                                              },
+                                              ELIDED);
 
         held.used = ++_asked;
 
@@ -477,6 +474,31 @@ namespace ttk {
         return metrics.ascent + metrics.descent;
     }
 
+    double Typeface::bleed(const BLFont &font) {
+        const BLFontMetrics metrics = font.metrics();
+        const MaskRows rows = mask_rows(font);
+
+        // The baseline is the line's top plus its ascent rounded to a whole pixel, so up to half a pixel out.
+        return std::max(static_cast<double>(rows.above) - static_cast<double>(metrics.ascent),
+                        static_cast<double>(rows.below) - static_cast<double>(metrics.descent))
+               + 0.5;
+    }
+
+    Typeface::MaskRows Typeface::mask_rows(const BLFont &font) {
+        // Up and down come from the face, whichever of its ascent and its tallest glyph reaches
+        // further. A pixel of room each way for the antialiasing to fall into.
+        const BLFontMetrics face = font.metrics();
+        const double tallest =
+                std::max(std::abs(static_cast<double>(face.y_min)), std::abs(static_cast<double>(face.y_max)));
+        const double rise = std::max(static_cast<double>(face.ascent), tallest);
+        const double fall = std::max(static_cast<double>(face.descent), tallest);
+
+        return MaskRows{
+                .above = static_cast<int>(std::ceil(rise)) + 1,
+                .below = static_cast<int>(std::ceil(fall)) + 1,
+        };
+    }
+
     void Typeface::draw(BLContext &context, const BLFont &font, const BLPoint top,
                     const std::string_view run, const BLRgba32 tone) {
         if (run.empty()) {
@@ -503,6 +525,12 @@ namespace ttk {
     }
 
     Typeface::Glyphs &Typeface::glyphs(const BLFont &font) {
+        if (const auto found = _glyphs.find(reinterpret_cast<std::uintptr_t>(&font)); found != _glyphs.end()) {
+            found->second.used = ++_asked;
+
+            return found->second;
+        }
+
         Cache::evict_oldest(_glyphs, TABLES);
 
         Glyphs &table = _glyphs[reinterpret_cast<std::uintptr_t>(&font)];
@@ -639,12 +667,13 @@ namespace ttk {
             return;
         }
 
-        Cache::evict_oldest(_rows, ROWS);
-
-        auto [made, fresh] = Cache::run_entry(
-            _rows, Cache::RunView{.font = reinterpret_cast<std::uintptr_t>(&font),
-                                  .at = std::lround(room * 4.0),
-                                  .run = run,});
+        auto [made, fresh] = Cache::run_entry(_rows,
+                                              Cache::RunView{
+                                                      .font = reinterpret_cast<std::uintptr_t>(&font),
+                                                      .at = std::lround(room * 4.0),
+                                                      .run = run,
+                                              },
+                                              ROWS);
 
         made.used = ++_asked;
 
@@ -660,21 +689,13 @@ namespace ttk {
     }
 
     void Typeface::compose(const BLFont &font, const Cut &cut, const double room, Row &into) {
-        const BLFontMetrics face = font.metrics();
         const BLFontMatrix &scale = font.matrix();
         const std::uint32_t *ids = _scratch.content();
         const BLGlyphPlacement *placed = _scratch.placement_data();
 
-        // The line box as lay() sizes one: the face's rise and fall, whichever of its
-        // ascent and its tallest glyph reaches further, and a pixel each way.
-        const double rise = std::max({static_cast<double>(face.ascent),
-                                      std::abs(static_cast<double>(face.y_min)),
-                                      std::abs(static_cast<double>(face.y_max)),});
-        const double fall = std::max({static_cast<double>(face.descent),
-                                      std::abs(static_cast<double>(face.y_min)),
-                                      std::abs(static_cast<double>(face.y_max)),});
-        const int above = static_cast<int>(std::ceil(rise)) + 1;
-        const int tall = above + static_cast<int>(std::ceil(fall)) + 1;
+        const MaskRows rows = mask_rows(font);
+        const int above = rows.above;
+        const int tall = rows.above + rows.below;
         const double reach = std::min(room, cut.made ? _pens[cut.shown] + cut.dotWide : _pens.back());
         const int wide = static_cast<int>(std::ceil(reach)) + (SLACK * 2);
 

@@ -431,16 +431,16 @@ namespace ttk {
         return static_cast<int>(std::clamp(wait, 0.0, static_cast<double>(std::numeric_limits<int>::max())));
     }
 
-    void Shell::relayout() {
+    bool Shell::relayout() {
         if (!_surface.sync(_window)) {
-            return;
+            return false;
         }
 
         const double width = _surface.width();
         const double height = _surface.height();
 
         if (width == _width && height == _height) {
-            return;
+            return true;
         }
 
         _width = width;
@@ -451,6 +451,8 @@ namespace ttk {
         if (resized) {
             resized(width, height);
         }
+
+        return true;
     }
 
     void Shell::draw() {
@@ -467,9 +469,7 @@ namespace ttk {
         _root->set_now(at);
         _root->advance(at);
 
-        relayout();
-
-        if (!_surface.ready()) {
+        if (!relayout()) {
             return;
         }
 
@@ -739,9 +739,10 @@ namespace ttk {
 
             // Nothing in flight, or nothing anyone can see: block until the desktop or an
             // alarm has something to say. This is where the idle cost goes to nothing at all.
-            if (const bool hidden = unseen();
-                !_nudged && (hidden || (!_root->busy() && !_root->dirty()))
-                && SDL_WaitEventTimeout(&event, sleep_for(now(), hidden))) {
+            const bool hidden = unseen();
+            const bool idle = !_root->busy() && !_root->dirty() && !_surface.dirty();
+
+            if (!_nudged && (hidden || idle) && SDL_WaitEventTimeout(&event, sleep_for(now(), hidden))) {
                 handle(event);
             }
 

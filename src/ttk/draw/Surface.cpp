@@ -14,10 +14,6 @@
 #include "ttk/draw/Surface.h"
 
 namespace ttk {
-    namespace {
-
-    }
-
     bool Surface::sync(SDL_Window *window) {
         if (!_ready) {
             return attach(window);
@@ -144,7 +140,13 @@ namespace ttk {
         _damage.all();
         _moved.clear();
 
-        return retarget();
+        if (retarget()) {
+            return true;
+        }
+
+        release();
+
+        return false;
     }
 
     bool Surface::retarget() {
@@ -152,8 +154,7 @@ namespace ttk {
 
         // A frame about to be repainted whole has nothing to carry over from the last.
         if (!_shm.acquire(_width, _height, _damage.whole(), target)) {
-            release();
-
+            // No buffer could be made. Nothing was drawn, so the damage pending stands for the next try.
             return false;
         }
 
@@ -220,7 +221,8 @@ namespace ttk {
     }
 
     void Surface::shift(const BLRectI &wanted, const int dy) {
-        if (!_ready || dy == 0) {
+        // A frame repainted whole has no pixels worth moving.
+        if (!_ready || dy == 0 || _damage.whole()) {
             return;
         }
 
@@ -269,17 +271,7 @@ namespace ttk {
             }
         }
 
-        // Whatever was due a repaint inside has gone with the pixels.
-        // Copied first: damage() below grows the list, or replaces it when crowded.
-        _pending.assign(_damage.regions().begin(), _damage.regions().end());
-
-        for (const BLRectI &held : _pending) {
-            if (held.x < region.x + region.w && held.x + held.w > region.x
-                && held.y < region.y + region.h && held.y + held.h > region.y) {
-                damage(BLRect{static_cast<double>(held.x), static_cast<double>(held.y + dy),
-                              static_cast<double>(held.w), static_cast<double>(held.h)});
-            }
-        }
+        _damage.shift(region, dy);
 
         _moved.push_back(region);
     }
@@ -319,7 +311,7 @@ namespace ttk {
     }
 
     void Surface::present(SDL_Window *window) {
-        if (!_ready || _damage.empty()) {
+        if (!_ready || !dirty()) {
             return;
         }
 
@@ -327,18 +319,27 @@ namespace ttk {
         // them. The context is synchronous, so this is the one place it has to be said.
         _context.flush(BL_CONTEXT_FLUSH_SYNC);
 
-        if (_path == Path::Shared) {
-            // A buffer committed before the surface has its role is a protocol error.
-            // The damage stands, and the frame after the window is shown is drawn whole.
-            if ((SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0) {
-                return;
+        // A buffer committed before the surface has its role is a protocol error.
+        // The damage stands, and the frame after the window is shown is drawn whole.
+        if (_path == Path::Shared && (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0) {
+            return;
+        }
+
+        // A shifted region usually holds the strips repainted inside it, so each pixel is handed over once.
+        _presented.resize(_width, _height);
+
+        const auto collect = [&](const std::vector<BLRectI> &regions) {
+            for (const BLRectI &region : regions) {
+                _presented.add(BLRect{static_cast<double>(region.x), static_cast<double>(region.y),
+                                      static_cast<double>(region.w), static_cast<double>(region.h)});
             }
+        };
 
-            _presented.clear();
-            _presented.insert(_presented.end(), _damage.regions().begin(), _damage.regions().end());
-            _presented.insert(_presented.end(), _moved.begin(), _moved.end());
+        collect(_damage.regions());
+        collect(_moved);
 
-            if (_shm.present(_presented)) {
+        if (_path == Path::Shared) {
+            if (_shm.present(_presented.regions())) {
                 _damage.clear();
                 _moved.clear();
             }
@@ -354,15 +355,16 @@ namespace ttk {
 
         _rects.clear();
 
-        for (const BLRectI &region : _damage.regions()) {
+        for (const BLRectI &region : _presented.regions()) {
             _rects.push_back({.x = region.x, .y = region.y, .w = region.w, .h = region.h});
         }
 
-        for (const BLRectI &region : _moved) {
-            _rects.push_back({.x = region.x, .y = region.y, .w = region.w, .h = region.h});
-        }
+        // A frame SDL would not take is lost, so the next sync() attaches again and draws it whole.
+        if (!SDL_UpdateWindowSurfaceRects(window, _rects.data(), static_cast<int>(_rects.size()))) {
+            release();
 
-        SDL_UpdateWindowSurfaceRects(window, _rects.data(), static_cast<int>(_rects.size()));
+            return;
+        }
 
         _damage.clear();
         _moved.clear();
@@ -385,7 +387,7 @@ namespace ttk {
         // before holds whatever was last in that memory, and only this frame's damage
         // would go over it. The image behind is whole, so all of it does.
         if (surface != _surface || surface->pixels != _pixels) {
-            damage_all();
+            _presented.all();
         }
 
         const auto *from = static_cast<const uint8_t *>(data.pixel_data);
@@ -401,11 +403,7 @@ namespace ttk {
             }
         };
 
-        for (const BLRectI &region : _damage.regions()) {
-            copy(region);
-        }
-
-        for (const BLRectI &region : _moved) {
+        for (const BLRectI &region : _presented.regions()) {
             copy(region);
         }
 

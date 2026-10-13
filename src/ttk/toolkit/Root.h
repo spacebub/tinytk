@@ -17,6 +17,7 @@
 
 #include <blend2d/blend2d.h>
 
+#include "ttk/draw/Damage.h"
 #include "ttk/draw/Typeface.h"
 #include "ttk/toolkit/Painter.h"
 #include "ttk/toolkit/Widget.h"
@@ -84,20 +85,23 @@ namespace ttk {
 
         //! Marks `region` for repainting. An empty `region` is ignored.
         //!
-        //! Once more than 32 regions are pending they are merged into their bounding rectangle, which every further
-        //! region joins until the next \ref take().
+        //! Regions are kept as given, at most \ref Damage::CROWDED of them, until \ref take(), \ref whole() or
+        //! \ref shift() rounds them out to pixels, clips them to the window and merges them through
+        //! \ref Damage::add(). A region inside the one given last is dropped at once.
         void damage(const BLRect &region);
         //! Replaces every pending region with the whole window.
         void damage_all();
 
         //! Returns the pending regions and clears them.
         //!
-        //! Regions are merged where repainting their bounding rectangle costs less than repainting them apart. The
-        //! list is owned by the root and overwritten by the next call.
+        //! The list is owned by the root and overwritten by the next call.
         const std::vector<BLRect> &take();
 
-        //! Tests whether any region is pending.
-        bool dirty() const { return !_dirty.empty(); }
+        //! Tests whether a repaint, layout or pixel move is pending.
+        bool dirty() const { return _relayout || !_pending.empty() || !_dirty.empty() || !_shifts.empty(); }
+
+        //! Tests whether the pending regions, merged, cover the whole window.
+        bool whole();
 
         //! Pixel move requested through \ref shift().
         struct Shift {
@@ -287,6 +291,8 @@ namespace ttk {
         //! \}
 
     private:
+        void flush();
+
         Widget *pick(double x, double y);
 
         void hover_to(Widget *who, const Pointer &at);
@@ -323,11 +329,12 @@ namespace ttk {
         Page _page;
         Page _layers[LAYERS];
 
-        std::vector<BLRect> _dirty;
+        // What damage() was given since the last take(), merged into the pixel set by flush().
+        std::vector<BLRect> _pending;
+        Damage _dirty;
         std::vector<Shift> _shifts;
-        bool _crowded = false;
 
-        // What the takes handed out last, swapped with the pending lists so neither gives its capacity up.
+        // What the takes handed out last, retaining capacity between frames.
         std::vector<BLRect> _taken;
         std::vector<Shift> _shifted;
 

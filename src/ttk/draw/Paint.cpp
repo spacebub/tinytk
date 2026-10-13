@@ -233,7 +233,8 @@ namespace ttk {
 
                 const uint16_t total = sums[width - 1];
 
-                for (auto at = static_cast<size_t>(width); at < static_cast<size_t>(stride) + span + Lane::WORDS; ++at) {
+                for (auto at = static_cast<size_t>(width); at < static_cast<size_t>(stride) + span + (LANES / 2);
+                     ++at) {
                     sums[at] = total;
                 }
 

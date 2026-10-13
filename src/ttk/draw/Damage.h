@@ -17,11 +17,16 @@
 namespace ttk {
     //! Set of rectangles of a frame that changed and must be repainted and presented.
     //!
-    //! All rectangles are in pixels and clipped to the frame size given to \ref resize().
+    //! All rectangles are in pixels and clipped to the frame size given to \ref resize(). Until then the frame has no
+    //! pixels, and every rectangle is dropped.
     class Damage {
     public:
-        //! Number of rectangles above which \ref add() merges all of them into their bounding rectangle.
+        //! Maximum number of rectangles retained by \ref add().
         static constexpr size_t CROWDED = 32;
+
+        //! Clean pixels \ref add() repaints to join two rectangles rather than keep them apart, each costing a walk
+        //! of the widget tree.
+        static constexpr int64_t WALK = int64_t{128} * 128;
 
         //! Sets the frame size to `width` by `height` pixels and clears all rectangles.
         void resize(int width, int height);
@@ -29,12 +34,20 @@ namespace ttk {
         //! Adds `region` to the set.
         //!
         //! `region` is first clipped to the frame and rounded outward to whole pixels. It is dropped when nothing
-        //! of it is left, or when a rectangle already in the set covers it. Once the set holds more than
-        //! \ref CROWDED rectangles, they are replaced by their bounding rectangle.
+        //! of it is left or a rectangle already in the set covers it, and otherwise replaces the rectangles it
+        //! covers. It is joined with the rectangle whose bounding rectangle with it adds the fewest clean pixels,
+        //! when that is at most \ref WALK or the set already holds \ref CROWDED rectangles, and the join goes on
+        //! while it brings another rectangle within \ref WALK.
         void add(const BLRect &region);
 
-        //! Replaces the set with a single rectangle covering the whole frame.
+        //! Replaces the set with a single rectangle covering the whole frame, or empties it when the frame has no
+        //! pixels.
         void all();
+
+        //! Also damages where the parts of pending rectangles inside `region` land when its pixels move down by
+        //! `dy` pixels, or up when `dy` is negative. The pending rectangles stay, and the strip the move uncovers is
+        //! left for the caller to damage.
+        void shift(const BLRectI &region, int dy);
 
         //! Removes all rectangles.
         void clear() { _regions.clear(); }
@@ -54,6 +67,9 @@ namespace ttk {
 
     private:
         std::vector<BLRectI> _regions;
+
+        // Scratch for shift(), kept so a frame allocates nothing.
+        std::vector<BLRectI> _moving;
 
         int _width = 0;
         int _height = 0;

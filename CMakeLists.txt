@@ -19,6 +19,7 @@ option(TTK_HTTP "Build ttk::http, which needs libcurl outside Windows" ON)
 option(TTK_NOTIFY "Build ttk::notify, desktop notifications over the session bus" ON)
 option(TTK_EXAMPLES "Build the example programs" ${PROJECT_IS_TOP_LEVEL})
 option(TTK_BENCHMARKS "Build the benchmark suite in bench/" OFF)
+option(TTK_TESTS "Build headless rendering correctness tests" OFF)
 option(TTK_SANITIZE "Build with the address and undefined sanitizers" OFF)
 
 # Where SDL builds a Wayland video driver.
@@ -109,4 +110,9 @@ endif ()
 
 if (TTK_BENCHMARKS AND TTK_UI)
     add_subdirectory(bench)
+endif ()
+
+if (TTK_TESTS AND TTK_UI)
+    enable_testing()
+    add_subdirectory(tests)
 endif ()

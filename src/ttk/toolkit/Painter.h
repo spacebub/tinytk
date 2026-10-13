@@ -55,7 +55,8 @@ namespace ttk {
     //!
     //! A painter draws one damaged rectangle at a time, \ref clip(), and the context is already clipped to it.
     //! All coordinates are in window pixels and all text is UTF-8. \ref fill(), \ref round(), \ref outline() and
-    //! \ref circle() draw nothing for an empty box or a fully transparent `tone`.
+    //! \ref circle() draw nothing where \ref needed() rejects their box. They, \ref path() and \ref stroke() draw
+    //! nothing for a fully transparent `tone`.
     class Painter {
     public:
         //! Creates a painter drawing into `context` with fonts from `type`, for the damaged rectangle `clip`.
@@ -84,6 +85,9 @@ namespace ttk {
         const BLRectI &clip() const { return _clip; }
 
         //! Tests whether any of `box` lies inside \ref clip(). Use it to skip painting what is not being repainted.
+        //!
+        //! Returns false for an empty box. While the context has a transform it returns true for any other box, as
+        //! \ref clip() is in window pixels and `box` is not.
         bool needed(const BLRect &box) const;
 
         //! Fills `box` with `tone`.
@@ -96,7 +100,7 @@ namespace ttk {
         //! Draws a border `width` thick with outer corner radius `radius`, inside `box` rather than straddling its
         //! edge.
         //!
-        //! Draws nothing unless `box` is wider and taller than twice `width`.
+        //! Draws nothing unless `width` is positive and `box` is wider and taller than twice `width`.
         void outline(const BLRect &box, double radius, double width, BLRgba32 tone) const;
 
         //! Fills a circle of `radius` around `centre`. Draws nothing when `radius` is not positive.
@@ -106,7 +110,8 @@ namespace ttk {
         void path(const BLPath &shape, BLRgba32 tone) const;
         //! Strokes `shape` `width` thick with round caps and joins.
         //!
-        //! The stroke width, caps and join stay set on \ref context() afterwards.
+        //! Draws nothing for a `width` that is not positive. Otherwise the stroke width, caps and join stay set on
+        //! \ref context() afterwards.
         void stroke(const BLPath &shape, double width, BLRgba32 tone) const;
 
         //! Returns the font of `weight` at `size` from \ref type(). The font is owned by the typeface.

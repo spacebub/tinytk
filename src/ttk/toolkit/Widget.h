@@ -198,6 +198,9 @@ namespace ttk {
         //! the widget is not attached to a root.
         void invalidate(const BLRect &region) const;
 
+        //! Marks the part of `region` inside `clip` for repainting, as \ref invalidate(const BLRect &) does.
+        void invalidate(const BLRect &region, const BLRect &clip) const;
+
         //! \}
 
         //! \name Events

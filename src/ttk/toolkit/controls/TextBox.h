@@ -120,6 +120,8 @@ namespace ttk {
         void insert(const std::string &what);
 
         void span(size_t &from, size_t &to) const;
+        [[nodiscard]] BLRect caret_box(Typeface &type, const BLFont &face) const;
+        void invalidate_caret() const;
 
         [[nodiscard]] size_t before(size_t at) const;
         [[nodiscard]] size_t after(size_t at) const;

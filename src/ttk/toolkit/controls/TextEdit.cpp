@@ -757,6 +757,11 @@ namespace ttk {
                                    static_cast<size_t>(std::floor((_scrollY + view_height()) / _lineHeight)));
         const double left = text_left() - _scrollX;
         const double inset = (_lineHeight - _fontHeight) / 2.0;
+        // A row's text is a line box centred `inset` inside the row, and its ink reaches past that box.
+        const double reach = std::max(0.0, Typeface::bleed(font) - inset);
+        const auto needed = [&](const double y) {
+            return painter.needed(BLRect{_box.x, y - reach, _box.w, _lineHeight + (reach * 2.0)});
+        };
 
         for (size_t row = first; _numbered && row <= last; ++row) {
             const size_t start = _rowStarts[row];
@@ -768,16 +773,26 @@ namespace ttk {
             }
 
             const double y = view_top() + (static_cast<double>(row) * _lineHeight) - _scrollY;
+
+            if (!needed(y)) {
+                continue;
+            }
+
             const bool current = line == caretLine && focused() && !_readOnly;
 
             painter.label(font, BLRect{_box.x, y, gutter - PAD_X, _lineHeight}, Align::End,
                           std::to_string(line + 1), current ? palette.muted : palette.faint);
         }
 
-        painter.push(BLRect{_box.x + gutter + 1.0, _box.y + 1.0, _box.w - gutter - 2.0, _box.h - 2.0});
+        painter.push(text_clip(gutter));
 
         for (size_t row = first; row <= last; ++row) {
             const double y = view_top() + (static_cast<double>(row) * _lineHeight) - _scrollY;
+
+            if (!needed(y)) {
+                continue;
+            }
+
             const size_t start = _rowStarts[row];
             const size_t end = row_end(row);
             const size_t base = base_of(row);
@@ -816,10 +831,7 @@ namespace ttk {
         }
 
         if (focused() && _showCaret && !_readOnly) {
-            const double x = left + (static_cast<double>(column_of(_caret) - base_of(caretRow)) * _charWidth);
-            const double y = view_top() + (static_cast<double>(caretRow) * _lineHeight) - _scrollY;
-
-            painter.fill(BLRect{x, y + 2.0, 1.5, _lineHeight - 4.0}, palette.accent);
+            painter.fill(caret_box(caretRow, left), palette.accent);
         }
 
         painter.pop();
@@ -1145,6 +1157,21 @@ namespace ttk {
         invalidate();
     }
 
+    BLRect TextEdit::text_clip(const double gutter) const {
+        return BLRect{_box.x + gutter + 1.0, _box.y + 1.0, _box.w - gutter - 2.0, _box.h - 2.0};
+    }
+
+    BLRect TextEdit::caret_box(const size_t row, const double left) const {
+        const double x = left + (static_cast<double>(column_of(_caret) - base_of(row)) * _charWidth);
+        const double y = view_top() + (static_cast<double>(row) * _lineHeight) - _scrollY;
+
+        return BLRect{x, y + 2.0, 1.5, _lineHeight - 4.0};
+    }
+
+    void TextEdit::invalidate_caret() const {
+        invalidate(caret_box(row_of(_caret), text_left() - _scrollX), text_clip(gutter_width()));
+    }
+
     bool TextEdit::advance(const double now) {
         if (!focused() || _readOnly) {
             return false;
@@ -1153,7 +1180,7 @@ namespace ttk {
         // Hidden rather than frozen, and due to come back on the first frame the window is active again.
         if (!root()->active()) {
             if (_showCaret) {
-                invalidate();
+                invalidate_caret();
             }
 
             _showCaret = false;
@@ -1166,7 +1193,7 @@ namespace ttk {
             _blinked = now;
             _showCaret = !_showCaret;
 
-            invalidate();
+            invalidate_caret();
         }
 
         return sleep_until(_blinked + BLINK);

@@ -13,12 +13,18 @@ namespace ttk {
     std::size_t compose(Root &root, Surface &surface) {
         root.settle();
 
-        for (const BLRect &region : root.take()) {
-            surface.damage(region);
+        // A frame repainted whole has no pixels worth moving.
+        if (root.whole()) {
+            surface.damage_all();
         }
 
         for (const Root::Shift &moved : root.take_shifts()) {
             surface.shift(moved.region, moved.dy);
+        }
+
+        // Root moved its own pending regions with the pixels, so they go in after the moves.
+        for (const BLRect &region : root.take()) {
+            surface.damage(region);
         }
 
         if (!surface.dirty()) {

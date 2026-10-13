@@ -245,7 +245,7 @@ namespace ttk {
         _grabbed = bar.y;
         _from = at.y;
 
-        invalidate();
+        invalidate(thumb());
 
         return true;
     }
@@ -254,7 +254,7 @@ namespace ttk {
         if (_dragging) {
             _dragging = false;
 
-            invalidate();
+            invalidate(thumb());
         }
     }
 
