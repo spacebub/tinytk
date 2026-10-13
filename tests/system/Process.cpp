@@ -7,7 +7,6 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <chrono>
-#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -16,6 +15,14 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <csignal>
+#endif
 
 #include "support/Sandbox.h"
 #include "ttk/system/Process.h"
@@ -124,6 +131,7 @@ double elapsed_seconds(const Clock::time_point since) {
 }
 }
 
+#ifndef _WIN32
 TEST(ProcessStart, TrueFinishesWithZero) {
     Process::Id id = 0;
 
@@ -267,6 +275,7 @@ TEST(ProcessStart, RunsAProgramGivenByPath) {
     ASSERT_TRUE(result.started) << result.error;
     EXPECT_EQ(ttk::Text::trim(result.output), "from script arg");
 }
+#endif
 
 TEST(ProcessStart, MissingProgramFails) {
     Process::Id id = 0;
@@ -293,6 +302,7 @@ TEST(ProcessStart, MissingProgramWithOutputFails) {
     EXPECT_FALSE(error.empty());
 }
 
+#ifndef _WIN32
 TEST(ProcessStart, FileWithoutExecutePermissionFails) {
     const fs::path directory = tests::Sandbox::scratch("process-noexec");
     const fs::path file = directory / "plain";
@@ -306,11 +316,13 @@ TEST(ProcessStart, FileWithoutExecutePermissionFails) {
     EXPECT_FALSE(Process::start(file, {}, {}, {}, &id, nullptr, &error));
     EXPECT_FALSE(error.empty());
 }
+#endif
 
 TEST(ProcessStart, MissingProgramWithoutErrorPointer) {
     EXPECT_FALSE(Process::start("ttk-no-such-program-anywhere", {}, {}));
 }
 
+#ifndef _WIN32
 TEST(ProcessStart, UntrackedChildStarts) {
     EXPECT_TRUE(Process::start("true", {}, {})) << "no id means nothing needs to reap it";
 }
@@ -324,12 +336,14 @@ TEST(ProcessStart, UntrackedChildStillCapturesOutput) {
 
     Process::close_stream(output);
 }
+#endif
 
 TEST(ProcessPoll, UnknownIdIsUnknown) {
     EXPECT_EQ(Process::poll(0), Process::State::Unknown);
     EXPECT_EQ(Process::poll(987654321), Process::State::Unknown);
 }
 
+#ifndef _WIN32
 TEST(ProcessPoll, EndIsReportedOnce) {
     Process::Id id = 0;
 
@@ -419,6 +433,7 @@ TEST(ProcessForce, EndsAChildThatIgnoresStop) {
 
     Process::close_stream(output);
 }
+#endif
 
 TEST(ProcessStop, UnknownIdDoesNothing) {
     Process::stop(0);
@@ -429,6 +444,7 @@ TEST(ProcessStop, UnknownIdDoesNothing) {
     SUCCEED();
 }
 
+#ifndef _WIN32
 TEST(ProcessStop, AfterTheEndWasReportedDoesNothing) {
     Process::Id id = 0;
 
@@ -440,6 +456,7 @@ TEST(ProcessStop, AfterTheEndWasReportedDoesNothing) {
 
     EXPECT_EQ(Process::poll(id), Process::State::Unknown);
 }
+#endif
 
 TEST(ProcessRead, NothingFailsAndEmpties) {
     std::string into = "stale";
@@ -478,6 +495,7 @@ TEST(ProcessRead, EndOfStreamIsFalseAndEmpty) {
     Process::close_stream(readEnd);
 }
 
+#ifndef _WIN32
 TEST(ProcessRead, ChildOutputEndsWithFalse) {
     Process::Id id = 0;
     Process::Stream output = Process::NOTHING;
@@ -493,6 +511,7 @@ TEST(ProcessRead, ChildOutputEndsWithFalse) {
 
     Process::close_stream(output);
 }
+#endif
 
 TEST(ProcessWaker, MakesTwoDistinctEnds) {
     Process::Stream readEnd = Process::NOTHING;
@@ -571,6 +590,7 @@ TEST(ProcessWaker, WakeNothingDoesNothing) {
     SUCCEED();
 }
 
+#ifndef _WIN32
 TEST(ProcessWaitFor, ReturnsAtOnceWithNothingToWaitOn) {
     const Clock::time_point began = Clock::now();
 
@@ -595,6 +615,7 @@ TEST(ProcessWaitFor, ReturnsWhenOutputArrives) {
 
     Process::close_stream(output);
 }
+#endif
 
 TEST(ProcessWaitFor, TimesOutWhenNothingHappens) {
     Process::Stream readEnd = Process::NOTHING;
@@ -611,3 +632,170 @@ TEST(ProcessWaitFor, TimesOutWhenNothingHappens) {
     Process::close_stream(readEnd);
     Process::close_stream(writeEnd);
 }
+
+#ifdef _WIN32
+// Every child here gets an output stream: without one a console window opens for it.
+TEST(ProcessStart, ExitZeroFinishes) {
+    const Outcome result = launch("cmd", {"/c", "exit", "0"});
+
+    ASSERT_TRUE(result.started) << result.error;
+    EXPECT_EQ(result.ended.state, Process::State::Finished);
+    EXPECT_EQ(result.ended.code, 0);
+}
+
+TEST(ProcessStart, ReportsTheExitStatus) {
+    const Outcome result = launch("cmd", {"/c", "exit", "7"});
+
+    ASSERT_TRUE(result.started) << result.error;
+    EXPECT_EQ(result.ended.state, Process::State::Failed);
+    EXPECT_EQ(result.ended.code, 7);
+}
+
+TEST(ProcessStart, CapturesOutput) {
+    const Outcome result = launch("cmd", {"/c", "echo", "hello"});
+
+    ASSERT_TRUE(result.started) << result.error;
+    EXPECT_EQ(ttk::Text::trim(result.output), "hello");
+    EXPECT_EQ(result.ended.state, Process::State::Finished);
+}
+
+TEST(ProcessStart, CapturesStandardError) {
+    const Outcome result = launch("cmd", {"/c", "echo", "oops", "1>&2"});
+
+    EXPECT_EQ(ttk::Text::trim(result.output), "oops") << "stderr shares the output stream";
+}
+
+TEST(ProcessStart, RunsInTheWorkingDirectory) {
+    const fs::path directory = tests::Sandbox::scratch("process-cwd");
+    const Outcome result = launch("cmd", {"/c", "cd"}, directory);
+
+    ASSERT_TRUE(result.started) << result.error;
+    EXPECT_TRUE(fs::equivalent(fs::path(ttk::Text::trim(result.output)), directory)) << result.output;
+}
+
+TEST(ProcessStart, AddsEnvironmentVariables) {
+    const Outcome result = launch("cmd", {"/c", "echo", "%TTK_TEST_ADDED%"}, {}, {{"TTK_TEST_ADDED", "added value"}});
+
+    EXPECT_EQ(ttk::Text::trim(result.output), "added value");
+}
+
+TEST(ProcessStart, ReplacesEnvironmentVariables) {
+    const Outcome result = launch("cmd", {"/c", "echo", "%USERPROFILE%"}, {}, {{"USERPROFILE", R"(C:\replaced)"}});
+
+    EXPECT_EQ(ttk::Text::trim(result.output), R"(C:\replaced)");
+}
+
+TEST(ProcessStart, KeepsTheRestOfTheEnvironment) {
+    const Outcome result = launch("cmd", {"/c", "echo", "%APPDATA%"}, {}, {{"TTK_TEST_OTHER", "x"}});
+
+    EXPECT_EQ(fs::path(ttk::Text::trim(result.output)), tests::Sandbox::root() / "appdata");
+}
+
+TEST(ProcessStart, LeavesTheCallersEnvironmentAlone) {
+    ASSERT_TRUE(launch("cmd", {"/c", "exit", "0"}, {}, {{"TTK_TEST_ADDED", "added value"}}).started);
+
+    EXPECT_EQ(GetEnvironmentVariableW(L"TTK_TEST_ADDED", nullptr, 0), 0U) << "set for the child, then restored";
+}
+
+TEST(ProcessStart, UntrackedChildStillCapturesOutput) {
+    Process::Stream output = Process::NOTHING;
+
+    ASSERT_TRUE(Process::start("cmd", {"/c", "echo", "untracked"}, {}, {}, nullptr, &output));
+    ASSERT_NE(output, Process::NOTHING);
+    EXPECT_EQ(ttk::Text::trim(drain(output)), "untracked");
+
+    Process::close_stream(output);
+}
+
+TEST(ProcessPoll, EndIsReportedOnce) {
+    Process::Id id = 0;
+    Process::Stream output = Process::NOTHING;
+
+    ASSERT_TRUE(Process::start("cmd", {"/c", "exit", "0"}, {}, {}, &id, &output));
+    ASSERT_EQ(finish(id, output).state, Process::State::Finished);
+
+    int code = 99;
+
+    EXPECT_EQ(Process::poll(id, &code), Process::State::Unknown);
+    EXPECT_EQ(code, 99) << "the code is only written when the end is reported";
+
+    Process::close_stream(output);
+}
+
+TEST(ProcessStop, EndsTheChildAtOnce) {
+    Process::Id id = 0;
+    Process::Stream output = Process::NOTHING;
+
+    ASSERT_TRUE(Process::start(
+            "cmd", {"/c", "echo", "ready&", "ping", "-n", "30", "127.0.0.1", ">nul"}, {}, {}, &id, &output));
+    EXPECT_EQ(ttk::Text::trim(first_line(output)), "ready");
+    EXPECT_EQ(Process::poll(id), Process::State::Running);
+
+    const Clock::time_point began = Clock::now();
+
+    Process::stop(id);
+
+    const Ended ended = finish(id, output);
+
+    EXPECT_EQ(ended.state, Process::State::Failed);
+    EXPECT_EQ(ended.code, 1) << "the child is terminated with status 1";
+    EXPECT_LT(elapsed_seconds(began), 1.0);
+
+    Process::close_stream(output);
+}
+
+TEST(ProcessForce, EndsTheChildAtOnce) {
+    Process::Id id = 0;
+    Process::Stream output = Process::NOTHING;
+
+    ASSERT_TRUE(Process::start("ping", {"-n", "30", "127.0.0.1"}, {}, {}, &id, &output));
+
+    Process::force(id);
+
+    const Ended ended = finish(id, output);
+
+    EXPECT_EQ(ended.state, Process::State::Failed);
+    EXPECT_EQ(ended.code, 1);
+
+    Process::close_stream(output);
+}
+
+TEST(ProcessStop, AfterTheEndWasReportedDoesNothing) {
+    Process::Id id = 0;
+    Process::Stream output = Process::NOTHING;
+
+    ASSERT_TRUE(Process::start("cmd", {"/c", "exit", "0"}, {}, {}, &id, &output));
+    ASSERT_EQ(finish(id, output).state, Process::State::Finished);
+
+    Process::stop(id);
+    Process::force(id);
+
+    EXPECT_EQ(Process::poll(id), Process::State::Unknown);
+
+    Process::close_stream(output);
+}
+
+TEST(ProcessRead, ChildOutputEndsWithFalse) {
+    Process::Id id = 0;
+    Process::Stream output = Process::NOTHING;
+
+    ASSERT_TRUE(Process::start("cmd", {"/c", "exit", "0"}, {}, {}, &id, &output));
+    EXPECT_EQ(drain(output), "");
+
+    std::string into = "stale";
+
+    EXPECT_FALSE(Process::read(output, into)) << "the stream has ended";
+    EXPECT_EQ(into, "");
+    EXPECT_EQ(finish(id).state, Process::State::Finished);
+
+    Process::close_stream(output);
+}
+
+TEST(ProcessWaitFor, WaitsOutTheTimeWithNothingToWaitOn) {
+    const Clock::time_point began = Clock::now();
+
+    Process::wait_for(Process::NOTHING, Process::NOTHING, 200);
+
+    EXPECT_GE(elapsed_seconds(began), 0.15) << "an anonymous pipe cannot be waited on, so the time is slept";
+}
+#endif

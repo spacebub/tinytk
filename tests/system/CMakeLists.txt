@@ -14,6 +14,12 @@ if (TTK_HTTP)
 endif ()
 
 if (TTK_NOTIFY)
-    ttk_test(system_notify Notify.cpp)
+    # Windows and macOS build the stub in place of the D-Bus client.
+    if (WIN32 OR APPLE)
+        ttk_test(system_notify Notify_Stub.cpp)
+    else ()
+        ttk_test(system_notify Notify.cpp)
+    endif ()
+
     target_link_libraries(ttk_test_system_notify PRIVATE ttk::notify)
 endif ()

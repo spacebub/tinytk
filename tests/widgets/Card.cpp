@@ -19,10 +19,11 @@
 #include "Screen.h"
 #include "support/Canvas.h"
 #include "ttk/draw/Theme.h"
-#include "ttk/system/Env.h"
+#include "ttk/system/Paths.h"
 #include "ttk/toolkit/controls/Button.h"
 #include "ttk/toolkit/controls/Card.h"
 #include "ttk/toolkit/controls/Pill.h"
+#include "ttk/util/Format.h"
 
 namespace {
 using widgets::Painted;
@@ -238,7 +239,7 @@ TEST_F(Painted, CardSubtitleIsWrappedFaintText) {
 }
 
 TEST_F(Painted, CardFileWritesTheHomeAsTilde) {
-    const std::string home = ttk::Env::get("HOME");
+    const std::string home = ttk::Format::from_path(ttk::Paths::home_directory());
 
     ASSERT_FALSE(home.empty());
 

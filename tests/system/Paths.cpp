@@ -7,15 +7,17 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <array>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <optional>
 #include <string>
+#include <system_error>
 
 #include <gtest/gtest.h>
+
+#ifndef _WIN32
 #include <pwd.h>
 #include <unistd.h>
+#endif
 
 #include "support/Sandbox.h"
 #include "ttk/system/Env.h"
@@ -24,6 +26,15 @@
 namespace {
 namespace fs = std::filesystem;
 
+#ifdef _WIN32
+constexpr std::array<const char *, 5> TOUCHED = {
+        "USERPROFILE",
+        "HOMEDRIVE",
+        "HOMEPATH",
+        "APPDATA",
+        "PROGRAMDATA",
+};
+#else
 constexpr std::array<const char *, 5> TOUCHED = {
         "HOME",
         "XDG_CONFIG_HOME",
@@ -31,22 +42,13 @@ constexpr std::array<const char *, 5> TOUCHED = {
         "XDG_CONFIG_DIRS",
         "XDG_CACHE_HOME",
 };
-
-std::optional<std::string> raw(const char *name) {
-    const char *value = std::getenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-
-    return value != nullptr ? std::optional<std::string>(value) : std::nullopt;
-}
-
-void unset(const char *name) {
-    unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-}
+#endif
 
 class Paths : public ::testing::Test {
 protected:
     void SetUp() override {
         for (std::size_t i = 0; i < TOUCHED.size(); ++i) {
-            _saved[i] = raw(TOUCHED[i]);
+            _saved[i] = ttk::Env::get(TOUCHED[i]);
         }
 
         _application = ttk::Paths::application();
@@ -54,11 +56,12 @@ protected:
     }
 
     void TearDown() override {
+        // Paths reads an empty variable as unset, so one that was empty comes back unset.
         for (std::size_t i = 0; i < TOUCHED.size(); ++i) {
-            if (const std::optional<std::string> &saved = _saved[i]; saved.has_value()) {
-                ttk::Env::set(TOUCHED[i], saved->c_str());
+            if (_saved[i].empty()) {
+                ttk::Env::unset(TOUCHED[i]);
             } else {
-                unset(TOUCHED[i]);
+                ttk::Env::set(TOUCHED[i], _saved[i].c_str());
             }
         }
 
@@ -69,7 +72,7 @@ protected:
     static fs::path sandbox(const char *part) { return tests::Sandbox::root() / part; }
 
 private:
-    std::array<std::optional<std::string>, TOUCHED.size()> _saved{};
+    std::array<std::string, TOUCHED.size()> _saved{};
     std::string _application;
     fs::path _executable;
 };
@@ -92,6 +95,15 @@ TEST_F(Paths, SetApplicationKeepsUtf8) {
     EXPECT_EQ(ttk::Paths::config_directory().filename(), fs::path("\xE6\x97\xA5\xE6\x9C\xAC"));
 }
 
+TEST_F(Paths, ConfigDirectoryIsNotCreated) {
+    ttk::Paths::set_application("never-created");
+
+    const fs::path directory = ttk::Paths::config_directory();
+
+    EXPECT_FALSE(fs::exists(directory));
+}
+
+#ifndef _WIN32
 TEST_F(Paths, ConfigDirectoryIsUnderXdgConfigHome) {
     EXPECT_EQ(ttk::Paths::config_directory(), sandbox("config") / "tinytk");
 }
@@ -103,7 +115,7 @@ TEST_F(Paths, ConfigDirectoryEndsInTheApplication) {
 }
 
 TEST_F(Paths, ConfigDirectoryFallsBackToHomeDotConfig) {
-    unset("XDG_CONFIG_HOME");
+    ttk::Env::unset("XDG_CONFIG_HOME");
 
     EXPECT_EQ(ttk::Paths::config_directory(), sandbox("home") / ".config" / "tinytk");
 }
@@ -122,14 +134,6 @@ TEST_F(Paths, ConfigDirectoryFollowsAChangedVariable) {
     EXPECT_EQ(ttk::Paths::config_directory(), elsewhere / "tinytk") << "nothing is cached between calls";
 }
 
-TEST_F(Paths, ConfigDirectoryIsNotCreated) {
-    ttk::Paths::set_application("never-created");
-
-    const fs::path directory = ttk::Paths::config_directory();
-
-    EXPECT_FALSE(fs::exists(directory));
-}
-
 TEST_F(Paths, DataDirectoryIsUnderXdgDataHome) {
     EXPECT_EQ(ttk::Paths::data_directory(), sandbox("data") / "tinytk");
 }
@@ -141,7 +145,7 @@ TEST_F(Paths, DataDirectoryEndsInTheApplication) {
 }
 
 TEST_F(Paths, DataDirectoryFallsBackToHomeLocalShare) {
-    unset("XDG_DATA_HOME");
+    ttk::Env::unset("XDG_DATA_HOME");
 
     EXPECT_EQ(ttk::Paths::data_directory(), sandbox("home") / ".local" / "share" / "tinytk");
 }
@@ -169,7 +173,7 @@ TEST_F(Paths, SystemConfigDirectoryWithOneEntry) {
 }
 
 TEST_F(Paths, SystemConfigDirectoryDefaultsToEtcXdg) {
-    unset("XDG_CONFIG_DIRS");
+    ttk::Env::unset("XDG_CONFIG_DIRS");
 
     EXPECT_EQ(ttk::Paths::system_config_directory(), fs::path("/etc/xdg") / "tinytk");
 }
@@ -192,7 +196,7 @@ TEST_F(Paths, HomeDirectoryIsHome) {
 }
 
 TEST_F(Paths, HomeDirectoryFallsBackToThePasswordDatabase) {
-    unset("HOME");
+    ttk::Env::unset("HOME");
 
     const passwd *entry = getpwuid(getuid()); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
 
@@ -213,12 +217,83 @@ TEST_F(Paths, FallbacksFollowAChangedHome) {
     const fs::path home = tests::Sandbox::scratch("other-home");
 
     ttk::Env::set("HOME", home.c_str());
-    unset("XDG_CONFIG_HOME");
-    unset("XDG_DATA_HOME");
+    ttk::Env::unset("XDG_CONFIG_HOME");
+    ttk::Env::unset("XDG_DATA_HOME");
 
     EXPECT_EQ(ttk::Paths::config_directory(), home / ".config" / "tinytk");
     EXPECT_EQ(ttk::Paths::data_directory(), home / ".local" / "share" / "tinytk");
 }
+#else
+TEST_F(Paths, ConfigDirectoryIsUnderAppData) {
+    EXPECT_EQ(ttk::Paths::config_directory(), sandbox("appdata") / "tinytk");
+}
+
+TEST_F(Paths, ConfigDirectoryEndsInTheApplication) {
+    ttk::Paths::set_application("demo");
+
+    EXPECT_EQ(ttk::Paths::config_directory(), sandbox("appdata") / "demo");
+}
+
+TEST_F(Paths, ConfigDirectoryFallsBackBesideTheExecutable) {
+    ttk::Env::unset("APPDATA");
+
+    EXPECT_EQ(ttk::Paths::config_directory(), ttk::Paths::executable_directory() / "tinytk");
+}
+
+TEST_F(Paths, EmptyAppDataCountsAsUnset) {
+    ttk::Env::set("APPDATA", "");
+
+    EXPECT_EQ(ttk::Paths::config_directory(), ttk::Paths::executable_directory() / "tinytk");
+}
+
+TEST_F(Paths, ConfigDirectoryFollowsAChangedVariable) {
+    const fs::path elsewhere = tests::Sandbox::scratch("config-elsewhere");
+
+    ttk::Env::set("APPDATA", elsewhere.string().c_str());
+
+    EXPECT_EQ(ttk::Paths::config_directory(), elsewhere / "tinytk") << "nothing is cached between calls";
+}
+
+TEST_F(Paths, DataDirectoryIsTheConfigDirectory) {
+    EXPECT_EQ(ttk::Paths::data_directory(), sandbox("appdata") / "tinytk");
+
+    ttk::Paths::set_application("demo");
+
+    EXPECT_EQ(ttk::Paths::data_directory(), ttk::Paths::config_directory());
+}
+
+TEST_F(Paths, SystemConfigDirectoryIsUnderProgramData) {
+    ttk::Env::set("PROGRAMDATA", sandbox("programdata").string().c_str());
+
+    EXPECT_EQ(ttk::Paths::system_config_directory(), sandbox("programdata") / "tinytk");
+}
+
+TEST_F(Paths, SystemConfigDirectoryWithoutProgramDataIsEmpty) {
+    ttk::Env::unset("PROGRAMDATA");
+
+    EXPECT_TRUE(ttk::Paths::system_config_directory().empty());
+}
+
+TEST_F(Paths, HomeDirectoryIsTheUserProfile) {
+    EXPECT_EQ(ttk::Paths::home_directory(), sandbox("home"));
+}
+
+TEST_F(Paths, HomeDirectoryFallsBackToHomeDriveAndPath) {
+    ttk::Env::unset("USERPROFILE");
+    ttk::Env::set("HOMEDRIVE", "C:");
+    ttk::Env::set("HOMEPATH", R"(\Users\someone)");
+
+    EXPECT_EQ(ttk::Paths::home_directory(), fs::path(R"(C:\Users\someone)"));
+}
+
+TEST_F(Paths, HomeDirectoryNeedsBothHomeDriveAndPath) {
+    ttk::Env::unset("USERPROFILE");
+    ttk::Env::set("HOMEDRIVE", "C:");
+    ttk::Env::unset("HOMEPATH");
+
+    EXPECT_TRUE(ttk::Paths::home_directory().empty());
+}
+#endif
 
 TEST_F(Paths, SetExecutableMakesThePathCanonical) {
     const fs::path bin = tests::Sandbox::scratch("exe") / "bin";
@@ -235,7 +310,15 @@ TEST_F(Paths, SetExecutableResolvesSymbolicLinks) {
     const fs::path root = tests::Sandbox::scratch("exe-link");
 
     std::ofstream(root / "real").put('x');
-    fs::create_symlink(root / "real", root / "link");
+
+    std::error_code code;
+
+    // Windows only makes them with developer mode or elevation.
+    fs::create_symlink(root / "real", root / "link", code);
+
+    if (code) {
+        GTEST_SKIP() << "no symbolic links here: " << code.message();
+    }
 
     ttk::Paths::set_executable(root / "link");
 

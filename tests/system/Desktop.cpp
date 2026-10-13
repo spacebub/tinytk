@@ -13,9 +13,11 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 #include <gtest/gtest.h>
 
+#include "ttk/system/Env.h"
 #include "ttk/system/Paths.h"
 #include "ttk/util/Clipboard.h"
 #include "ttk/util/Clock.h"
@@ -25,13 +27,33 @@
 namespace {
 namespace fs = std::filesystem;
 
-constexpr std::array<std::string_view, 5> FAMILIES = {
-        "JetBrains Mono",
-        "Fira Code",
-        "DejaVu Sans Mono",
-        "Noto Sans Mono",
-        "monospace",
+using namespace std::string_view_literals;
+
+constexpr std::array FAMILIES = {
+        "JetBrains Mono"sv,
+        "Fira Code"sv,
+        "DejaVu Sans Mono"sv,
+        "Noto Sans Mono"sv,
+#ifdef _WIN32
+        "Consolas"sv,
+        "Courier New"sv,
+#elifdef __APPLE__
+        "Menlo"sv,
+        "Monaco"sv,
+#endif
+        "monospace"sv,
 };
+
+// Where the user installs fonts of their own.
+fs::path user_fonts() {
+#ifdef _WIN32
+    return ttk::Paths::home_directory() / "AppData" / "Local" / "Microsoft" / "Windows" / "Fonts";
+#elifdef __APPLE__
+    return ttk::Paths::home_directory() / "Library" / "Fonts";
+#else
+    return ttk::Paths::home_directory() / ".local" / "share" / "fonts";
+#endif
+}
 
 void plant(const fs::path &directory, const char *name) {
     fs::create_directories(directory);
@@ -42,10 +64,8 @@ class DesktopFonts : public ::testing::Test {
 protected:
     void TearDown() override {
         std::error_code code;
-        const fs::path home = ttk::Paths::home_directory();
-
-        fs::remove_all(home / ".local" / "share" / "fonts", code);
-        fs::remove_all(home / ".fonts", code);
+        fs::remove_all(user_fonts(), code);
+        fs::remove_all(ttk::Paths::home_directory() / ".fonts", code);
     }
 };
 }
@@ -61,9 +81,18 @@ TEST(DesktopOpen, EmptyTargetFailsWithoutAReasonPointer) {
     EXPECT_FALSE(ttk::Desktop::open(""));
 }
 
+#ifdef _WIN32
+TEST(DesktopDrives, ListTheSystemDriveInLetterOrder) {
+    const std::vector<std::string> drives = ttk::Desktop::drives();
+
+    EXPECT_NE(std::ranges::find(drives, ttk::Env::get("SystemDrive") + "/"), drives.end());
+    EXPECT_TRUE(std::ranges::is_sorted(drives));
+}
+#else
 TEST(DesktopDrives, EmptyOutsideWindows) {
     EXPECT_TRUE(ttk::Desktop::drives().empty());
 }
+#endif
 
 TEST_F(DesktopFonts, ReturnsAKnownFamily) {
     const std::string family = ttk::Desktop::monospace_family();
@@ -72,19 +101,21 @@ TEST_F(DesktopFonts, ReturnsAKnownFamily) {
 }
 
 TEST_F(DesktopFonts, FindsTheFavouriteInTheUserFontDirectory) {
-    plant(ttk::Paths::home_directory() / ".local" / "share" / "fonts" / "jetbrains", "JetBrainsMono-Regular.ttf");
+    plant(user_fonts() / "jetbrains", "JetBrainsMono-Regular.ttf");
 
     EXPECT_EQ(ttk::Desktop::monospace_family(), "JetBrains Mono");
 }
 
+#if !defined(_WIN32) && !defined(__APPLE__)
 TEST_F(DesktopFonts, FindsTheFavouriteInDotFonts) {
     plant(ttk::Paths::home_directory() / ".fonts", "JetBrainsMono-Bold.otf");
 
     EXPECT_EQ(ttk::Desktop::monospace_family(), "JetBrains Mono");
 }
+#endif
 
 TEST_F(DesktopFonts, MatchesFileNamesWithoutCase) {
-    plant(ttk::Paths::home_directory() / ".fonts", "JETBRAINSMONO-ITALIC.TTF");
+    plant(user_fonts(), "JETBRAINSMONO-ITALIC.TTF");
 
     EXPECT_EQ(ttk::Desktop::monospace_family(), "JetBrains Mono");
 }
@@ -92,7 +123,7 @@ TEST_F(DesktopFonts, MatchesFileNamesWithoutCase) {
 TEST_F(DesktopFonts, WalksTheDirectoriesAgainOnEachCall) {
     const std::string before = ttk::Desktop::monospace_family();
 
-    plant(ttk::Paths::home_directory() / ".fonts", "JetBrainsMono-Regular.ttf");
+    plant(user_fonts(), "JetBrainsMono-Regular.ttf");
 
     EXPECT_EQ(ttk::Desktop::monospace_family(), "JetBrains Mono");
     EXPECT_NE(std::ranges::find(FAMILIES, before), FAMILIES.end()) << before;

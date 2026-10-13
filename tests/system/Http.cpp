@@ -62,6 +62,8 @@ protected:
 };
 }
 
+// libcurl reads file:// addresses, WinHTTP only http and https.
+#ifndef _WIN32
 TEST_F(HttpFetch, KeepsTheBodyInMemory) {
     const fs::path source = tests::Sandbox::scratch("http-memory") / "page.txt";
 
@@ -143,6 +145,19 @@ TEST_F(HttpFetch, TruncatesTheTargetFileFirst) {
     ASSERT_TRUE(settle(fetch));
     EXPECT_EQ(slurp(root / "saved.txt"), "short");
 }
+#else
+TEST_F(HttpFetch, FileAddressFails) {
+    const fs::path source = tests::Sandbox::scratch("http-file") / "page.txt";
+
+    spill(source, "hello from a file");
+
+    const ttk::Http::Fetch fetch(url_of(source), "", {});
+
+    ASSERT_TRUE(settle(fetch));
+    EXPECT_FALSE(fetch.error().empty());
+    EXPECT_EQ(fetch.body(), "");
+}
+#endif
 
 TEST_F(HttpFetch, UnwritableTargetFails) {
     const fs::path root = tests::Sandbox::scratch("http-unwritable");
@@ -204,6 +219,7 @@ TEST_F(HttpFetch, IsNotCancelledUntilAsked) {
     EXPECT_TRUE(settle(fetch)) << "a cancelled request still ends";
 }
 
+#ifndef _WIN32
 TEST_F(HttpFetch, CancelledRequestReportsStoppedOrFinished) {
     const fs::path source = tests::Sandbox::scratch("http-cancel-early") / "page.txt";
 
@@ -219,6 +235,7 @@ TEST_F(HttpFetch, CancelledRequestReportsStoppedOrFinished) {
 
     EXPECT_TRUE(error.empty() || error == "Stopped") << "a race with completion may finish first: " << error;
 }
+#endif
 
 TEST_F(HttpFetch, ProgressStaysWithinRange) {
     const fs::path source = tests::Sandbox::scratch("http-progress") / "page.txt";
@@ -244,6 +261,7 @@ TEST_F(HttpFetch, DestroyingARunningFetchWaitsForIt) {
     SUCCEED() << "the destructor cancelled and joined the thread";
 }
 
+#ifndef _WIN32
 TEST_F(HttpFetch, SetAgentBeforeFetching) {
     const fs::path source = tests::Sandbox::scratch("http-agent") / "page.txt";
 
@@ -257,3 +275,4 @@ TEST_F(HttpFetch, SetAgentBeforeFetching) {
 
     ttk::Http::set_agent("tinytk");
 }
+#endif

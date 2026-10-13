@@ -17,9 +17,10 @@
 #include "Screen.h"
 #include "support/Canvas.h"
 #include "ttk/draw/Theme.h"
-#include "ttk/system/Env.h"
+#include "ttk/system/Paths.h"
 #include "ttk/toolkit/controls/Fact.h"
 #include "ttk/toolkit/controls/Label.h"
+#include "ttk/util/Format.h"
 
 namespace {
 using widgets::Painted;
@@ -234,7 +235,7 @@ TEST_F(Painted, FactLinkValueLightsOnHover) {
 }
 
 TEST_F(Painted, FactPathValueWritesTheHomeAsTilde) {
-    const std::string home = ttk::Env::get("HOME");
+    const std::string home = ttk::Format::from_path(ttk::Paths::home_directory());
 
     ASSERT_FALSE(home.empty());
 

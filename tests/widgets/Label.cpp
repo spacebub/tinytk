@@ -18,9 +18,10 @@
 #include "Screen.h"
 #include "support/Canvas.h"
 #include "ttk/draw/Theme.h"
-#include "ttk/system/Env.h"
+#include "ttk/system/Paths.h"
 #include "ttk/toolkit/controls/Label.h"
 #include "ttk/toolkit/layout/Box.h"
+#include "ttk/util/Format.h"
 
 namespace {
 using widgets::Painted;
@@ -849,7 +850,7 @@ TEST_F(Painted, LabelPlainLabelDoesNotLightUnderAHover) {
 }
 
 TEST_F(Painted, LabelPathMeasuresTheWholePathInTheFixedFace) {
-    const std::string path = ttk::Env::get("HOME") + "/games/doom/wads/eviternity.wad";
+    const std::string path = ttk::Format::from_path(ttk::Paths::home_directory()) + "/games/doom/wads/eviternity.wad";
     ttk::Label label(path);
 
     label.path();
@@ -858,7 +859,7 @@ TEST_F(Painted, LabelPathMeasuresTheWholePathInTheFixedFace) {
 }
 
 TEST_F(Painted, LabelPathWritesTheHomeAsTilde) {
-    const std::string home = ttk::Env::get("HOME");
+    const std::string home = ttk::Format::from_path(ttk::Paths::home_directory());
 
     ASSERT_FALSE(home.empty());
 

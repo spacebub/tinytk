@@ -24,6 +24,13 @@ using overlays::marked;
 using overlays::names;
 using Names = std::vector<std::string>;
 
+// A POSIX path hangs off "/", a Windows one off its drive letter.
+#ifdef _WIN32
+constexpr bool ROOTED = false;
+#else
+constexpr bool ROOTED = true;
+#endif
+
 Names texts() {
     return {"alpha", "Beta", "dir2", "dir10", "A.TXT", "b.txt", "file2.txt", "file10.txt"};
 }
@@ -139,7 +146,7 @@ TEST_F(Picker, OpenFillsTheState) {
     EXPECT_FALSE(state().editing);
     EXPECT_FALSE(state().drives);
     EXPECT_FALSE(state().hiddenShown);
-    EXPECT_TRUE(state().rooted);
+    EXPECT_EQ(state().rooted, ROOTED);
     EXPECT_EQ(state().path, root);
     EXPECT_EQ(state().marked, 0);
     EXPECT_GT(changes, 0);
@@ -153,7 +160,11 @@ TEST_F(Picker, PartsAreTheNonEmptyComponentsOfThePath) {
     for (const std::string &part : state().parts) {
         EXPECT_FALSE(part.empty());
 
-        joined += "/" + part;
+        if (ROOTED || !joined.empty()) {
+            joined += '/';
+        }
+
+        joined += part;
     }
 
     EXPECT_EQ(joined, root);
@@ -376,7 +387,8 @@ TEST_F(Picker, UpToListsTheAncestorAtThatIndex) {
 
     picker.up_to(0);
 
-    EXPECT_EQ(state().path, "/" + state().parts.front());
+    // A drive alone keeps its slash, since "C:" names the current directory on it.
+    EXPECT_EQ(state().path, ROOTED ? "/" + state().parts.front() : state().parts.front() + "/");
     EXPECT_EQ(state().parts.size(), 1U);
 }
 

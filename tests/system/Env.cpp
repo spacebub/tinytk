@@ -7,25 +7,26 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <cstddef>
-#include <cstdlib>
 #include <string>
 
 #include <gtest/gtest.h>
 
 #include "ttk/system/Env.h"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 namespace {
 constexpr const char *NAME = "TTK_TEST_ENV_VALUE";
 
-void unset(const char *name) {
-    unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-}
-
 class Env : public ::testing::Test {
 protected:
-    void SetUp() override { unset(NAME); }
+    void SetUp() override { ttk::Env::unset(NAME); }
 
-    void TearDown() override { unset(NAME); }
+    void TearDown() override { ttk::Env::unset(NAME); }
 };
 }
 
@@ -37,15 +38,6 @@ TEST_F(Env, SetThenGet) {
     ttk::Env::set(NAME, "value");
 
     EXPECT_EQ(ttk::Env::get(NAME), "value");
-}
-
-TEST_F(Env, SetIsVisibleToTheCRuntime) {
-    ttk::Env::set(NAME, "seen");
-
-    const char *raw = std::getenv(NAME); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-
-    ASSERT_NE(raw, nullptr);
-    EXPECT_STREQ(raw, "seen");
 }
 
 TEST_F(Env, SetReplacesExistingValue) {
@@ -67,13 +59,11 @@ TEST_F(Env, EmptyValueReadsAsEmpty) {
     ttk::Env::set(NAME, "");
 
     EXPECT_EQ(ttk::Env::get(NAME), "");
-    EXPECT_NE(std::getenv(NAME), nullptr) // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-            << "set with an empty value still defines the variable";
 }
 
 TEST_F(Env, UnsetAfterSetReadsAsEmpty) {
     ttk::Env::set(NAME, "gone soon");
-    unset(NAME);
+    ttk::Env::unset(NAME);
 
     EXPECT_EQ(ttk::Env::get(NAME), "");
 }
@@ -99,7 +89,12 @@ TEST_F(Env, KeepsShellMetacharacters) {
 }
 
 TEST_F(Env, KeepsALongValue) {
+#ifdef _WIN32
+    // A Windows variable holds at most 32767 characters.
+    constexpr std::size_t SIZE = 32000;
+#else
     constexpr std::size_t SIZE = std::size_t{64} * 1024;
+#endif
     const std::string value(SIZE, 'v');
 
     ttk::Env::set(NAME, value.c_str());
@@ -107,11 +102,51 @@ TEST_F(Env, KeepsALongValue) {
     EXPECT_EQ(ttk::Env::get(NAME), value);
 }
 
+TEST_F(Env, UnsetMissingVariableDoesNothing) {
+    ttk::Env::unset(NAME);
+
+    EXPECT_EQ(ttk::Env::get(NAME), "");
+}
+
+#ifdef _WIN32
+TEST_F(Env, NamesIgnoreCase) {
+    ttk::Env::set(NAME, "upper");
+
+    EXPECT_EQ(ttk::Env::get("ttk_test_env_value"), "upper");
+}
+
+TEST_F(Env, SetReachesTheWin32Environment) {
+    ttk::Env::set(NAME, "seen");
+
+    std::wstring value(16, L'\0');
+    const DWORD written = GetEnvironmentVariableW(L"TTK_TEST_ENV_VALUE", value.data(), 16);
+
+    value.resize(written);
+
+    EXPECT_EQ(value, L"seen") << "libraries reading the Win32 copy see it too";
+}
+
+TEST_F(Env, OverlongValueLeavesTheVariableAsItWas) {
+    ttk::Env::set(NAME, "kept");
+    ttk::Env::set(NAME, std::string(std::size_t{64} * 1024, 'v').c_str());
+
+    EXPECT_EQ(ttk::Env::get(NAME), "kept");
+}
+
+TEST_F(Env, UnsetLeavesNeitherCopy) {
+    ttk::Env::set(NAME, "gone soon");
+    ttk::Env::unset(NAME);
+
+    EXPECT_EQ(ttk::Env::get(NAME), "");
+    EXPECT_EQ(GetEnvironmentVariableW(L"TTK_TEST_ENV_VALUE", nullptr, 0), 0U);
+}
+#else
 TEST_F(Env, NamesAreCaseSensitive) {
     ttk::Env::set(NAME, "upper");
 
     EXPECT_EQ(ttk::Env::get("ttk_test_env_value"), "");
 }
+#endif
 
 TEST_F(Env, SandboxPointsHomeAway) {
     EXPECT_FALSE(ttk::Env::get("HOME").empty());

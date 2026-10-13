@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <climits>
 #include <cstddef>
-#include <cstdlib>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -107,21 +106,17 @@ Strings windows_split(const std::string_view line) {
     return out;
 }
 
-void unset(const char *name) {
-    unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-}
-
 class TextParseArguments : public ::testing::Test {
 protected:
     void SetUp() override {
         ttk::Env::set("TTK_TEST_WORD", "word");
         ttk::Env::set("TTK_TEST_SPACED", "two words");
-        unset("TTK_TEST_UNSET");
+        ttk::Env::unset("TTK_TEST_UNSET");
     }
 
     void TearDown() override {
-        unset("TTK_TEST_WORD");
-        unset("TTK_TEST_SPACED");
+        ttk::Env::unset("TTK_TEST_WORD");
+        ttk::Env::unset("TTK_TEST_SPACED");
     }
 };
 }

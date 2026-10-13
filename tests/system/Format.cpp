@@ -6,6 +6,7 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <algorithm>
 #include <climits>
 #include <filesystem>
 #include <fstream>
@@ -322,11 +323,24 @@ TEST(FormatSameFile, DifferentMissingPathsDoNotMatch) {
     EXPECT_FALSE(ttk::Format::same_file(ttk::Format::from_path(root / "a"), ttk::Format::from_path(root / "b")));
 }
 
+#ifdef _WIN32
+TEST(FormatSameFile, CaseAndSlashDirectionAreIgnoredOnWindows) {
+    const fs::path root = tests::Sandbox::scratch("same-file-case");
+    const std::string forward = ttk::Format::from_path(root / "Name");
+    std::string backward = forward;
+
+    std::ranges::replace(backward, '/', '\\');
+
+    EXPECT_TRUE(ttk::Format::same_file(forward, ttk::Format::from_path(root / "name")));
+    EXPECT_TRUE(ttk::Format::same_file(forward, backward));
+}
+#else
 TEST(FormatSameFile, CaseMattersOutsideWindows) {
     const fs::path root = tests::Sandbox::scratch("same-file-case");
 
     EXPECT_FALSE(ttk::Format::same_file(ttk::Format::from_path(root / "Name"), ttk::Format::from_path(root / "name")));
 }
+#endif
 
 TEST(FormatBytes, ZeroBytes) {
     EXPECT_EQ(ttk::Format::bytes(0), "0 B");
