@@ -1,0 +1,238 @@
+# Changelog
+
+## 1.5.2 - 2026-10-13
+
+### Added
+
+- `WlShm::open` takes a `wl_display` and `wl_surface` obtained elsewhere
+- Tests of the `wl_shm` ring against a compositor of the suite's own, made of libwayland-server
+
+### Fixed
+
+- A `wl_shm` buffer taken back while the compositor holds it goes under a new `wl_buffer`, so the
+  compositor's late release of the old one no longer frees it while it is attached again
+- The `wl_shm` stride is computed in 64 bits, so a width past 2^29 pixels is refused instead of
+  overflowing
+- `WlShm::acquire` keeps `Target::fresh` until the held buffer is presented
+- `Damage::shift` adds nothing for a move of at least the region height, and overflows on none
+
+## 1.5.1 - 2026-10-13
+
+### Changed
+
+- The fetched SDL is patched so its Wayland driver no longer damages the whole surface after
+  every frame callback. The compositor now receives only the rectangles the toolkit painted,
+  which cuts its upload and GPU work while the toolkit's own paint work stays the same
+
+## 1.5.0 - 2026-10-13
+
+### Added
+
+- A GoogleTest suite under `tests/`, one program per area, every test registered with ctest
+  so `ctest -j` runs them in parallel. Fetched only with `TTK_TESTS=ON`
+- Benchmarks for damage tracking, clip culling and the caret blink
+- `Typeface::bleed` and a `Widget::invalidate(region, clip)` overload
+
+### Changed
+
+- Presentation happens on the CPU alone and SDL is built without its render API
+- Damage is tracked as bounded pixel sets and only the strips that changed are repainted.
+  A frame with many scattered regions folds them into one rectangle
+- Culled fills, hit tests and the caret blink cost nothing on the paint path, and Release
+  builds align functions to cache lines
+- `Json::Doc` takes its text as a `std::unique_ptr<char[]>`
+- The clang-format configuration is shared with qzdl and applied, with the hand laid tables
+  guarded
+
+### Fixed
+
+- `Json::read_file` no longer reads past its buffer and refuses a directory
+- `fit_path` elision, `natural_less` on unsigned numbers and `bytes` rolling over to the next unit
+- `Typeface::at` before a font is loaded
+- Glyph masks keep their full ink instead of clipping the outer pixels
+- Scroll's columns off the grid edge
+- `Code::Delete` matches SDL's key code
+- A Painter with an empty clip, and Root regions damaged before its first size
+- Toasts stop ticking once nothing is showing
+- FilePickerDialog answers `said()` in every mode and the picker dismisses after a push
+- Button and Pill labels elide instead of overflowing
+- StatusIndicator restarts its blink and times it against the last beat
+- TextEdit word movement to the right and rewrapping after `wrapped(false)`
+- The caret blink checks in TextBox and TextEdit
+- A use after free in `Dialog::release`
+
+## 1.4.1 - 2026-10-13
+
+### Changed
+
+- The caret stops blinking in an inactive window and the loop idles while the window is unseen
+- Neighbouring marked rows in the file picker keep a gap between them
+
+## 1.4.0 - 2026-10-12
+
+### Changed
+
+- The loop blocks until something happens. `Shell::nudge` wakes it for touches made during
+  a frame
+- Nothing is allocated per frame in the paint path or per sync in the setters
+
+### Fixed
+
+- 23 clang-tidy findings
+
+## 1.3.2 - 2026-10-11
+
+### Fixed
+
+- The file picker list repaints when a single pick moves to another file
+
+## 1.3.1 - 2026-10-10
+
+### Changed
+
+- SDL is built without the drivers, X11 extensions and services the toolkit never uses
+
+## 1.3.0 - 2026-10-10
+
+### Added
+
+- Automatic tab order across the window. Tab and Shift+Tab move focus, and a popup closes when
+  focus leaves it
+
+## 1.2.3 - 2026-10-10
+
+### Changed
+
+- SDL 3.2.24 to 3.4.18
+
+## 1.2.2 - 2026-10-10
+
+### Added
+
+- A globe glyph
+
+## 1.2.1 - 2026-10-03
+
+### Added
+
+- `Button::Kind::Success` with the `successHover` and `successText` palette slots
+
+## 1.2.0 - 2026-10-03
+
+### Added
+
+- Programs can define their own Button kinds, StatusIndicator tones and palette-derived Tones
+- A clang-format configuration with a 120 column limit
+
+## 1.1.4 - 2026-10-02
+
+### Changed
+
+- The public headers are documented
+
+### Fixed
+
+- `TextView::drop_rows` on a wrapped run, Card painting over its content and Maximize leaking
+  its stroke width
+
+### Removed
+
+- Unused code in FilePicker
+
+## 1.1.3 - 2026-10-01
+
+### Changed
+
+- An optimisation level or an LTO flag given through `CMAKE_CXX_FLAGS` takes precedence over the
+  toolkit's own
+
+## 1.1.2 - 2026-09-26
+
+### Changed
+
+- `wl_shm` presentation is offered on Linux only
+
+## 1.1.1 - 2026-09-26
+
+### Changed
+
+- Release builds at O2. The shadow blur is vectorised with AVX2 tiers, outlines are filled as
+  rings, the run caches drop their string keys, and the text editor's line indexing and
+  wrapping is vectorised
+
+## 1.1.0 - 2026-09-26
+
+### Added
+
+- Presentation through `wl_shm` buffers of the toolkit's own on Wayland, on by default
+
+### Fixed
+
+- A link time error in `ttk::Json`
+- Garbled output from processes run in pty mode, which now get a minimum column count
+
+## 1.0.0 - 2026-09-25
+
+### Fixed
+
+- The Windows build
+
+## 0.1.8 - 2026-09-25
+
+### Added
+
+- TextEdit, a multi-line editor
+- A TextView benchmark
+
+### Changed
+
+- TextView is far faster
+
+## 0.1.7 - 2026-09-24
+
+### Removed
+
+- The git revision CMake helper
+
+## 0.1.6 - 2026-09-24
+
+### Changed
+
+- The sanitizer option is renamed `TTK_SANITIZE` so it does not clash with consumers
+
+## 0.1.5 - 2026-09-24
+
+### Changed
+
+- Notifications talk to D-Bus directly, so libdbus is no longer a hard dependency
+- The build is split into parts that can be switched off one by one
+
+## 0.1.4 - 2026-09-24
+
+### Added
+
+- Desktop notifications
+
+## 0.1.3 - 2026-09-24
+
+### Fixed
+
+- The Windows build
+
+## 0.1.2 - 2026-09-24
+
+### Fixed
+
+- Performance regressions in the theme
+
+## 0.1.1 - 2026-09-24
+
+### Changed
+
+- The theme is reworked into palette slots with a revision that restyles widgets
+
+## 0.1.0 - 2026-09-19
+
+### Added
+
+- First release
