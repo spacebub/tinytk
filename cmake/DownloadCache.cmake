@@ -82,3 +82,23 @@ function(ttk_cache_source name repo tag)
     set(FETCHCONTENT_SOURCE_DIR_${upper} "${dir}" CACHE PATH
             "When not empty, overrides where to find pre-populated content for ${name}" FORCE)
 endfunction()
+
+# Applies a patch to a fetched source: at once when the source is already on disk, otherwise through the
+# fetch's patch step. Hands back TTK_PATCH_<NAME> for the FetchContent_Declare of that source.
+function(ttk_patch_source name patch)
+    string(TOUPPER ${name} upper)
+    set(script ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ApplyPatch.cmake)
+
+    if (FETCHCONTENT_SOURCE_DIR_${upper})
+        execute_process(
+                COMMAND ${CMAKE_COMMAND} -DPATCH=${patch} -DSOURCE=${FETCHCONTENT_SOURCE_DIR_${upper}} -P ${script}
+                RESULT_VARIABLE result)
+
+        if (NOT result EQUAL 0)
+            message(FATAL_ERROR "Could not patch ${name} in ${FETCHCONTENT_SOURCE_DIR_${upper}}")
+        endif ()
+    endif ()
+
+    set(TTK_PATCH_${upper} PATCH_COMMAND ${CMAKE_COMMAND} -DPATCH=${patch} -DSOURCE=<SOURCE_DIR> -P ${script}
+            PARENT_SCOPE)
+endfunction()

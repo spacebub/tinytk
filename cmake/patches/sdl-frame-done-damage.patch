@@ -1,0 +1,28 @@
+SDL damages the whole surface after every frame callback, a workaround for an
+NVIDIA egl-wayland bug with viewports. ttk attaches its own wl_shm buffers with
+exact damage on that same surface, so the compositor re-uploaded the whole
+window on every frame. Only a GL window presents through egl-wayland, so the
+damage is kept for those alone.
+
+--- a/src/video/wayland/SDL_waylandwindow.c
++++ b/src/video/wayland/SDL_waylandwindow.c
+@@ -678,11 +678,15 @@
+     /* XXX: This is needed to work around an Nvidia egl-wayland bug due to buffer coordinates
+      *      being used with wl_surface_damage, which causes part of the output to not be
+      *      updated when using a viewport with an output region larger than the source region.
++     *      Only a GL window presents through egl-wayland, so a window whose buffers are
++     *      attached by the application keeps the damage it reported.
+      */
+-    if (wl_compositor_get_version(wind->waylandData->compositor) >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+-        wl_surface_damage_buffer(wind->surface, 0, 0, SDL_MAX_SINT32, SDL_MAX_SINT32);
+-    } else {
+-        wl_surface_damage(wind->surface, 0, 0, SDL_MAX_SINT32, SDL_MAX_SINT32);
++    if (wind->egl_window) {
++        if (wl_compositor_get_version(wind->waylandData->compositor) >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
++            wl_surface_damage_buffer(wind->surface, 0, 0, SDL_MAX_SINT32, SDL_MAX_SINT32);
++        } else {
++            wl_surface_damage(wind->surface, 0, 0, SDL_MAX_SINT32, SDL_MAX_SINT32);
++        }
+     }
+ 
+     if (wind->shell_surface_type == WAYLAND_SHELL_SURFACE_TYPE_XDG_TOPLEVEL) {

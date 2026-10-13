@@ -107,10 +107,16 @@ set(TTK_SDL_VERSION release-3.4.18)
 
 ttk_cache_source(SDL3 https://github.com/libsdl-org/SDL.git ${TTK_SDL_VERSION})
 
+# SDL damages the whole surface after every frame callback, which would undo the exact damage the wl_shm path reports.
+if (TTK_WLSHM)
+    ttk_patch_source(SDL3 ${PROJECT_SOURCE_DIR}/cmake/patches/sdl-frame-done-damage.patch)
+endif ()
+
 FetchContent_Declare(SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
         GIT_TAG ${TTK_SDL_VERSION}
         GIT_SHALLOW TRUE
+        ${TTK_PATCH_SDL3}
         EXCLUDE_FROM_ALL
         SYSTEM)
 

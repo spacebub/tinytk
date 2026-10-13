@@ -39,6 +39,10 @@ one on macOS, cannot open a window. `TTK_WLSHM` is offered on Unix other than ma
 Android, ON by default, and needs the wayland-client headers. With it OFF, SDL is built
 without its Wayland driver and windows open through X11, or XWayland in a Wayland session.
 
+With `TTK_WLSHM` ON the fetched SDL is patched from `cmake/patches/` so that its Wayland driver stops
+damaging the whole surface after every frame callback, and the compositor receives only the
+rectangles the toolkit painted.
+
 `TTK_EXAMPLES=ON` builds `examples/*`, a basic hello world app and a gallery showing every widget,
 dialog, menu, tooltip and notice the library has. ON by default if ttk is compiled standalone.
 
