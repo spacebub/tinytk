@@ -25,8 +25,8 @@ namespace tests {
 // A solid rectangle with a natural size of its own, so a layout can be checked without text.
 class Block final : public ttk::Widget {
 public:
-    explicit Block(const double width = 0.0, const double height = 0.0, const std::uint32_t colour = 0xff3366aaU)
-        : wide(width), tall(height), colour(colour) {}
+    explicit Block(const double width = 0.0, const double height = 0.0, const std::uint32_t fill = 0xff3366aaU)
+        : wide(width), tall(height), colour(fill) {}
 
     // Natural size before fixedWidth, fixedHeight and the floors.
     double wide;

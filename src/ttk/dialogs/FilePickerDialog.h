@@ -161,13 +161,13 @@ private:
                 } else if (pick.folders && entry.directory) {
                     // Always shown: the only sign a folder can be taken.
                     const double plus = Glyphs::span(1.2F);
-                    const bool lit = std::cmp_equal(index, _over) && _onEdge;
+                    const bool hot = std::cmp_equal(index, _over) && _onEdge;
 
                     Glyphs::draw(painter.context(),
                                  Glyphs::Glyph::Plus,
                                  BLPoint{line.x + line.w - 16.0 - plus, line.y + ((line.h - plus) / 2.0)},
                                  1.2F,
-                                 Theme::alpha(lit ? palette.accent : palette.faint, lit ? 1.0 : 0.5));
+                                 Theme::alpha(hot ? palette.accent : palette.faint, hot ? 1.0 : 0.5));
                 }
             }
 

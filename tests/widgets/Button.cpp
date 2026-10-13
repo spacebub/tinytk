@@ -238,7 +238,7 @@ INSTANTIATE_TEST_SUITE_P(
                           Resting{&ttk::Button::Kind::Success, &ttk::Theme::Palette::success, "Success"},
                           Resting{&ttk::Button::Kind::Danger, &ttk::Theme::Palette::raised, "Danger"},
                           Resting{&ttk::Button::Kind::Ghost, &ttk::Theme::Palette::background, "Ghost"}),
-        [](const ::testing::TestParamInfo<Resting> &info) { return std::string(info.param.name); });
+        [](const ::testing::TestParamInfo<Resting> &each) { return std::string(each.param.name); });
 
 TEST_F(Painted, ButtonDefaultBorderIsTheStrongBorder) {
     const Mounted mounted;

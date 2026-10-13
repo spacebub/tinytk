@@ -457,7 +457,7 @@ INSTANTIATE_TEST_SUITE_P(Label,
                                            Placement{ttk::Align::Start, true, "SectionStart"},
                                            Placement{ttk::Align::Centre, true, "SectionCentre"},
                                            Placement{ttk::Align::End, true, "SectionEnd"}),
-                         [](const ::testing::TestParamInfo<Placement> &info) { return std::string(info.param.name); });
+                         [](const ::testing::TestParamInfo<Placement> &each) { return std::string(each.param.name); });
 
 TEST_F(Painted, LabelWrappedTextIgnoresAlignment) {
     auto made = std::make_unique<ttk::Label>(paragraph());

@@ -24,8 +24,8 @@
 namespace tests {
 class Probe : public ttk::Widget {
 public:
-    explicit Probe(std::string name = "probe", std::vector<std::string> *journal = nullptr, const bool pointer = true)
-        : name(std::move(name)), journal(journal) {
+    explicit Probe(std::string label = "probe", std::vector<std::string> *log = nullptr, const bool pointer = true)
+        : name(std::move(label)), journal(log) {
         _takesPointer = pointer;
     }
 

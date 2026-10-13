@@ -42,6 +42,7 @@ else ()
             "-Wextra"
             "-Werror"
             "-Wpedantic"
+            "-Wshadow"
             "-fstack-protector-strong"
             "$<$<CONFIG:RELEASE>:-ffunction-sections;-fdata-sections;-fvisibility=hidden>")
 

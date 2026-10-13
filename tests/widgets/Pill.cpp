@@ -131,7 +131,7 @@ INSTANTIATE_TEST_SUITE_P(
                 Scheme{Kind::Success, &ttk::Theme::Palette::success, &ttk::Theme::Palette::successSoft, "Success"},
                 Scheme{Kind::Warning, &ttk::Theme::Palette::warning, &ttk::Theme::Palette::warningSoft, "Warning"},
                 Scheme{Kind::Danger, &ttk::Theme::Palette::danger, &ttk::Theme::Palette::dangerSoft, "Danger"}),
-        [](const ::testing::TestParamInfo<Scheme> &info) { return std::string(info.param.name); });
+        [](const ::testing::TestParamInfo<Scheme> &each) { return std::string(each.param.name); });
 
 TEST(Pill, ChainedSettersReturnThePill) {
     ttk::Pill pill("Ready");

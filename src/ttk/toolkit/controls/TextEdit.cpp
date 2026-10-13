@@ -771,9 +771,9 @@ void TextEdit::paint(const Painter &painter) {
     const double left = text_left() - _scrollX;
     const double inset = (_lineHeight - _fontHeight) / 2.0;
     // A row's text is a line box centred `inset` inside the row, and its ink reaches past that box.
-    const double reach = std::max(0.0, Typeface::bleed(font) - inset);
+    const double bleed = std::max(0.0, Typeface::bleed(font) - inset);
     const auto needed = [&](const double y) {
-        return painter.needed(BLRect{_box.x, y - reach, _box.w, _lineHeight + (reach * 2.0)});
+        return painter.needed(BLRect{_box.x, y - bleed, _box.w, _lineHeight + (bleed * 2.0)});
     };
 
     for (size_t row = first; _numbered && row <= last; ++row) {
