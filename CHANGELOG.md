@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.3 - 2026-10-14
+
+### Added
+
+- `Label::elide(rows)` caps a wrapped label at a row count, cutting the last line shown with an
+  ellipsis. A positive count turns `wrap()` on and zero lifts the cap
+
 ## 1.5.2 - 2026-10-13
 
 ### Added
