@@ -6,6 +6,7 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -452,7 +453,7 @@ TEST_F(FieldTest, PrefixIsDrawnWithADivider) {
     const ttk::Field *field = place(std::move(made));
     const double taken = type.width(type.at(ttk::Typeface::mono, ttk::Theme::fontBody), prefix);
     const double frameTop = field->input()->box().y - 6.0;
-    const int divider = static_cast<int>(BOX.x + 12.0 + taken + 9.0);
+    const auto divider = static_cast<int>(std::round(BOX.x + 12.0 + taken + 9.0));
 
     canvas.full();
 

@@ -188,8 +188,14 @@ inline std::uint32_t peak(const tests::Canvas &canvas, const BLRectI &region, co
     return found;
 }
 
+// Every pixel `box` touches, so ink in a partly covered edge pixel counts as inside it.
 inline BLRectI pixels_of(const BLRect &box) {
-    return BLRectI{static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h)};
+    const auto left = static_cast<int>(std::floor(box.x));
+    const auto top = static_cast<int>(std::floor(box.y));
+    const auto right = static_cast<int>(std::ceil(box.x + box.w));
+    const auto bottom = static_cast<int>(std::ceil(box.y + box.h));
+
+    return BLRectI{left, top, right - left, bottom - top};
 }
 
 inline void hover(tests::Canvas &canvas, const double x, const double y) {

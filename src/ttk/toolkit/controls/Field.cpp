@@ -7,6 +7,7 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <cmath>
 
 #include "ttk/draw/Glyphs.h"
 #include "ttk/draw/Typeface.h"
@@ -219,7 +220,8 @@ void Field::paint(const Painter &painter) {
         const double at = _frame.x + 12.0 + (_leadingGlyph == Glyphs::Glyph::Empty ? 0.0 : (12.0 * 1.1) + 9.0);
 
         painter.label(face, BLRect{at, _frame.y, taken + 2.0, _frame.h}, Align::Start, _prefix, palette.faint);
-        painter.fill(BLRect{at + taken + 9.0, _frame.y + 6.0, 1.0, _frame.h - 12.0}, palette.borderStrong);
+        // On a whole pixel, or the rule smears across two at partial strength.
+        painter.fill(BLRect{std::round(at + taken + 9.0), _frame.y + 6.0, 1.0, _frame.h - 12.0}, palette.borderStrong);
     }
 
     Box::paint(painter);
