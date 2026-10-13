@@ -92,20 +92,21 @@ set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
 set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
 
+# ttk draws and presents on the CPU alone, so SDL is built without its render API and graphics backends too.
 foreach (part AUDIO CAMERA JOYSTICK HAPTIC HIDAPI SENSOR POWER GPU DIALOG TRAY
-        OPENGLES VULKAN KMSDRM OFFSCREEN DUMMYVIDEO PIPEWIRE LIBUDEV LIBURING
+        RENDER OPENGL OPENGLES METAL VULKAN KMSDRM OFFSCREEN DUMMYVIDEO PIPEWIRE LIBUDEV LIBURING
         X11_XTEST X11_XSHAPE X11_XSCRNSAVER X11_XDBE X11_XFIXES FRIBIDI LIBTHAI
         WAYLAND_LIBDECOR RENDER_D3D RENDER_D3D11 RENDER_D3D12 XINPUT)
     set(SDL_${part} OFF CACHE BOOL "" FORCE)
 endforeach ()
 
+# A Wayland window has no framebuffer without wl_shm, so SDL is left on X11 instead.
+set(SDL_WAYLAND ${TTK_WLSHM} CACHE BOOL "" FORCE)
+
 set(TTK_SDL_VERSION release-3.4.18)
 
 ttk_cache_source(SDL3 https://github.com/libsdl-org/SDL.git ${TTK_SDL_VERSION})
 
-# SDL_RENDER and OpenGL stay on: only the Windows and X11 video drivers implement a
-# framebuffer of their own, and everywhere else SDL_GetWindowSurface falls back to
-# SDL_CreateWindowTexture, which is the 2D render API over a GPU texture.
 FetchContent_Declare(SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
         GIT_TAG ${TTK_SDL_VERSION}
@@ -287,9 +288,7 @@ else ()
     target_sources(ttk_ui PRIVATE ttk/draw/Chrome_Stub.cpp)
 endif ()
 
-# SDL's Wayland driver has no framebuffer: SDL_GetWindowSurface there is a GPU
-# texture. With this on, the frame goes into wl_shm buffers of ours instead, and
-# on any other driver SDL keeps the window's pixels as before.
+# SDL's Wayland driver has no framebuffer, so the frame goes into wl_shm buffers of ours.
 if (TTK_WLSHM)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)

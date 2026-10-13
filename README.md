@@ -32,9 +32,12 @@ target_link_libraries(app PRIVATE ttk::ui ttk::http)
 its target along with its fetches and lookups, so a build machine needs only what is kept. `TTK_DOWNLOAD_CACHE`
 names where fetched sources are kept between build trees.
 
-`TTK_WLSHM=ON` gives `ttk::ui` a framebuffer of its own on Wayland, where SDL has
-none and would otherwise draw through a GPU texture. It needs the wayland-client
-headers, and on any other video driver SDL keeps the window's pixels as before.
+`ttk::ui` draws and presents on the CPU alone: into SDL's native framebuffer on Windows
+and X11, and into `wl_shm` buffers of its own on Wayland. SDL is built without its render
+API and graphics backends, so a video driver with no framebuffer of its own, such as the
+one on macOS, cannot open a window. `TTK_WLSHM` is offered on Unix other than macOS and
+Android, ON by default, and needs the wayland-client headers. With it OFF, SDL is built
+without its Wayland driver and windows open through X11, or XWayland in a Wayland session.
 
 `TTK_EXAMPLES=ON` builds `examples/*`, a basic hello world app and a gallery showing every widget,
 dialog, menu, tooltip and notice the library has. ON by default if ttk is compiled standalone.

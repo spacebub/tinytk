@@ -21,7 +21,8 @@ option(TTK_EXAMPLES "Build the example programs" ${PROJECT_IS_TOP_LEVEL})
 option(TTK_BENCHMARKS "Build the benchmark suite in bench/" OFF)
 option(TTK_SANITIZE "Build with the address and undefined sanitizers" OFF)
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+# Where SDL builds a Wayland video driver.
+if (UNIX AND NOT APPLE AND NOT ANDROID)
     option(TTK_WLSHM "Present through wl_shm on Wayland, where SDL has no framebuffer of its own" ON)
 else ()
     set(TTK_WLSHM OFF)

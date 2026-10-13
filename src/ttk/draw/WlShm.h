@@ -21,7 +21,7 @@ namespace ttk {
     //!
     //! Keeps a ring of at most four `wl_shm` buffers in XRGB8888, and each frame is drawn straight into one the
     //! compositor is not holding. Wayland events are read on an event queue of its own, apart from SDL's. Only
-    //! built with the `TTK_WLSHM` option on Linux, otherwise \ref available() and every other query return false.
+    //! built with the `TTK_WLSHM` option, otherwise \ref available() and every other query return false.
     class WlShm {
     public:
         WlShm();

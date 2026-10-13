@@ -125,14 +125,6 @@ namespace ttk {
             return false;
         }
 
-        // Only the Windows and X11 drivers have a framebuffer of their own. Pinned to
-        // it the window surface is plain memory and no graphics device is opened.
-        if (const char *driver = SDL_GetCurrentVideoDriver();
-            driver != nullptr
-            && (SDL_strcmp(driver, "windows") == 0 || SDL_strcmp(driver, "x11") == 0)) {
-            SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
-        }
-
         _window = SDL_CreateWindow(title.c_str(), width, height,
                                    SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS
                                        | SDL_WINDOW_HIDDEN);

@@ -65,14 +65,21 @@ namespace ttk {
     bool Surface::attach(SDL_Window *window) {
         release();
 
-        // Wayland has no framebuffer for SDL to hand out, so the frame goes into
-        // shared memory of ours where that is built in. Where it is not, or the
-        // compositor has no wl_shm, SDL's fallback below is a GPU texture.
-        if (WlShm::available(window) && (_shm.opened() || _shm.open(window))) {
+        // SDL's Wayland driver has no framebuffer, so the frame goes into shared memory of ours.
+        const char *driver = SDL_GetCurrentVideoDriver();
+
+        if (driver != nullptr && SDL_strcmp(driver, "wayland") == 0) {
+            if (!WlShm::available(window) || (!_shm.opened() && !_shm.open(window))) {
+                return SDL_SetError("Presenting on Wayland needs wl_shm");
+            }
+
             return attach_shared(window);
         }
 
         _shm.close();
+
+        // Without the render API a texture framebuffer can only fail, so SDL is told not to try one.
+        SDL_SetHintWithPriority(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0", SDL_HINT_OVERRIDE);
 
         SDL_Surface *surface = SDL_GetWindowSurface(window);
 
@@ -86,8 +93,6 @@ namespace ttk {
             && surface->format != SDL_PIXELFORMAT_ARGB8888) {
             return false;
         }
-
-        const char *driver = SDL_GetCurrentVideoDriver();
 
         _path = driver != nullptr
                 && (SDL_strcmp(driver, "windows") == 0 || SDL_strcmp(driver, "x11") == 0)
