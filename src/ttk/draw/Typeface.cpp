@@ -7,6 +7,7 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -101,6 +102,126 @@ size_t step(const std::string_view run, const size_t at) {
     const size_t wide = lead < 0x80 ? 1 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
 
     return std::min(wide, run.size() - at);
+}
+
+// The code point starting at `at`. Only one or two bytes behind its lead are read, which is all a combining
+// mark takes; a longer sequence gives back its lead byte, which is not a mark.
+char32_t code_at(const std::string_view run, const size_t at) {
+    const auto byte = [&](const size_t index) {
+        return index < run.size() ? static_cast<char32_t>(static_cast<unsigned char>(run[index])) : char32_t{0};
+    };
+    const char32_t lead = byte(at);
+
+    if ((lead & 0xe0U) == 0xc0U) {
+        return ((lead & 0x1fU) << 6U) | (byte(at + 1) & 0x3fU);
+    }
+
+    if ((lead & 0xf0U) == 0xe0U) {
+        return ((lead & 0x0fU) << 12U) | ((byte(at + 1) & 0x3fU) << 6U) | (byte(at + 2) & 0x3fU);
+    }
+
+    return lead;
+}
+
+// The combining blocks: the diacritics with their extension and supplement, those for symbols, and the half marks.
+bool combining(const char32_t code) {
+    return (code >= 0x0300 && code <= 0x036f) || (code >= 0x1ab0 && code <= 0x1aff)
+           || (code >= 0x1dc0 && code <= 0x1dff) || (code >= 0x20d0 && code <= 0x20ff)
+           || (code >= 0xfe20 && code <= 0xfe2f);
+}
+
+// Every combining mark is encoded behind one of these lead bytes.
+bool may_combine(const std::string_view run) {
+    return std::ranges::any_of(run, [](const char letter) {
+        const auto lead = static_cast<unsigned char>(letter);
+
+        return lead == 0xcc || lead == 0xcd || lead == 0xe1 || lead == 0xe2 || lead == 0xef;
+    });
+}
+
+// The byte length of the character at `at` with the combining marks that ride on it.
+size_t cluster_step(const std::string_view run, const size_t at) {
+    size_t wide = step(run, at);
+
+    while (at + wide < run.size() && combining(code_at(run, at + wide))) {
+        wide += step(run, at + wide);
+    }
+
+    return wide;
+}
+
+// Blend2D does not apply GPOS mark attachment, so a font that gives its combining marks an advance and counts
+// on GPOS to place them would have each one stand beside its base. Such a mark loses its advance and is centred
+// over the base instead. A mark the font gives no advance is placed by the font itself and is left alone.
+// Returns whether a mark was moved.
+bool settle_marks(const BLFont &font, BLGlyphBuffer &buffer, const std::string_view run) {
+    if (!may_combine(run)) {
+        return false;
+    }
+
+    const size_t count = buffer.size();
+    const std::uint32_t *ids = buffer.content();
+    const BLGlyphInfo *info = buffer.info_data();
+    BLGlyphPlacement *placed = buffer.placement_data();
+    size_t base = count;
+    bool moved = false;
+
+    for (size_t at = 0; at < count; ++at) {
+        if (!combining(code_at(run, info[at].cluster))) {
+            base = at;
+
+            continue;
+        }
+
+        if (base == count || placed[at].advance.x == 0) {
+            continue;
+        }
+
+        const std::array<std::uint32_t, 2> pair{ids[base], ids[at]};
+        std::array<BLBoxI, 2> ink{};
+
+        if (font.get_glyph_bounds(pair.data(), sizeof(std::uint32_t), ink.data(), pair.size()) != BL_SUCCESS) {
+            continue;
+        }
+
+        // A base without ink, a space, centres on its advance.
+        const int under = ink[0].x1 > ink[0].x0 ? (ink[0].x0 + ink[0].x1) / 2 : placed[base].advance.x / 2;
+        const int over = (ink[1].x0 + ink[1].x1) / 2;
+
+        // The pen stands past the base, and past any marks between, which no longer move it.
+        placed[at].placement.x = placed[base].placement.x + under - over - placed[base].advance.x;
+        placed[at].advance.x = 0;
+        moved = true;
+    }
+
+    return moved;
+}
+
+// The sideways reach of a run's ink over every glyph where it is placed. Blend2D measures it from the first and
+// last glyph alone, at their pens, which misses a mark moved back over its base.
+void widen_to_ink(const BLFont &font, const BLGlyphBuffer &buffer, BLBox &ink) {
+    const size_t count = buffer.size();
+    std::vector<BLBoxI> each(count);
+
+    if (count == 0
+        || font.get_glyph_bounds(buffer.content(), sizeof(std::uint32_t), each.data(), count) != BL_SUCCESS) {
+        return;
+    }
+
+    const BLGlyphPlacement *placed = buffer.placement_data();
+    const double m00 = font.matrix().m00;
+    double pen = 0.0;
+
+    for (size_t at = 0; at < count; ++at) {
+        if (each[at].x1 > each[at].x0) {
+            const double x = pen + placed[at].placement.x;
+
+            ink.x0 = std::min(ink.x0, (x + each[at].x0) * m00);
+            ink.x1 = std::max(ink.x1, (x + each[at].x1) * m00);
+        }
+
+        pen += placed[at].advance.x;
+    }
 }
 
 // How many runs, answers and words are kept before the coldest quarter goes.
@@ -261,9 +382,15 @@ Typeface::Shaped &Typeface::shaped(const BLFont &font, const std::string_view ru
     made.buffer.set_utf8_text(run.data(), run.size());
     font.shape(made.buffer);
 
+    const bool moved = settle_marks(font, made.buffer, run);
+
     if (font.get_text_metrics(made.buffer, metrics) == BL_SUCCESS) {
         made.width = static_cast<float>(metrics.advance.x);
         made.ink = metrics.bounding_box;
+
+        if (moved) {
+            widen_to_ink(font, made.buffer, made.ink);
+        }
     }
 
     return made;
@@ -345,6 +472,7 @@ float Typeface::width_once(const BLFont &font, const std::string_view run) {
 
     _scratch.set_utf8_text(run.data(), run.size());
     font.shape(_scratch);
+    settle_marks(font, _scratch, run);
 
     return font.get_text_metrics(_scratch, metrics) == BL_SUCCESS ? static_cast<float>(metrics.advance.x) : 0.0F;
 }
@@ -444,7 +572,7 @@ float Typeface::width_tracked(const BLFont &font, const std::string_view run, co
     float total = 0.0F;
 
     for (size_t at = 0; at < run.size();) {
-        const size_t wide = step(run, at);
+        const size_t wide = cluster_step(run, at);
 
         total += width(font, run.substr(at, wide)) + tracking;
         at += wide;
@@ -465,7 +593,7 @@ void Typeface::draw_tracked(BLContext &context,
     double x = top.x;
 
     for (size_t at = 0; at < run.size();) {
-        const size_t wide = step(run, at);
+        const size_t wide = cluster_step(run, at);
         Shaped &one = shaped(font, run.substr(at, wide));
 
         lay(context, font, one, BLPoint{x, baseline}, tone);
@@ -617,6 +745,7 @@ Typeface::Cut Typeface::shape_to(const BLFont &font, const std::string_view run,
 
     _scratch.set_utf8_text(run.data(), run.size());
     font.shape(_scratch);
+    settle_marks(font, _scratch, run);
 
     const size_t count = _scratch.size();
     const BLGlyphPlacement *placed = _scratch.placement_data();
@@ -820,6 +949,7 @@ size_t Typeface::nearest(const BLFont &font, const std::string_view run, const f
 
     _scratch.set_utf8_text(run.data(), run.size());
     font.shape(_scratch);
+    settle_marks(font, _scratch, run);
 
     const size_t count = _scratch.size();
     const BLGlyphPlacement *placed = _scratch.placement_data();

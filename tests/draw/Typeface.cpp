@@ -231,6 +231,15 @@ TEST_F(Typed, CombiningMarkAddsNoAdvance) {
     EXPECT_LT(marked, type().width(body(), "ee"));
 }
 
+TEST_F(Typed, CombiningMarkMatchesThePrecomposedWidth) {
+    EXPECT_NEAR(type().width(body(), "e\xcc\x81"), type().width(body(), "\xc3\xa9"), 0.5F);
+}
+
+TEST_F(Typed, TrackingKeepsAMarkOnItsBase) {
+    EXPECT_FLOAT_EQ(type().width_tracked(body(), "e\xcc\x81", 2.0F), type().width_tracked(body(), "e", 2.0F))
+            << "a mark is not a letter of its own to space out";
+}
+
 TEST_F(Typed, TrackedWidthAddsTrackingBetweenCharacters) {
     const std::string_view run = "abcй";
     float parts = 0.0F;
@@ -672,6 +681,25 @@ TEST_F(Drawn, CombiningMarksDrawInsideTheLineBox) {
 
     ASSERT_TRUE(found.any());
     EXPECT_TRUE(boxed(found, body(), top, type().width(body(), run)));
+}
+
+TEST_F(Drawn, CombiningMarkSitsOverItsBase) {
+    const BLPoint top{20.0, 20.0};
+
+    type().draw(context, body(), top, "e", BLRgba32(0xffffffff));
+
+    const tests::Ink plain = settle();
+
+    context.fill_all(BLRgba32(GROUND));
+    type().draw(context, body(), top, "e\xcc\x81", BLRgba32(0xffffffff));
+
+    const tests::Ink marked = settle();
+
+    ASSERT_TRUE(plain.any());
+    ASSERT_TRUE(marked.any());
+    EXPECT_LT(marked.y0, plain.y0) << "the accent stands above the e";
+    EXPECT_GE(marked.x0, plain.x0 - 1) << "not beside it";
+    EXPECT_LE(marked.x1, plain.x1 + 1) << "not beside it";
 }
 
 #ifdef __GLIBC__
