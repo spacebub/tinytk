@@ -112,6 +112,7 @@ namespace ttk {
         void set_said(const std::string_view text, const bool warning) const {
             _said->set_text(text);
             _said->tone(warning ? &Theme::Palette::warning : &Theme::Palette::faint);
+            _said->invalidate();
         }
 
         //! Returns the heading and padding height plus the body height scaled by how far the body has slid
@@ -279,7 +280,8 @@ namespace ttk {
             _said = _head->append(std::make_unique<Label>());
             _said->font(400, Theme::fontTiny)->tone(&Theme::Palette::faint);
 
-            _head->append(std::make_unique<Spacer>());
+            // The rest of the row, so a new text has the room to show without a layout.
+            _said->stretch = 1.0;
 
             _body = append(Box::column());
         }

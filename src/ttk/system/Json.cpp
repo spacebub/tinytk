@@ -6,8 +6,12 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <memory>
+#include <new>
 #include <utility>
 
 #include "ttk/system/Json.h"
@@ -68,7 +72,7 @@ namespace ttk::Json {
     }
 
     Doc read_file(const std::filesystem::path &path, std::string *error) {
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        std::ifstream file(path, std::ios::binary);
 
         if (!file) {
             if (error != nullptr) {
@@ -78,9 +82,17 @@ namespace ttk::Json {
             return {};
         }
 
-        const std::streamoff size = file.tellg();
+        // A directory opens as a stream on Linux, so its size is what turns it away.
+        std::error_code code;
+        const std::uintmax_t size = std::filesystem::file_size(path, code);
+        std::unique_ptr<char[]> text;
 
-        if (size < 0) {
+        if (!code && size <= SIZE_MAX - YYJSON_PADDING_SIZE) {
+            // YYJSON_READ_INSITU needs YYJSON_PADDING_SIZE zeroed bytes of slack after the text.
+            text.reset(new (std::nothrow) char[size + YYJSON_PADDING_SIZE]);
+        }
+
+        if (text == nullptr || (size > 0 && !file.read(text.get(), static_cast<std::streamsize>(size)))) {
             if (error != nullptr) {
                 *error = "cannot read " + path.string();
             }
@@ -88,22 +100,11 @@ namespace ttk::Json {
             return {};
         }
 
-        // YYJSON_READ_INSITU needs YYJSON_PADDING_SIZE bytes of slack after the text.
-        std::string data(static_cast<size_t>(size) + YYJSON_PADDING_SIZE, '\0');
+        std::fill_n(text.get() + size, YYJSON_PADDING_SIZE, '\0');
 
-        file.seekg(0);
+        yyjson_doc *doc = parse(text.get(), static_cast<size_t>(size), YYJSON_READ_INSITU, error);
 
-        if (size > 0 && !file.read(data.data(), size)) {
-            if (error != nullptr) {
-                *error = "cannot read " + path.string();
-            }
-
-            return {};
-        }
-
-        yyjson_doc *doc = parse(data.data(), static_cast<size_t>(size), YYJSON_READ_INSITU, error);
-
-        return {doc, std::move(data)};
+        return {doc, std::move(text)};
     }
 
     std::string as_string(const yyjson_val *val, const std::string &def) {

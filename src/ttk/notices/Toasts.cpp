@@ -208,7 +208,7 @@ namespace ttk {
         Widget::leave();
 
         // The countdown resumes from here, not from the last tick before the hover.
-        _ticked = 0.0;
+        _ticking = false;
 
         wake();
     }
@@ -249,11 +249,12 @@ namespace ttk {
         const bool counting = _message.duration > 0 && !_going && !hovered();
 
         if (counting) {
-            if (_ticked > 0.0) {
+            if (_ticking) {
                 _left -= (now - _ticked) * 1000.0;
             }
 
             _ticked = now;
+            _ticking = true;
 
             if (_left <= 0.0) {
                 close();

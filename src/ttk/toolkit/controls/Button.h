@@ -107,7 +107,7 @@ namespace ttk {
         double natural_height(Typeface &type, double width) override;
 
         //! Paints the button body in its \ref Kind style, then either the glyph and label centred in the box or the
-        //! busy dots. A disabled button draws its label faded.
+        //! busy dots. A label too long for the box is cut with an ellipsis. A disabled button draws its label faded.
         void paint(const Painter &painter) override;
 
         //! Takes the press unless the button is disabled or busy, and shrinks the body slightly while it is held.

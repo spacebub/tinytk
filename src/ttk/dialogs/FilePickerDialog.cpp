@@ -136,23 +136,17 @@ namespace ttk {
         _option->hint = pick.optionHint;
         _option->set_checked(pick.optionSet);
 
+        _use->set_text(said(pick));
+
         if (pick.saving) {
-            _use->set_text(pick.replacing ? "Replace" : "Save");
             _use->kind(pick.replacing ? Button::Kind::Danger : Button::Kind::Primary);
             _use->set_enabled(!pick.target.empty());
             _use->set_visible(!pick.drives);
         } else if (pick.directories) {
-            _use->set_text("Use this directory");
             _use->kind(Button::Kind::Primary);
             _use->set_enabled(true);
             _use->set_visible(!pick.drives);
-        } else if (pick.multiple) {
-            _use->set_text(said(pick));
-            _use->kind(Button::Kind::Primary);
-            _use->set_enabled(pick.marked > 0);
-            _use->set_visible(true);
         } else {
-            _use->set_text("Use this file");
             _use->kind(Button::Kind::Primary);
             _use->set_enabled(pick.marked > 0);
             _use->set_visible(true);
@@ -365,6 +359,18 @@ namespace ttk {
     }
 
     std::string FilePickerDialog::said(const FilePicker::State &pick) {
+        if (pick.saving) {
+            return pick.replacing ? "Replace" : "Save";
+        }
+
+        if (pick.directories) {
+            return "Use this directory";
+        }
+
+        if (!pick.multiple) {
+            return "Use this file";
+        }
+
         if (pick.markedFolders == 0) {
             return pick.marked == 1 ? "Add 1 file"
                                     : "Add " + std::to_string(pick.marked) + " files";

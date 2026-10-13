@@ -369,6 +369,19 @@ namespace {
         EXPECT_TRUE(canvas.matches_full());
     }
 
+    TEST_F(Panel, SaidToneChangeRepaints) {
+        folding->set_said("Saved", false);
+        canvas.frame_at(START);
+
+        const std::vector<std::uint32_t> faint = canvas.pixels();
+
+        folding->set_said("Saved", true);
+        canvas.frame_at(START);
+
+        EXPECT_NE(canvas.pixels(), faint) << "the warning tone was not painted";
+        EXPECT_TRUE(canvas.matches_full());
+    }
+
     TEST_F(Panel, ShownPillTakesRoomInTheHeading) {
         folding->pill()->set_text("New");
         folding->pill()->set_visible(true);
@@ -539,6 +552,24 @@ namespace {
         canvas.frame_at(START);
 
         EXPECT_NE(canvas.pixels(), bare);
+        EXPECT_TRUE(canvas.matches_full());
+    }
+
+    TEST_F(Heading, SaidTextIsPaintedWithoutALayout) {
+        const std::vector<std::uint32_t> bare = canvas.pixels();
+
+        folding->set_said("3 items");
+        canvas.frame_at(START);
+
+        const std::vector<std::uint32_t> said = canvas.pixels();
+
+        EXPECT_NE(said, bare) << "the status text was not drawn";
+        EXPECT_TRUE(canvas.matches_full());
+
+        folding->set_said("12 items in all");
+        canvas.frame_at(START);
+
+        EXPECT_NE(canvas.pixels(), said) << "the longer status text was not drawn";
         EXPECT_TRUE(canvas.matches_full());
     }
 

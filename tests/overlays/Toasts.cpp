@@ -213,6 +213,20 @@ namespace {
         EXPECT_EQ(gone, (std::vector<int>{0}));
     }
 
+    TEST_F(Stacked, CountdownStartingAtTimeZeroCountsItsFirstInterval) {
+        const std::string text = "Saved";
+
+        canvas.root().set_now(0.0);
+        notifier.info(text);
+        canvas.frame();
+        at(0.0);
+        at(0.5);
+        at(lasting(text) + 0.05);
+        at(lasting(text) + 0.05 + FADE + 0.02);
+
+        EXPECT_EQ(gone, (std::vector<int>{0})) << "the first interval of the countdown was lost";
+    }
+
     TEST_F(Stacked, ClosedToastPaintsNothingUntilTheListDropsIt) {
         const BLRect box = posted("Saved")->box();
 

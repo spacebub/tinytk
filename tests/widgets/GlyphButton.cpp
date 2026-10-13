@@ -317,6 +317,21 @@ namespace {
         EXPECT_EQ(mounted.clicks, 2);
     }
 
+    TEST_F(Painted, GlyphButtonIsATabStopThatReturnClicks) {
+        Mounted mounted;
+
+        mounted.canvas.root().focus_next(false);
+
+        EXPECT_EQ(mounted.canvas.root().focused(), mounted.button);
+        EXPECT_TRUE(mounted.canvas.root().key(widgets::key(ttk::Code::Return)));
+        EXPECT_TRUE(mounted.canvas.root().key(widgets::key(ttk::Code::Space)));
+        EXPECT_EQ(mounted.clicks, 2);
+
+        mounted.button->set_enabled(false);
+
+        EXPECT_FALSE(mounted.button->takes_focus());
+    }
+
     TEST_F(Painted, GlyphButtonReleaseOutsideDoesNotClick) {
         Mounted mounted;
 

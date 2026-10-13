@@ -96,6 +96,11 @@ namespace ttk {
         _wrapped = value;
         _fit = 0;
         _scrollX = 0.0;
+
+        if (!value) {
+            rewrap();
+        }
+
         refit();
 
         return this;
@@ -220,6 +225,12 @@ namespace ttk {
     }
 
     void TextEdit::rewrap() {
+        if (!_wrapped || _fit == 0) {
+            _rowStarts = _starts;
+
+            return;
+        }
+
         _rowStarts.clear();
 
         for (size_t line = 0; line < line_count(); ++line) {
@@ -459,7 +470,7 @@ namespace ttk {
             at = after(at);
         }
 
-        if (at < _text.size() && _text[at] == '\n' && (at == 0 || !is_word_char(_text[at - 1]))) {
+        if (at < _text.size() && _text[at] == '\n') {
             return at + 1;
         }
 
@@ -1189,7 +1200,7 @@ namespace ttk {
             return false;
         }
 
-        if (now - _blinked >= BLINK) {
+        if (now >= _blinked + BLINK) {
             _blinked = now;
             _showCaret = !_showCaret;
 

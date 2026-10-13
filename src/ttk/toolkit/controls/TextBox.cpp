@@ -508,7 +508,7 @@ namespace ttk {
             return false;
         }
 
-        if (now - _blinked >= BLINK) {
+        if (now >= _blinked + BLINK) {
             _blinked = now;
             _showCaret = !_showCaret;
 

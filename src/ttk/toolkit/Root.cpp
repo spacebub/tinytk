@@ -113,7 +113,8 @@ namespace ttk {
             }
         }
 
-        if (_pending.size() == Damage::CROWDED) {
+        // A root without a size has no pixels to merge into, so its regions wait for one.
+        if (_pending.size() >= Damage::CROWDED && _width > 0.0 && _height > 0.0) {
             flush();
         }
 

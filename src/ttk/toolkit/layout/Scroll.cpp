@@ -109,14 +109,24 @@ namespace ttk {
             return;
         }
 
-        // What came into view, a row at each edge for a box off the pixel grid, and
-        // the bar, which did not move with the content.
+        // What came into view, a row at each edge and the part column at each side for
+        // a box off the pixel grid, and the bar, which did not move with the content.
         const double bare = std::abs(static_cast<double>(dy));
+        const double left = std::ceil(_box.x);
+        const double right = std::floor(_box.x + _box.w);
 
         invalidate(BLRect{_box.x, _box.y, _box.w, dy > 0 ? bare : 1.0});
         invalidate(BLRect{_box.x, _box.y + _box.h - (dy < 0 ? bare : 1.0), _box.w,
                           dy < 0 ? bare : 1.0});
         invalidate(lane());
+
+        if (left > _box.x) {
+            invalidate(BLRect{_box.x, _box.y, left - _box.x, _box.h});
+        }
+
+        if (right < _box.x + _box.w) {
+            invalidate(BLRect{right, _box.y, _box.x + _box.w - right, _box.h});
+        }
     }
 
     void Scroll::set_reach(const double reach) {

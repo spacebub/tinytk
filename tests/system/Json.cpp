@@ -353,6 +353,20 @@ TEST(JsonReadFile, StringsSurviveMovingTheDocument) {
     EXPECT_EQ(Json::obj_get_string(second.root(), "name"), "a value long enough to live on the heap");
 }
 
+TEST(JsonReadFile, StringsOfATinyFileOutliveTheRead) {
+    const fs::path root = tests::Sandbox::scratch("read-tiny-strings");
+
+    spill(root / "first.json", R"("hello")");
+    spill(root / "second.json", R"("world")");
+
+    Json::Doc first = Json::read_file(root / "first.json");
+    const Json::Doc second = Json::read_file(root / "second.json");
+    const Json::Doc moved(std::move(first));
+
+    EXPECT_EQ(Json::as_string(moved.root()), "hello");
+    EXPECT_EQ(Json::as_string(second.root()), "world");
+}
+
 TEST(JsonReadFile, ParsesAFileWithoutStrings) {
     const fs::path path = tests::Sandbox::scratch("read-tiny") / "doc.json";
 
@@ -407,6 +421,32 @@ TEST(JsonReadFile, MissingFileIsInvalid) {
 
 TEST(JsonReadFile, MissingFileWithoutError) {
     EXPECT_FALSE(Json::read_file(tests::Sandbox::scratch("read-missing-quiet") / "absent.json").valid());
+}
+
+TEST(JsonReadFile, DirectoryIsInvalid) {
+    const fs::path path = tests::Sandbox::scratch("read-directory");
+    std::string error;
+
+    EXPECT_FALSE(Json::read_file(path, &error).valid());
+    EXPECT_NE(error.find(path.string()), std::string::npos) << error;
+    EXPECT_FALSE(Json::read_file(fs::temp_directory_path()).valid());
+    EXPECT_FALSE(Json::read_file("/").valid());
+}
+
+TEST(JsonReadFile, UnreadableFileIsInvalid) {
+    const fs::path path = tests::Sandbox::scratch("read-unreadable") / "locked.json";
+
+    spill(path, "[1]");
+    fs::permissions(path, fs::perms::none);
+
+    if (std::ifstream(path)) {
+        GTEST_SKIP() << "permissions do not bind this user";
+    }
+
+    std::string error;
+
+    EXPECT_FALSE(Json::read_file(path, &error).valid());
+    EXPECT_NE(error.find("cannot open"), std::string::npos) << error;
 }
 
 TEST(JsonReadFile, EmptyFileIsInvalid) {

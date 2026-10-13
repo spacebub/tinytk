@@ -387,6 +387,40 @@ namespace {
         EXPECT_FALSE(mounted.canvas.root().dirty());
     }
 
+    TEST_F(Painted, StatusIndicatorSetRestartsTheBlinkOnItsFullPhase) {
+        Mounted mounted(Status::Running);
+
+        mounted.canvas.frame_at(5.0);
+        mounted.indicator->set(Status::Launching);
+        mounted.canvas.frame_at(5.0);
+
+        EXPECT_EQ(mounted.dot(), tone_of(Status::Launching)) << "the blink restarted faint";
+
+        mounted.canvas.frame_at(5.0 + (ttk::StatusIndicator::BEAT / 2));
+
+        EXPECT_EQ(mounted.dot(), tone_of(Status::Launching));
+        EXPECT_DOUBLE_EQ(mounted.canvas.root().waking(), 5.0 + ttk::StatusIndicator::BEAT);
+
+        mounted.canvas.frame_at(5.0 + ttk::StatusIndicator::BEAT);
+
+        EXPECT_TRUE(widgets::near(mounted.dot(), faint_dot(Status::Launching))) << std::hex << mounted.dot();
+    }
+
+    TEST_F(Painted, StatusIndicatorFlipsAtTheTimeItWakes) {
+        Mounted mounted(Status::Launching);
+
+        mounted.canvas.frame_at(0.0);
+
+        for (int beat = 1; beat <= 4; ++beat) {
+            const double due = mounted.canvas.root().waking();
+
+            mounted.canvas.frame_at(due);
+
+            EXPECT_EQ(beat % 2 == 0, mounted.dot() == tone_of(Status::Launching))
+                    << "beat " << beat << " at " << due << " did not flip";
+        }
+    }
+
     TEST_F(Painted, StatusIndicatorSetDoesNotRelayout) {
         Mounted mounted(Status::Closed);
 

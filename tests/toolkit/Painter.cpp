@@ -490,6 +490,23 @@ namespace {
         EXPECT_TRUE(narrow.needed({0, 0, WIDTH, HEIGHT}));
     }
 
+    TEST_F(Drawn, PushOfADisjointBoxNeedsNoBoxAcrossWhereTheyMissed) {
+        const ttk::Painter narrow(ours, tests::fonts(), {20, 20, 40, 40});
+
+        narrow.push({100, 0, 10, 10});
+
+        EXPECT_FALSE(narrow.needed({0, 0, WIDTH, HEIGHT}));
+        EXPECT_FALSE(narrow.needed({90, -10, 30, 30}));
+
+        narrow.push({0, 0, WIDTH, HEIGHT});
+
+        EXPECT_EQ(narrow.clip().w, 0) << "a push inside an empty clip found something";
+        EXPECT_FALSE(narrow.needed({0, 0, WIDTH, HEIGHT}));
+
+        narrow.pop();
+        narrow.pop();
+    }
+
     TEST_F(Drawn, PopRestoresTheClip) {
         painter.push({10, 10, 20, 20});
         painter.pop();
@@ -554,6 +571,7 @@ namespace {
 
         EXPECT_EQ(idle.clip().w, 0);
         EXPECT_FALSE(idle.needed({0, 0, 100, 100}));
+        EXPECT_FALSE(idle.needed({-10, -10, 20, 20})) << "a box across the origin was needed with no context";
         EXPECT_EQ(&idle.type(), &tests::fonts());
     }
 

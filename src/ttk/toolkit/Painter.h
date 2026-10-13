@@ -11,6 +11,7 @@
 
 
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -82,12 +83,16 @@ namespace ttk {
         Typeface &type() const { return _type; }
 
         //! Returns the rectangle being painted, narrowed by \ref push() while one is in effect.
+        //!
+        //! An empty clip, left by a \ref push() that keeps nothing or held before the first \ref aim(), has no width
+        //! or height and sits at the largest `int` coordinate on both axes, past any box in a window.
         const BLRectI &clip() const { return _clip; }
 
         //! Tests whether any of `box` lies inside \ref clip(). Use it to skip painting what is not being repainted.
         //!
         //! Returns false for an empty box. While the context has a transform it returns true for any other box, as
-        //! \ref clip() is in window pixels and `box` is not.
+        //! \ref clip() is in window pixels and `box` is not. Otherwise it returns false for every box while
+        //! \ref clip() is empty.
         bool needed(const BLRect &box) const;
 
         //! Fills `box` with `tone`.
@@ -162,16 +167,20 @@ namespace ttk {
 
         //! Narrows \ref clip() and the context's clip to their intersection with `box` rounded out to whole pixels.
         //!
-        //! Saves the context state first. Every call must be matched by \ref pop(), and calls nest.
+        //! Where they do not meet, \ref clip() is left empty until the matching \ref pop(). Saves the context state
+        //! first. Every call must be matched by \ref pop(), and calls nest.
         void push(const BLRect &box) const;
         //! Restores the context state and the \ref clip() saved by the matching \ref push().
         void pop() const;
 
     private:
+        // Where an empty clip is parked, so that the comparisons of needed() reject every box.
+        static constexpr int NOWHERE = std::numeric_limits<int>::max();
+
         BLContext *_context = nullptr;
         Typeface &_type;
 
-        mutable BLRectI _clip{};
+        mutable BLRectI _clip{NOWHERE, NOWHERE, 0, 0};
         mutable std::vector<BLRectI> _held;
 
         // Kept between outlines, so one allocates nothing.

@@ -11,6 +11,7 @@
 
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -105,7 +106,7 @@ namespace ttk::Json {
 
         //! Creates a document that takes ownership of `doc` and of `text`, the buffer `doc` was parsed from in place
         //! and whose strings it points into.
-        Doc(yyjson_doc *doc, std::string text) : _doc(doc), _text(std::move(text)) {}
+        Doc(yyjson_doc *doc, std::unique_ptr<char[]> text) : _doc(doc), _text(std::move(text)) {}
 
         ~Doc();
 
@@ -129,7 +130,7 @@ namespace ttk::Json {
         yyjson_doc *_doc{nullptr};
 
         // Backing text of an in-situ parse. The document's strings point into it.
-        std::string _text;
+        std::unique_ptr<char[]> _text;
     };
 
     //! Parses the file at `path` and returns the document.

@@ -22,8 +22,9 @@
 namespace ttk {
     //! Square button that shows a single glyph and no text.
     //!
-    //! The button is drawn as a square of \ref size() centred in its box. It does not take keyboard focus. Only
-    //! \ref glyph() repaints. The other chained setters are meant for construction.
+    //! The button is drawn as a square of \ref size() centred in its box. A click is a press released inside the
+    //! button, or Return or Space while it has focus. Only \ref glyph() repaints. The other chained setters are
+    //! meant for construction.
     class GlyphButton : public Widget {
     public:
         //! Creates a button showing `glyph` that calls `clicked` on each click. `clicked` may be empty.

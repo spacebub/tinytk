@@ -85,6 +85,7 @@ namespace {
         EXPECT_EQ(ttk::Code::Return, static_cast<int>(SDLK_RETURN));
         EXPECT_EQ(ttk::Code::Tab, static_cast<int>(SDLK_TAB));
         EXPECT_EQ(ttk::Code::Backspace, static_cast<int>(SDLK_BACKSPACE));
+        EXPECT_EQ(ttk::Code::Delete, static_cast<int>(SDLK_DELETE));
         EXPECT_EQ(ttk::Code::Left, static_cast<int>(SDLK_LEFT));
         EXPECT_EQ(ttk::Code::Right, static_cast<int>(SDLK_RIGHT));
         EXPECT_EQ(ttk::Code::Up, static_cast<int>(SDLK_UP));

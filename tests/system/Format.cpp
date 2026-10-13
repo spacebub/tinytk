@@ -119,6 +119,11 @@ TEST(FormatFitPath, DropsOnlyAsManyDirectoriesAsNeeded) {
     EXPECT_EQ(ttk::Format::fit_path("/aaaa/bbbb/cccc/dddd/file", 20), std::string(ELLIPSIS) + "/cccc/dddd/file");
 }
 
+TEST(FormatFitPath, KeepsEveryTrailingDirectoryThatFits) {
+    EXPECT_EQ(ttk::Format::fit_path("/aaa/bbb/ccc", 9), std::string(ELLIPSIS) + "/bbb/ccc");
+    EXPECT_EQ(ttk::Format::fit_path("/aaa/bbb/ccc", 8), std::string(ELLIPSIS) + "/ccc");
+}
+
 TEST(FormatFitPath, ResultFitsAndEndsInTheFileName) {
     const std::string path = "/one/two/three/four/five/six/seven/name.txt";
 
@@ -362,4 +367,11 @@ TEST(FormatBytes, LargestValue) {
 TEST(FormatBytes, RoundsToOneDecimal) {
     EXPECT_EQ(ttk::Format::bytes(1126), "1.1 KB");
     EXPECT_EQ(ttk::Format::bytes(2047), "2.0 KB");
+}
+
+TEST(FormatBytes, RoundingUpTo1024StepsToTheNextUnit) {
+    EXPECT_EQ(ttk::Format::bytes(1048524), "1023.9 KB");
+    EXPECT_EQ(ttk::Format::bytes(1048525), "1.0 MB");
+    EXPECT_EQ(ttk::Format::bytes(MB - 1), "1.0 MB");
+    EXPECT_EQ(ttk::Format::bytes(GB - 1), "1.0 GB");
 }

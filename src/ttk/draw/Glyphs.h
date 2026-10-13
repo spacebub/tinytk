@@ -83,10 +83,14 @@ namespace ttk::Glyphs {
         Count,
     };
 
-    //! Side of the square a glyph covers at weight 1, in pixels. A glyph is centred in it.
+    //! Side of the square a glyph is laid out in at weight 1, in pixels. A glyph is centred on it.
     constexpr float element = 12.0F;
 
-    //! Draws `glyph` in `tone` inside a square \ref span() of `weight` across, with its top-left corner at `origin`.
+    //! Draws `glyph` in `tone` centred on a square \ref span() of `weight` across, with its top-left corner at `origin`.
+    //!
+    //! Unturned, glyphs drawn in a larger viewbox, such as \ref Glyph::Light and \ref Glyph::File, ink up to 1.1 times
+    //! `weight` pixels past a side of the square, and their antialiasing a pixel beyond that. Pad the square by as
+    //! much before testing it against a clip.
     //!
     //! `turn` rotates the glyph clockwise about the centre of the square, in degrees. The state of `context` is
     //! left as it was. When `turn` is zero and `context` only translates by whole pixels, a glyph drawn twice at
@@ -94,7 +98,7 @@ namespace ttk::Glyphs {
     void draw(BLContext &context, Glyph glyph, BLPoint origin, float weight, BLRgba32 tone,
               float turn = 0.0F);
 
-    //! Returns the side of the square \ref draw() covers at `weight`, which is \ref element times `weight`.
+    //! Returns the side of the square \ref draw() lays a glyph out in at `weight`, which is \ref element times `weight`.
     float span(float weight);
 
     //! Draws every glyph except \ref Glyph::Empty onto one sheet and writes it to the image file at `path`.

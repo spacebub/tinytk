@@ -85,9 +85,10 @@ namespace ttk {
 
         //! Marks `region` for repainting. An empty `region` is ignored.
         //!
-        //! Regions are kept as given, at most \ref Damage::CROWDED of them, until \ref take(), \ref whole() or
-        //! \ref shift() rounds them out to pixels, clips them to the window and merges them through
-        //! \ref Damage::add(). A region inside the one given last is dropped at once.
+        //! Regions are kept as given until \ref take(), \ref whole() or \ref shift() rounds them out to pixels, clips
+        //! them to the window and merges them through \ref Damage::add(). Once the window has a size, at most
+        //! \ref Damage::CROWDED are kept, and the next region merges them first. A region inside the one given last
+        //! is dropped at once.
         void damage(const BLRect &region);
         //! Replaces every pending region with the whole window.
         void damage_all();

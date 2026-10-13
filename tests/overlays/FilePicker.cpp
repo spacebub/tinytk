@@ -546,6 +546,18 @@ namespace {
         EXPECT_TRUE(chosen.empty()) << "the mark outlived the dismissal";
     }
 
+    TEST_F(Picker, DismissLeavesTheStateUnmarked) {
+        open({"*.txt"}, false, true, true);
+        picker.mark(at("b.txt"));
+        picker.mark(at("alpha"));
+        picker.dismiss();
+
+        EXPECT_TRUE(marked(picker).empty()) << "a row still reads as marked";
+        EXPECT_EQ(state().marked, 0);
+        EXPECT_EQ(state().markedFolders, 0);
+        EXPECT_FALSE(state().multiple);
+    }
+
     TEST_F(Picker, DismissWhileTypingOnlyEndsTheTyping) {
         open();
         picker.state().editing = true;

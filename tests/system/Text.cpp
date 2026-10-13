@@ -499,6 +499,12 @@ TEST(TextNaturalLess, ComparesTextAfterEqualNumbers) {
     EXPECT_TRUE(ttk::Text::natural_less("v2.9", "v2.10"));
 }
 
+TEST(TextNaturalLess, HighBytesCompareUnsigned) {
+    EXPECT_TRUE(ttk::Text::natural_less("z", UMLAUT)) << "0x7a sorts before the lead byte 0xc3";
+    EXPECT_FALSE(ttk::Text::natural_less(UMLAUT, "z"));
+    EXPECT_TRUE(ttk::Text::natural_less("\x7f", "\x80"));
+}
+
 TEST(TextNaturalLess, IsAsymmetricForMultiByteText) {
     const std::string umlaut(UMLAUT);
 

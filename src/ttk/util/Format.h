@@ -55,7 +55,8 @@ namespace ttk::Format {
 
     //! Returns `size` in bytes as a short human-readable string such as `512 B` or `12.4 MB`.
     //!
-    //! Units step by 1024 up to GB. Bytes show no decimals, larger units one.
+    //! Units step by 1024 up to GB. Bytes show no decimals, larger units one, and a size that would round to
+    //! `1024.0` of a unit shows as `1.0` of the next.
     [[nodiscard]] std::string bytes(unsigned long long size);
 
 }

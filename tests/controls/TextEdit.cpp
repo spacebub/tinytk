@@ -361,6 +361,56 @@ namespace {
         EXPECT_EQ(edit->selection(), "naïve");
     }
 
+    TEST_F(TextEditTest, CtrlRightAtALineEndStopsAfterTheBreak) {
+        ttk::TextEdit *edit = focused("ab\ncd");
+
+        edit->key(key(Code::End));
+        edit->key(key(Code::Right, true));
+
+        EXPECT_EQ(probe(edit), "ab\n|cd");
+    }
+
+    TEST_F(TextEditTest, RepeatedCtrlRightWalksPastEveryLineEnd) {
+        ttk::TextEdit *edit = focused("ab\ncd\nef");
+
+        type_keys(edit, Code::Right, 4, true);
+
+        EXPECT_EQ(probe(edit), "ab\ncd\n|ef");
+    }
+
+    TEST_F(TextEditTest, CtrlRightInsideAWordGoesToItsEnd) {
+        ttk::TextEdit *edit = focused("one two");
+
+        edit->key(key(Code::Right));
+        edit->key(key(Code::Right, true));
+
+        EXPECT_EQ(probe(edit), "one| two");
+    }
+
+    TEST_F(TextEditTest, CtrlRightSkipsPunctuationToTheEndOfTheNextWord) {
+        ttk::TextEdit *edit = focused("ab, cd;\nef");
+
+        type_keys(edit, Code::Right, 2);
+        edit->key(key(Code::Right, true));
+
+        EXPECT_EQ(probe(edit), "ab, cd|;\nef");
+
+        edit->set_text("ab;\ncd");
+        type_keys(edit, Code::Right, 2);
+        edit->key(key(Code::Right, true));
+
+        EXPECT_EQ(probe(edit), "ab;\n|cd") << "punctuation before a break did not lead past it";
+    }
+
+    TEST_F(TextEditTest, CtrlRightAtTheEndOfTheTextStays) {
+        ttk::TextEdit *edit = focused("ab");
+
+        edit->key(key(Code::End));
+
+        EXPECT_TRUE(edit->key(key(Code::Right, true)));
+        EXPECT_EQ(probe(edit), "ab|");
+    }
+
     TEST_F(TextEditTest, DownKeepsTheGoalColumnAcrossAShortLine) {
         ttk::TextEdit *edit = focused("abcdef\nab\nabcdef");
 
@@ -728,6 +778,15 @@ namespace {
         edit->key(key(Code::Delete, true));
 
         EXPECT_EQ(edit->text(), "abcd");
+    }
+
+    TEST_F(TextEditTest, CtrlDeleteAtALineEndJoinsTheLines) {
+        ttk::TextEdit *edit = focused("ab\ncd");
+
+        edit->key(key(Code::End));
+        edit->key(key(Code::Delete, true));
+
+        EXPECT_EQ(probe(edit), "ab|cd");
     }
 
     TEST_F(TextEditTest, CtrlCIsConsumedAndChangesNothing) {
@@ -1454,6 +1513,34 @@ namespace {
         EXPECT_EQ(probe(edit), "aaaa bbbb cccc |dddd");
     }
 
+    TEST_F(TextEditTest, UnwrappingMakesEachLineOneRow) {
+        ttk::TextEdit *edit = focused("aaaa bbbb cccc dddd", fitting(10));
+
+        edit->wrapped();
+        canvas.frame();
+        edit->wrapped(false);
+        canvas.frame();
+        edit->key(key(Code::Down));
+
+        EXPECT_EQ(probe(edit), "aaaa bbbb cccc dddd|");
+        EXPECT_TRUE(edit->wheel(-1.0, ttk::Pointer{.x = 30.0, .y = 30.0, .shift = true}))
+                << "the unwrapped line did not scroll sideways";
+    }
+
+    TEST_F(TextEditTest, UnwrappingKeepsTheCaretOnItsCharacter) {
+        ttk::TextEdit *edit = focused("aaaa bbbb cccc dddd", fitting(10));
+
+        edit->wrapped();
+        canvas.frame();
+        edit->key(key(Code::Down));
+        edit->key(key(Code::Right));
+        edit->wrapped(false);
+        canvas.frame();
+        edit->key(key(Code::Home, false, true));
+
+        EXPECT_EQ(edit->selection(), "aaaa bbbb c") << "Home stopped at the start of a wrapped row";
+    }
+
     TEST_F(TextEditTest, PageDownCountsWrappedRows) {
         std::string text;
 
@@ -1558,6 +1645,25 @@ namespace {
         const int y = static_cast<int>(edit->box().y + PAD_Y + (lh / 2.0));
 
         EXPECT_EQ(canvas.at(x, y), ttk::Theme::palette().accent.value);
+    }
+
+    TEST_F(TextEditTest, CaretBlinksAtTheTimeItSleptUntil) {
+        // 0.58 + 0.53 rounds to a sum that is less than 0.53 past 0.58.
+        constexpr double FOCUSED_AT = 0.58;
+        constexpr double BLINK = 0.53;
+
+        canvas.root().set_now(FOCUSED_AT);
+
+        const ttk::TextEdit *edit = focused();
+        const int x = static_cast<int>(edit->box().x + PAD_X);
+        const int y = static_cast<int>(edit->box().y + PAD_Y + (lh / 2.0));
+
+        canvas.frame_at(FOCUSED_AT);
+        ASSERT_EQ(canvas.at(x, y), ttk::Theme::palette().accent.value);
+
+        canvas.frame_at(FOCUSED_AT + BLINK);
+
+        EXPECT_NE(canvas.at(x, y), ttk::Theme::palette().accent.value) << "the caret was still shown at its wake time";
     }
 
     TEST_F(TextEditTest, ReadOnlyEditorShowsNoCaret) {

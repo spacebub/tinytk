@@ -221,9 +221,19 @@ namespace ttk {
         }
 
         const double mark = 12.0 * (_compact ? 1.1 : 1.2);
+        const double lead = _glyph == Glyphs::Glyph::Empty ? 0.0 : mark + 7.0;
+        const double room = _box.w - lead - (_compact ? 26.0 : 38.0);
         const BLFont &face = painter.font(600, _compact ? Theme::fontSmall : Theme::fontBody);
-        const double label = painter.width(face, _text);
-        const double content = (_glyph == Glyphs::Glyph::Empty ? 0.0 : mark + 7.0) + label;
+
+        double label = painter.width(face, _text);
+        double fit = label + 2.0;
+
+        if (label > room) {
+            label = painter.width(face, painter.elide(face, _text, room));
+            fit = room;
+        }
+
+        const double content = lead + label;
 
         double x = _box.x + ((_box.w - content) / 2.0);
 
@@ -234,10 +244,10 @@ namespace ttk {
                          BLPoint{x, _box.y + ((_box.h - mark) / 2.0)},
                          static_cast<float>(_compact ? 1.1 : 1.2), tint);
 
-            x += mark + 7.0;
+            x += lead;
         }
 
-        painter.label(face, BLRect{x, _box.y, label + 2.0, _box.h}, Align::Start, _text, tint);
+        painter.label(face, BLRect{x, _box.y, fit, _box.h}, Align::Start, _text, tint);
     }
 
     bool Button::press(const Pointer & /*at*/) {

@@ -714,6 +714,27 @@ namespace {
         EXPECT_DOUBLE_EQ(mounted.button->box().w, BOX.w);
     }
 
+    TEST_F(Painted, ButtonLabelTooLongForTheBoxIsElidedInside) {
+        Mounted mounted;
+
+        mounted.button->set_text("A label much longer than the button it sits on, far too long");
+        mounted.canvas.frame();
+
+        constexpr BLRectI inside{44, 46, 172, 30};
+
+        EXPECT_GT(widgets::ink(mounted.canvas, inside, mounted.fill()).pixels, 0U) << "the label vanished";
+        EXPECT_EQ(widgets::outside(mounted.canvas, widgets::pixels_of(BOX)), 0U);
+        EXPECT_TRUE(mounted.canvas.matches_full());
+    }
+
+    TEST_F(Painted, ButtonInATinyBoxPaintsOnlyThere) {
+        constexpr BLRect tiny{50, 50, 6, 4};
+        Mounted mounted("Launch", ttk::Button::Kind::Default, tiny);
+
+        EXPECT_EQ(widgets::outside(mounted.canvas, widgets::pixels_of(tiny)), 0U);
+        EXPECT_TRUE(mounted.canvas.matches_full());
+    }
+
     TEST_F(Painted, ButtonConstructionSettersDoNotDamage) {
         Mounted mounted;
 

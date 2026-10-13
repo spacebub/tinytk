@@ -524,10 +524,11 @@ namespace ttk {
         }
 
         state.open = false;
+        state.multiple = false;
         _multiple = false;
         _marked.clear();
 
-        touch();
+        push();
     }
 
     void FilePicker::push() {

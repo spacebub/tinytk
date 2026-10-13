@@ -969,6 +969,26 @@ namespace {
         }
     }
 
+    TEST(Scroll, ViewOffTheColumnGridScrollsMatchAFullRepaint) {
+        for (const BLRect box : {
+                     BLRect{20.5, 30, 300, 150},
+                     BLRect{20, 30, 300.5, 150},
+                     BLRect{20.5, 30.25, 300, 150},
+                     BLRect{20.25, 30.25, 300.5, 150.5},
+             }) {
+            tests::Canvas canvas;
+            const Mounted mounted = floating(canvas, box, 1000.0);
+
+            for (const double offset : {3.0, 17.0, 9.0, 40.0, 25.0, 0.0}) {
+                mounted.scroll->scroll_to(offset);
+
+                EXPECT_LT(canvas.frame(), static_cast<std::size_t>(300 * 150 / 2))
+                        << "a scroll repainted the view at " << box.x << ", " << box.w << ", " << offset;
+                EXPECT_TRUE(canvas.matches_full()) << "at " << box.x << ", " << box.w << ", " << offset;
+            }
+        }
+    }
+
     TEST(Scroll, ClippingAncestorRefusesTheShift) {
         tests::Canvas canvas;
         auto *holder = canvas.root().content()->append(std::make_unique<Holder>());

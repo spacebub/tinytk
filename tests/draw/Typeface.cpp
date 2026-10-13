@@ -72,6 +72,29 @@ namespace {
         EXPECT_TRUE(type.at(ttk::Typeface::bold, 14).is_valid());
     }
 
+    TEST(Typeface, WeightAskedForBeforeLoadStillLoads) {
+        ttk::Typeface type;
+
+        type.at(ttk::Typeface::regular, 14);
+
+        if (!type.load()) {
+            GTEST_SKIP() << "no font installed";
+        }
+
+        EXPECT_TRUE(type.at(ttk::Typeface::regular, 15).is_valid());
+    }
+
+    TEST(Typeface, AskingBeforeLoadLeavesWhatLoadReports) {
+        ttk::Typeface asked;
+        ttk::Typeface fresh;
+
+        asked.at(500, 14);
+        asked.at(ttk::Typeface::mono, 14);
+
+        EXPECT_EQ(asked.load(), fresh.load());
+        EXPECT_FALSE(asked.at(500, 15).is_valid());
+    }
+
     TEST(Typeface, EmptyRunsMeasureZeroWithoutAFace) {
         ttk::Typeface type;
         const BLFont &font = type.at(ttk::Typeface::regular, 14);

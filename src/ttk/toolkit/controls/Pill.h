@@ -72,7 +72,8 @@ namespace ttk {
         //! Returns 26 pixels. \ref fixedHeight is ignored.
         double natural_height(Typeface & /*type*/, double /*width*/) override { return 26.0; }
 
-        //! Paints the rounded background and border, then the dot and the text or glyph centred in the box.
+        //! Paints the rounded background and border, then the dot and the text or glyph centred in the box. A text
+        //! too long for the box is cut with an ellipsis.
         void paint(const Painter &painter) override;
 
     protected:

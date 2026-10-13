@@ -117,6 +117,7 @@ namespace ttk {
 
         bool _going = false;
         bool _started = false;
+        bool _ticking = false;
 
         Anim::Tween _here;
     };

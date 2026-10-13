@@ -7,6 +7,7 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <array>
+#include <cmath>
 #include <format>
 #include <utility>
 
@@ -43,7 +44,7 @@ namespace ttk {
             for (size_t at = pretty.find('/'); at != std::string::npos; at = pretty.find('/', at + 1)) {
                 // The ellipsis is three bytes but one column.
                 if (std::string candidate = "…/" + pretty.substr(at + 1);
-                    std::cmp_less_equal(candidate.size() - 2, room - 1)) {
+                    std::cmp_less_equal(candidate.size() - 2, room)) {
                     return candidate;
                 }
             }
@@ -94,7 +95,8 @@ namespace ttk {
             auto shown = static_cast<double>(size);
             size_t unit = 0;
 
-            while (shown >= 1024.0 && unit + 1 < UNITS.size()) {
+            // Steps on the value as one decimal shows it, so 1023.95 KB becomes 1.0 MB.
+            while (std::round(shown * 10.0) >= 10240.0 && unit + 1 < UNITS.size()) {
                 shown /= 1024.0;
                 ++unit;
             }

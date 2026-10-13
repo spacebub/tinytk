@@ -370,7 +370,8 @@ namespace ttk {
         const int right = std::min(_clip.x + _clip.w, static_cast<int>(std::ceil(box.x + box.w)));
         const int bottom = std::min(_clip.y + _clip.h, static_cast<int>(std::ceil(box.y + box.h)));
 
-        _clip = BLRectI{left, top, std::max(0, right - left), std::max(0, bottom - top)};
+        _clip = right > left && bottom > top ? BLRectI{left, top, right - left, bottom - top}
+                                             : BLRectI{NOWHERE, NOWHERE, 0, 0};
 
         // Whole pixels, and the same ones `needed` answers for. A box off the grid,
         // which any odd window width gives, leaves a fractional clip that a blit of

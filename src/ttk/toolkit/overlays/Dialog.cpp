@@ -119,11 +119,14 @@ namespace ttk {
     }
 
     void Dialog::release(const Pointer &at) {
-        if (_onScrim && !_card->holds(at.x, at.y) && dismissed) {
-            dismissed();
-        }
+        const bool scrim = _onScrim;
 
         _onScrim = false;
+
+        // The callback can take the dialog down, so nothing of it is touched after.
+        if (scrim && !_card->holds(at.x, at.y) && dismissed) {
+            dismissed();
+        }
     }
 
     bool Dialog::advance(const double now) {

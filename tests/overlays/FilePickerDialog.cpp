@@ -373,6 +373,17 @@ namespace {
         EXPECT_TRUE(canvas.matches_full());
     }
 
+    TEST_F(Browsing, MarkingTheFirstFileRepaintsTheListWithoutALayout) {
+        ASSERT_NO_FATAL_FAILURE(open());
+
+        overlays::click(canvas.root(), rows->box().x + 120.0, row_y(row_of("b.txt")));
+        pending = false;
+        dialog->sync();
+
+        EXPECT_FALSE(canvas.root().settle()) << "a mark that changed no text laid the whole window out again";
+        EXPECT_TRUE(canvas.root().dirty());
+    }
+
     TEST_F(Browsing, MovingTheOnlyMarkRepaintsBothRows) {
         ASSERT_NO_FATAL_FAILURE(open());
 
@@ -699,6 +710,15 @@ namespace {
         EXPECT_EQ(picker.state().target, at("file2.txt"));
         EXPECT_TRUE(picker.state().replacing);
         EXPECT_TRUE(marked(picker).empty()) << "a click while saving marked the file";
+    }
+
+    TEST_F(Browsing, ReplaceButtonIsLaidOutToItsLabel) {
+        ASSERT_NO_FATAL_FAILURE(save("report"));
+
+        click_row(row_of("file2.txt"));
+
+        ASSERT_TRUE(picker.state().replacing);
+        EXPECT_DOUBLE_EQ(use->box().w, use->natural_width(canvas.root().type()));
     }
 
     TEST_F(Browsing, EmptyNameDisablesSave) {

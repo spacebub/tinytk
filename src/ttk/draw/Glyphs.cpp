@@ -6,8 +6,12 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <map>
 #include <numbers>
 #include <string>
@@ -335,13 +339,12 @@ namespace ttk {
         // (glyph, weight) pair, so a weight that is being animated never builds one.
         struct Mask {
             BLImage image;
+            BLPointI at{};
             bool asked = false;
+            bool made = false;
         };
 
         constexpr size_t KEPT = 512;
-
-        // A pixel of room each way for the antialiasing to fall into.
-        constexpr int PAD = 1;
 
         // A control centres its glyph, so the origin is as often a half pixel as a whole
         // one. The fraction is baked into the mask rather than rounded away, which keeps
@@ -355,8 +358,76 @@ namespace ttk {
             auto operator<=>(const Where &) const = default;
         };
 
-        const BLImage &mask_of(const Where &where) {
-            static const BLImage nothing;
+        // Stroked with half a span of room past each side of the square, far more than any
+        // glyph reaches, then cut down to the pixels it inked.
+        void build(Mask &into, const Where &where) {
+            const int side = static_cast<int>(std::ceil(Glyphs::element * where.weight));
+            const int room = (side / 2) + 1;
+            const int full = side + (room * 2) + 1;
+
+            BLImage drawn;
+
+            if (side <= 0 || drawn.create(full, full, BL_FORMAT_A8) != BL_SUCCESS) {
+                return;
+            }
+
+            BLContext context(drawn);
+
+            context.clear_all();
+            stroke(context, where.glyph, BLPoint{room + where.fx, room + where.fy}, where.weight, BLRgba32(0xffffffff));
+            context.end();
+
+            BLImageData from{};
+
+            if (drawn.get_data(&from) != BL_SUCCESS) {
+                return;
+            }
+
+            const auto *pixels = static_cast<const std::uint8_t *>(from.pixel_data);
+            int x0 = full;
+            int y0 = full;
+            int x1 = 0;
+            int y1 = 0;
+
+            for (int y = 0; y < full; ++y) {
+                const std::uint8_t *row = pixels + (static_cast<std::ptrdiff_t>(y) * from.stride);
+
+                for (int x = 0; x < full; ++x) {
+                    if (row[x] != 0) {
+                        x0 = std::min(x0, x);
+                        y0 = std::min(y0, y);
+                        x1 = std::max(x1, x + 1);
+                        y1 = y + 1;
+                    }
+                }
+            }
+
+            if (x1 <= x0) {
+                return;
+            }
+
+            // Blend2D lays a mask down four pixels at a time and the rest one by one.
+            const int wide = std::min((x1 - x0 + 3) / 4 * 4, full - x0);
+            BLImageData to{};
+
+            if (into.image.create(wide, y1 - y0, BL_FORMAT_A8) != BL_SUCCESS
+                || into.image.make_mutable(&to) != BL_SUCCESS) {
+                into.image.reset();
+
+                return;
+            }
+
+            for (int y = y0; y < y1; ++y) {
+                std::memcpy(static_cast<std::uint8_t *>(to.pixel_data)
+                                    + (static_cast<std::ptrdiff_t>(y - y0) * to.stride),
+                            pixels + (static_cast<std::ptrdiff_t>(y) * from.stride) + x0, static_cast<size_t>(wide));
+            }
+
+            into.at = BLPointI{x0 - room, y0 - room};
+        }
+
+        const Mask &mask_of(const Where &where) {
+            static const Mask nothing;
             static std::map<Where, Mask> masks;
 
             if (masks.size() >= KEPT) {
@@ -371,24 +442,12 @@ namespace ttk {
                 return nothing;
             }
 
-            if (!held.image.is_empty()) {
-                return held.image;
+            if (!held.made) {
+                held.made = true;
+                build(held, where);
             }
 
-            const int side = static_cast<int>(std::ceil(Glyphs::element * where.weight)) + (PAD * 2);
-
-            if (side <= 0 || held.image.create(side + 1, side + 1, BL_FORMAT_A8) != BL_SUCCESS) {
-                return nothing;
-            }
-
-            BLContext into(held.image);
-
-            into.clear_all();
-            stroke(into, where.glyph, BLPoint{PAD + where.fx, PAD + where.fy}, where.weight,
-                   BLRgba32(0xffffffff));
-            into.end();
-
-            return held.image;
+            return held;
         }
 
         // Blend2D fills a mask only where it lands square on the pixels, so the context
@@ -422,13 +481,13 @@ namespace ttk {
             const double left = std::floor(origin.x);
             const double top = std::floor(origin.y);
 
-            if (const BLImage &mask = mask_of(Where{.glyph = glyph,
-                                                   .weight = weight,
-                                                   .fx = origin.x - left,
-                                                   .fy = origin.y - top,});
-                !mask.is_empty()) {
-                context.fill_mask(BLPointI{static_cast<int>(left) - PAD, static_cast<int>(top) - PAD},
-                                  mask, tone);
+            if (const Mask &mask = mask_of(Where{.glyph = glyph,
+                                                 .weight = weight,
+                                                 .fx = origin.x - left,
+                                                 .fy = origin.y - top,});
+                !mask.image.is_empty()) {
+                context.fill_mask(BLPointI{static_cast<int>(left) + mask.at.x, static_cast<int>(top) + mask.at.y},
+                                  mask.image, tone);
 
                 return;
             }

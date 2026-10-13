@@ -146,6 +146,7 @@ namespace ttk {
         _status = status;
         _reason = reason;
         _dim = false;
+        _blinked = now();
 
         retell();
         invalidate();
@@ -195,7 +196,7 @@ namespace ttk {
             return false;
         }
 
-        if (now - _blinked >= BEAT) {
+        if (now >= _blinked + BEAT) {
             _blinked = now;
             _dim = !_dim;
 

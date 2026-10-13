@@ -209,7 +209,7 @@ namespace ttk {
                 }
 
                 if (left[li] != right[ri]) {
-                    return left[li] < right[ri];
+                    return static_cast<unsigned char>(left[li]) < static_cast<unsigned char>(right[ri]);
                 }
 
                 ++li;

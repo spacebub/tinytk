@@ -224,7 +224,10 @@ namespace ttk {
 
         BLFont font;
 
-        font.create_from_face(_faces[weight], size);
+        // Looked up, not inserted: load() skips a weight it already holds.
+        if (const auto face = _faces.find(weight); face != _faces.end()) {
+            font.create_from_face(face->second, size);
+        }
 
         return _fonts.emplace(at, std::move(font)).first->second;
     }

@@ -331,6 +331,16 @@ namespace {
         EXPECT_DOUBLE_EQ(mounted.pill->box().w, BOX.w);
     }
 
+    TEST_F(Painted, PillTextTooLongForTheBoxIsElidedInside) {
+        Mounted mounted("Ready");
+
+        mounted.pill->set_text("A much longer text than the pill holds");
+        mounted.canvas.frame();
+
+        EXPECT_EQ(widgets::outside(mounted.canvas, PIXELS), 0U);
+        EXPECT_TRUE(mounted.canvas.matches_full());
+    }
+
     TEST_F(Painted, PillSetTextToTheSameTextDamagesNothing) {
         Mounted mounted("Ready");
 

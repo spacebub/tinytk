@@ -133,21 +133,31 @@ namespace ttk {
         painter.outline(_box, radius, 1.0, Theme::alpha(ink, 0.3));
 
         const BLFont &face = painter.font(600, Theme::fontSmall);
-        const double label = _glyph == Glyphs::Glyph::Empty
+        const double lead = _dot ? 8.0 + 6.0 : 0.0;
+        const double room = _box.w - lead - 22.0;
+
+        double label = _glyph == Glyphs::Glyph::Empty
             ? painter.width(face, _text)
             : 12.0 * 1.4;
-        const double content = label + (_dot ? 8.0 + 6.0 : 0.0);
+        double fit = label + 2.0;
+
+        if (_glyph == Glyphs::Glyph::Empty && label > room) {
+            label = painter.width(face, painter.elide(face, _text, room));
+            fit = room;
+        }
+
+        const double content = label + lead;
 
         double x = _box.x + ((_box.w - content) / 2.0);
 
         if (_dot) {
             painter.circle(BLPoint{x + 4.0, _box.y + (_box.h / 2.0)}, 4.0, ink);
 
-            x += 8.0 + 6.0;
+            x += lead;
         }
 
         if (_glyph == Glyphs::Glyph::Empty) {
-            painter.label(face, BLRect{x, _box.y, label + 2.0, _box.h}, Align::Start, _text, ink);
+            painter.label(face, BLRect{x, _box.y, fit, _box.h}, Align::Start, _text, ink);
         } else {
             Glyphs::draw(painter.context(), _glyph,
                          BLPoint{x, _box.y + ((_box.h - (12.0 * 1.4)) / 2.0)}, 1.4F, ink);

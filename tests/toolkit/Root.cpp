@@ -400,6 +400,24 @@ namespace {
         EXPECT_TRUE(tests::same(taken[0], BLRect{5, 5, 10, 10}));
     }
 
+    TEST(Root, ManyRegionsGivenBeforeTheFirstSizeAreAllKept) {
+        ttk::Root root(tests::fonts());
+        std::vector<BLPoint> given;
+
+        for (int x = 0; given.size() < ttk::Damage::CROWDED + 8; x += 4) {
+            root.damage({static_cast<double>(x), 10, 1, 1});
+            given.emplace_back(x, 10);
+        }
+
+        root.resize(WIDTH, HEIGHT);
+
+        const std::vector<BLRect> &taken = root.take();
+
+        for (const BLPoint &point : given) {
+            ASSERT_TRUE(tests::covers(taken, point.x, point.y)) << "lost " << point.x << "," << point.y;
+        }
+    }
+
     TEST_F(Rooted, ARegionInsideTheLastOneAddsNothing) {
         root.damage({10, 10, 50, 50});
 

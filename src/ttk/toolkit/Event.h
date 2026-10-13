@@ -60,7 +60,7 @@ namespace ttk {
         //! Backspace key.
         inline constexpr int Backspace = 8;
         //! Delete key.
-        inline constexpr int Delete = 0x4000004C;
+        inline constexpr int Delete = 127;
         //! Left arrow key.
         inline constexpr int Left = 0x40000050;
         //! Right arrow key.
