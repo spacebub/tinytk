@@ -11,30 +11,30 @@
 #include "ttk/toolkit/layout/Box.h"
 
 namespace ttk {
-    Fact::Fact(std::string label, std::string value) : Box(Flow::Column) {
-        spacing(3.0);
+Fact::Fact(std::string label, std::string value) : Box(Flow::Column) {
+    spacing(3.0);
 
-        _caption = append(std::make_unique<Label>(std::move(label)));
-        _caption->section();
+    _caption = append(std::make_unique<Label>(std::move(label)));
+    _caption->section();
 
-        _value = append(std::make_unique<Label>(std::move(value)));
-        _value->font(600, Theme::fontBody)->tone(&Theme::Palette::text);
-    }
+    _value = append(std::make_unique<Label>(std::move(value)));
+    _value->font(600, Theme::fontBody)->tone(&Theme::Palette::text);
+}
 
-    void Fact::set_value(const std::string_view value) const {
-        _value->set_text(value);
-    }
+void Fact::set_value(const std::string_view value) const {
+    _value->set_text(value);
+}
 
-    Fact *Fact::path(const bool value) {
-        _value->path(value);
+Fact *Fact::path(const bool value) {
+    _value->path(value);
 
-        return this;
-    }
+    return this;
+}
 
-    Fact *Fact::on_click(std::string tip, std::function<void()> clicked) {
-        _value->on_click(std::move(clicked));
-        _value->hint = std::move(tip);
+Fact *Fact::on_click(std::string tip, std::function<void()> clicked) {
+    _value->on_click(std::move(clicked));
+    _value->hint = std::move(tip);
 
-        return this;
-    }
+    return this;
+}
 }

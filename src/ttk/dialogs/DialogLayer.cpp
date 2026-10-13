@@ -14,86 +14,85 @@
 
 namespace ttk {
 
-    Dialog *DialogLayer::show(std::unique_ptr<Dialog> dialog) {
-        if (Dialog *under = top(); under != nullptr) {
-            under->set_visible(false);
-        }
-
-        Dialog *raw = dialog.get();
-
-        raw->dismissed = [this] { close(); };
-
-        add(std::move(dialog));
-
-        if (root() != nullptr) {
-            root()->relayout();
-        }
-
-        raw->opened();
-
-        return raw;
+Dialog *DialogLayer::show(std::unique_ptr<Dialog> dialog) {
+    if (Dialog *under = top(); under != nullptr) {
+        under->set_visible(false);
     }
 
-    Dialog *DialogLayer::top() const {
-        return children().empty() ? nullptr : dynamic_cast<Dialog *>(children().back().get());
+    Dialog *raw = dialog.get();
+
+    raw->dismissed = [this] { close(); };
+
+    add(std::move(dialog));
+
+    if (root() != nullptr) {
+        root()->relayout();
     }
 
-    void DialogLayer::sync() const {
-        if (Dialog *up = top(); up != nullptr) {
-            up->sync();
-        }
+    raw->opened();
+
+    return raw;
+}
+
+Dialog *DialogLayer::top() const {
+    return children().empty() ? nullptr : dynamic_cast<Dialog *>(children().back().get());
+}
+
+void DialogLayer::sync() const {
+    if (Dialog *up = top(); up != nullptr) {
+        up->sync();
+    }
+}
+
+void DialogLayer::close() {
+    Dialog *up = top();
+
+    if (up == nullptr || !up->closing()) {
+        return;
     }
 
-    void DialogLayer::close() {
-        Dialog *up = top();
+    dismiss();
+}
 
-        if (up == nullptr || !up->closing()) {
-            return;
-        }
+void DialogLayer::dismiss() {
+    Dialog *up = top();
 
-        dismiss();
+    if (up == nullptr) {
+        return;
     }
 
-    void DialogLayer::dismiss() {
-        Dialog *up = top();
+    const BLRect was = up->box();
 
-        if (up == nullptr) {
-            return;
-        }
-
-        const BLRect was = up->box();
-
-        if (closed) {
-            closed(up);
-        }
-
-        erase(up);
-
-        Dialog *under = top();
-
-        if (under != nullptr) {
-            under->set_visible(true);
-        }
-
-        if (root() != nullptr) {
-            root()->damage(was);
-        }
-
-        if (under != nullptr) {
-            under->opened();
-        }
+    if (closed) {
+        closed(up);
     }
 
-    void DialogLayer::arrange(Typeface &type) {
-        // Never over the title bar: the window stays draggable by it.
-        const BLRect under{_box.x, _box.y + Theme::barHeight, _box.w,
-                           std::max(0.0, _box.h - Theme::barHeight)};
+    erase(up);
 
-        // A covered dialog is not measured: its card would shape all its text again.
-        for (const Ptr &child : children()) {
-            if (child->visible()) {
-                child->place(under, type);
-            }
+    Dialog *under = top();
+
+    if (under != nullptr) {
+        under->set_visible(true);
+    }
+
+    if (root() != nullptr) {
+        root()->damage(was);
+    }
+
+    if (under != nullptr) {
+        under->opened();
+    }
+}
+
+void DialogLayer::arrange(Typeface &type) {
+    // Never over the title bar: the window stays draggable by it.
+    const BLRect under{_box.x, _box.y + Theme::barHeight, _box.w, std::max(0.0, _box.h - Theme::barHeight)};
+
+    // A covered dialog is not measured: its card would shape all its text again.
+    for (const Ptr &child : children()) {
+        if (child->visible()) {
+            child->place(under, type);
         }
     }
+}
 }

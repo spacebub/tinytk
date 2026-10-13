@@ -13,20 +13,20 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
-    //! Widget that draws an image scaled to its box.
-    //!
-    //! The picture does not size itself from the image, so give it a \ref fixedWidth and a \ref fixedHeight.
-    class Picture : public Widget {
-    public:
-        //! Creates a picture that draws `image`.
-        explicit Picture(BLImage image) : _image(std::move(image)) {}
+//! Widget that draws an image scaled to its box.
+//!
+//! The picture does not size itself from the image, so give it a \ref fixedWidth and a \ref fixedHeight.
+class Picture : public Widget {
+public:
+    //! Creates a picture that draws `image`.
+    explicit Picture(BLImage image) : _image(std::move(image)) {}
 
-        //! Draws the image stretched to \ref box(). Draws nothing for an empty image, and never paints children.
-        void paint(const Painter &painter) override;
+    //! Draws the image stretched to \ref box(). Draws nothing for an empty image, and never paints children.
+    void paint(const Painter &painter) override;
 
-    private:
-        BLImage _image;
-    };
+private:
+    BLImage _image;
+};
 }
 
 

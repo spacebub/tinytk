@@ -23,27 +23,31 @@
 #include "ttk/util/Window.h"
 
 namespace {
-    namespace fs = std::filesystem;
+namespace fs = std::filesystem;
 
-    constexpr std::array<std::string_view, 5> FAMILIES = {
-            "JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "Noto Sans Mono", "monospace",
-    };
+constexpr std::array<std::string_view, 5> FAMILIES = {
+        "JetBrains Mono",
+        "Fira Code",
+        "DejaVu Sans Mono",
+        "Noto Sans Mono",
+        "monospace",
+};
 
-    void plant(const fs::path &directory, const char *name) {
-        fs::create_directories(directory);
-        std::ofstream(directory / name).put('x');
+void plant(const fs::path &directory, const char *name) {
+    fs::create_directories(directory);
+    std::ofstream(directory / name).put('x');
+}
+
+class DesktopFonts : public ::testing::Test {
+protected:
+    void TearDown() override {
+        std::error_code code;
+        const fs::path home = ttk::Paths::home_directory();
+
+        fs::remove_all(home / ".local" / "share" / "fonts", code);
+        fs::remove_all(home / ".fonts", code);
     }
-
-    class DesktopFonts : public ::testing::Test {
-    protected:
-        void TearDown() override {
-            std::error_code code;
-            const fs::path home = ttk::Paths::home_directory();
-
-            fs::remove_all(home / ".local" / "share" / "fonts", code);
-            fs::remove_all(home / ".fonts", code);
-        }
-    };
+};
 }
 
 TEST(DesktopOpen, EmptyTargetFails) {

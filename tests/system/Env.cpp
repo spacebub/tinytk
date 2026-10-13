@@ -15,18 +15,18 @@
 #include "ttk/system/Env.h"
 
 namespace {
-    constexpr const char *NAME = "TTK_TEST_ENV_VALUE";
+constexpr const char *NAME = "TTK_TEST_ENV_VALUE";
 
-    void unset(const char *name) {
-        unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-    }
+void unset(const char *name) {
+    unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
+}
 
-    class Env : public ::testing::Test {
-    protected:
-        void SetUp() override { unset(NAME); }
+class Env : public ::testing::Test {
+protected:
+    void SetUp() override { unset(NAME); }
 
-        void TearDown() override { unset(NAME); }
-    };
+    void TearDown() override { unset(NAME); }
+};
 }
 
 TEST_F(Env, UnsetVariableIsEmpty) {

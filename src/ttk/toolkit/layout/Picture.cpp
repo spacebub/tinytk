@@ -9,9 +9,9 @@
 #include "ttk/toolkit/layout/Picture.h"
 
 namespace ttk {
-    void Picture::paint(const Painter &painter) {
-        if (!_image.is_empty()) {
-            painter.context().blit_image(_box, _image);
-        }
+void Picture::paint(const Painter &painter) {
+    if (!_image.is_empty()) {
+        painter.context().blit_image(_box, _image);
     }
+}
 }

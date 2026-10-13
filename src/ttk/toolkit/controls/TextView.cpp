@@ -15,384 +15,382 @@
 #include "ttk/util/Clipboard.h"
 
 namespace ttk {
-    TextView::TextView() {
-        _takesPointer = true;
-        cursor = Cursor::Text;
-    }
+TextView::TextView() {
+    _takesPointer = true;
+    cursor = Cursor::Text;
+}
 
-    void TextView::unwrap() {
-        _spans.clear();
+void TextView::unwrap() {
+    _spans.clear();
 
-        if (_wrapped) {
-            _rows.clear();
-            _run.clear();
-            _wrapped = false;
-            _folded = -1.0;
-        }
-    }
-
-    void TextView::add_rows(std::vector<std::string> rows) {
-        if (rows.empty()) {
-            return;
-        }
-
-        unwrap();
-
-        _rows.insert(_rows.end(), std::make_move_iterator(rows.begin()),
-                     std::make_move_iterator(rows.end()));
-        _open = false;
-
-        clamp();
-        invalidate();
-    }
-
-    void TextView::append(std::string_view text) {
-        if (text.empty()) {
-            return;
-        }
-
-        unwrap();
-
-        while (!text.empty()) {
-            const size_t at = text.find('\n');
-            std::string_view piece = text.substr(0, at);
-
-            if (at != std::string_view::npos && piece.ends_with('\r')) {
-                piece.remove_suffix(1);
-            }
-
-            if (!_open) {
-                _rows.emplace_back();
-            }
-
-            if (const size_t back = piece.rfind('\r'); back != std::string_view::npos) {
-                _rows.back().assign(piece.substr(back + 1));
-            } else {
-                _rows.back().append(piece);
-            }
-
-            _open = at == std::string_view::npos;
-
-            if (_open) {
-                break;
-            }
-
-            text.remove_prefix(at + 1);
-        }
-
-        clamp();
-        invalidate();
-    }
-
-    void TextView::drop_rows(size_t count) {
-        if (_wrapped) {
-            return;
-        }
-
-        count = std::min(count, _rows.size());
-
-        if (count == 0) {
-            return;
-        }
-
-        _rows.erase(_rows.begin(), _rows.begin() + static_cast<std::ptrdiff_t>(count));
-
-        // A selection follows the rows it was on, and what was on the dropped ones is
-        // gathered at the top.
-        const auto lift = [count](Spot &spot) {
-            spot = spot.row >= count ? Spot{.row = spot.row - count, .at = spot.at} : Spot{};
-        };
-
-        lift(_anchor);
-        lift(_caret);
-
-        clamp();
-        invalidate();
-    }
-
-    void TextView::set_rows(std::vector<std::string> rows) {
-        if (_rows == rows && !_wrapped) {
-            return;
-        }
-
-        _rows = std::move(rows);
-        _spans.clear();
+    if (_wrapped) {
+        _rows.clear();
         _run.clear();
         _wrapped = false;
-        _open = false;
         _folded = -1.0;
+    }
+}
 
-        clamp();
-        invalidate();
+void TextView::add_rows(std::vector<std::string> rows) {
+    if (rows.empty()) {
+        return;
     }
 
-    void TextView::set_run(const std::string_view run) {
-        if (_wrapped && _run == run) {
-            return;
+    unwrap();
+
+    _rows.insert(_rows.end(), std::make_move_iterator(rows.begin()), std::make_move_iterator(rows.end()));
+    _open = false;
+
+    clamp();
+    invalidate();
+}
+
+void TextView::append(std::string_view text) {
+    if (text.empty()) {
+        return;
+    }
+
+    unwrap();
+
+    while (!text.empty()) {
+        const size_t at = text.find('\n');
+        std::string_view piece = text.substr(0, at);
+
+        if (at != std::string_view::npos && piece.ends_with('\r')) {
+            piece.remove_suffix(1);
         }
 
-        _run = run;
-        _wrapped = true;
-        _folded = -1.0;
-
-        clear_selection();
-        invalidate();
-    }
-
-    TextView *TextView::face(const int weight, const float size) {
-        _weight = weight;
-        _size = size;
-        _folded = -1.0;
-
-        return this;
-    }
-
-    TextView *TextView::ink(std::function<BLRgba32(size_t)> pick) {
-        _ink = std::move(pick);
-
-        return this;
-    }
-
-    const BLFont &TextView::font(Typeface &type) const {
-        return type.at(_weight, _size);
-    }
-
-    double TextView::row_height(Typeface &type) const {
-        return type.line_height(font(type));
-    }
-
-    void TextView::refold(Typeface &type, const double width) {
-        if (!_wrapped || (_folded == width && !_rows.empty())) {
-            return;
+        if (!_open) {
+            _rows.emplace_back();
         }
 
-        _rows.clear();
-        _spans.clear();
-
-        for (const Fold &line : fold_spans(type, font(type), _run, width)) {
-            _rows.push_back(line.text);
-            _spans.emplace_back(line.from, line.to);
+        if (const size_t back = piece.rfind('\r'); back != std::string_view::npos) {
+            _rows.back().assign(piece.substr(back + 1));
+        } else {
+            _rows.back().append(piece);
         }
 
-        _folded = width;
-    }
+        _open = at == std::string_view::npos;
 
-    void TextView::select_all() {
-        _anchor = Spot{};
-        _caret = _rows.empty()
-            ? Spot{}
-            : Spot{.row = _rows.size() - 1, .at = _rows.back().size()};
-
-        invalidate();
-    }
-
-    void TextView::clear_selection() {
-        if (_anchor == _caret) {
-            return;
+        if (_open) {
+            break;
         }
 
+        text.remove_prefix(at + 1);
+    }
+
+    clamp();
+    invalidate();
+}
+
+void TextView::drop_rows(size_t count) {
+    if (_wrapped) {
+        return;
+    }
+
+    count = std::min(count, _rows.size());
+
+    if (count == 0) {
+        return;
+    }
+
+    _rows.erase(_rows.begin(), _rows.begin() + static_cast<std::ptrdiff_t>(count));
+
+    // A selection follows the rows it was on, and what was on the dropped ones is
+    // gathered at the top.
+    const auto lift = [count](Spot &spot) {
+        spot = spot.row >= count ? Spot{.row = spot.row - count, .at = spot.at} : Spot{};
+    };
+
+    lift(_anchor);
+    lift(_caret);
+
+    clamp();
+    invalidate();
+}
+
+void TextView::set_rows(std::vector<std::string> rows) {
+    if (_rows == rows && !_wrapped) {
+        return;
+    }
+
+    _rows = std::move(rows);
+    _spans.clear();
+    _run.clear();
+    _wrapped = false;
+    _open = false;
+    _folded = -1.0;
+
+    clamp();
+    invalidate();
+}
+
+void TextView::set_run(const std::string_view run) {
+    if (_wrapped && _run == run) {
+        return;
+    }
+
+    _run = run;
+    _wrapped = true;
+    _folded = -1.0;
+
+    clear_selection();
+    invalidate();
+}
+
+TextView *TextView::face(const int weight, const float size) {
+    _weight = weight;
+    _size = size;
+    _folded = -1.0;
+
+    return this;
+}
+
+TextView *TextView::ink(std::function<BLRgba32(size_t)> pick) {
+    _ink = std::move(pick);
+
+    return this;
+}
+
+const BLFont &TextView::font(Typeface &type) const {
+    return type.at(_weight, _size);
+}
+
+double TextView::row_height(Typeface &type) const {
+    return type.line_height(font(type));
+}
+
+void TextView::refold(Typeface &type, const double width) {
+    if (!_wrapped || (_folded == width && !_rows.empty())) {
+        return;
+    }
+
+    _rows.clear();
+    _spans.clear();
+
+    for (const Fold &line : fold_spans(type, font(type), _run, width)) {
+        _rows.push_back(line.text);
+        _spans.emplace_back(line.from, line.to);
+    }
+
+    _folded = width;
+}
+
+void TextView::select_all() {
+    _anchor = Spot{};
+    _caret = _rows.empty() ? Spot{} : Spot{.row = _rows.size() - 1, .at = _rows.back().size()};
+
+    invalidate();
+}
+
+void TextView::clear_selection() {
+    if (_anchor == _caret) {
+        return;
+    }
+
+    _anchor = Spot{};
+    _caret = Spot{};
+
+    invalidate();
+}
+
+void TextView::clamp() {
+    if (_rows.empty()) {
         _anchor = Spot{};
         _caret = Spot{};
 
-        invalidate();
+        return;
     }
 
-    void TextView::clamp() {
-        if (_rows.empty()) {
-            _anchor = Spot{};
-            _caret = Spot{};
+    const auto hold = [this](Spot &spot) {
+        spot.row = std::min(spot.row, _rows.size() - 1);
+        spot.at = std::min(spot.at, _rows[spot.row].size());
+    };
 
-            return;
-        }
+    hold(_anchor);
+    hold(_caret);
+}
 
-        const auto hold = [this](Spot &spot) {
-            spot.row = std::min(spot.row, _rows.size() - 1);
-            spot.at = std::min(spot.at, _rows[spot.row].size());
+void TextView::span(Spot &from, Spot &to) const {
+    from = std::min(_anchor, _caret);
+    to = std::max(_anchor, _caret);
+}
+
+std::string TextView::selection() const {
+    Spot from;
+    Spot to;
+
+    span(from, to);
+
+    if (from == to || _rows.empty()) {
+        return {};
+    }
+
+    // A folded run reads back off the run itself, so what comes out is what went in
+    // rather than the lines it was broken into.
+    if (_wrapped && _spans.size() == _rows.size()) {
+        const auto offset_of = [this](const Spot &spot) {
+            const auto &[begins, ends] = _spans[std::min(spot.row, _spans.size() - 1)];
+
+            return std::min(begins + spot.at, ends);
         };
 
-        hold(_anchor);
-        hold(_caret);
+        const size_t begins = offset_of(from);
+        const size_t ends = offset_of(to);
+
+        return ends > begins ? _run.substr(begins, ends - begins) : std::string();
     }
 
-    void TextView::span(Spot &from, Spot &to) const {
-        from = std::min(_anchor, _caret);
-        to = std::max(_anchor, _caret);
+    std::string out;
+
+    for (size_t row = from.row; row <= to.row && row < _rows.size(); ++row) {
+        const std::string &text = _rows[row];
+        const size_t begins = row == from.row ? std::min(from.at, text.size()) : 0;
+        const size_t ends = row == to.row ? std::min(to.at, text.size()) : text.size();
+
+        if (row != from.row) {
+            out += '\n';
+        }
+
+        if (ends > begins) {
+            out += text.substr(begins, ends - begins);
+        }
     }
 
-    std::string TextView::selection() const {
-        Spot from;
-        Spot to;
+    return out;
+}
 
-        span(from, to);
+double TextView::natural_height(Typeface &type, const double width) {
+    refold(type, width);
 
-        if (from == to || _rows.empty()) {
-            return {};
-        }
+    return static_cast<double>(_rows.size()) * type.line_height(font(type));
+}
 
-        // A folded run reads back off the run itself, so what comes out is what went in
-        // rather than the lines it was broken into.
-        if (_wrapped && _spans.size() == _rows.size()) {
-            const auto offset_of = [this](const Spot &spot) {
-                const auto &[begins, ends] = _spans[std::min(spot.row, _spans.size() - 1)];
+void TextView::arrange(Typeface &type) {
+    refold(type, _box.w);
+}
 
-                return std::min(begins + spot.at, ends);
-            };
-
-            const size_t begins = offset_of(from);
-            const size_t ends = offset_of(to);
-
-            return ends > begins ? _run.substr(begins, ends - begins) : std::string();
-        }
-
-        std::string out;
-
-        for (size_t row = from.row; row <= to.row && row < _rows.size(); ++row) {
-            const std::string &text = _rows[row];
-            const size_t begins = row == from.row ? std::min(from.at, text.size()) : 0;
-            const size_t ends = row == to.row ? std::min(to.at, text.size()) : text.size();
-
-            if (row != from.row) {
-                out += '\n';
-            }
-
-            if (ends > begins) {
-                out += text.substr(begins, ends - begins);
-            }
-        }
-
-        return out;
+TextView::Spot TextView::spot_at(Typeface &type, const double x, const double y) const {
+    if (_rows.empty()) {
+        return {};
     }
 
-    double TextView::natural_height(Typeface &type, const double width) {
-        refold(type, width);
+    const double step = type.line_height(font(type));
+    const auto which = static_cast<long long>((y - _box.y) / std::max(1.0, step));
+    const size_t row = std::clamp(which, 0LL, static_cast<long long>(_rows.size()) - 1);
 
-        return static_cast<double>(_rows.size()) * type.line_height(font(type));
+    return Spot{
+            .row = row,
+            .at = type.nearest(font(type), _rows[row], static_cast<float>(x - _box.x)),
+    };
+}
+
+void TextView::move_to(const Spot &where, const bool selecting) {
+    if (_caret == where && (selecting || _anchor == where)) {
+        return;
     }
 
-    void TextView::arrange(Typeface &type) {
-        refold(type, _box.w);
+    _caret = where;
+
+    if (!selecting) {
+        _anchor = where;
     }
 
-    TextView::Spot TextView::spot_at(Typeface &type, const double x, const double y) const {
-        if (_rows.empty()) {
-            return {};
-        }
+    invalidate();
+}
 
-        const double step = type.line_height(font(type));
-        const auto which = static_cast<long long>((y - _box.y) / std::max(1.0, step));
-        const size_t row = std::clamp(which, 0LL, static_cast<long long>(_rows.size()) - 1);
-
-        return Spot{.row = row,
-                    .at = type.nearest(font(type), _rows[row], static_cast<float>(x - _box.x)),};
+bool TextView::press(const Pointer &at) {
+    if (root() == nullptr) {
+        return false;
     }
 
-    void TextView::move_to(const Spot &where, const bool selecting) {
-        if (_caret == where && (selecting || _anchor == where)) {
-            return;
-        }
+    root()->focus(this);
 
-        _caret = where;
+    move_to(spot_at(root()->type(), at.x, at.y), at.shift);
 
-        if (!selecting) {
-            _anchor = where;
-        }
+    return true;
+}
 
-        invalidate();
+void TextView::drag(const Pointer &at) {
+    if (root() != nullptr) {
+        move_to(spot_at(root()->type(), at.x, at.y), true);
     }
+}
 
-    bool TextView::press(const Pointer &at) {
-        if (root() == nullptr) {
-            return false;
-        }
-
-        root()->focus(this);
-
-        move_to(spot_at(root()->type(), at.x, at.y), at.shift);
+bool TextView::key(const Key &pressed) {
+    if (pressed.ctrl && pressed.code == 'a') {
+        select_all();
 
         return true;
     }
 
-    void TextView::drag(const Pointer &at) {
-        if (root() != nullptr) {
-            move_to(spot_at(root()->type(), at.x, at.y), true);
+    if (pressed.ctrl && pressed.code == 'c') {
+        if (const std::string taken = selection(); !taken.empty()) {
+            Clipboard::write(taken);
         }
+
+        return true;
     }
 
-    bool TextView::key(const Key &pressed) {
-        if (pressed.ctrl && pressed.code == 'a') {
-            select_all();
+    return false;
+}
 
-            return true;
-        }
+void TextView::lost_focus() {
+    Widget::lost_focus();
 
-        if (pressed.ctrl && pressed.code == 'c') {
-            if (const std::string taken = selection(); !taken.empty()) {
-                Clipboard::write(taken);
+    clear_selection();
+}
+
+void TextView::paint(const Painter &painter) {
+    if (_rows.empty()) {
+        return;
+    }
+
+    const BLFont &face = painter.font(_weight, _size);
+    const double step = painter.line_height(face);
+    const BLRgba32 wash = Theme::alpha(Theme::palette().accent, 0.3);
+
+    Spot from;
+    Spot to;
+
+    span(from, to);
+
+    const bool marked = from != to;
+
+    // Worked out from the clip rather than tested per row: a captured run holds
+    // thousands of them and a repaint only ever shows a screenful.
+    const BLRectI &clip = painter.clip();
+    const double above = (clip.y - _box.y) / step;
+    const double below = ((clip.y + clip.h) - _box.y) / step;
+
+    const auto first = static_cast<size_t>(std::max(0.0, std::floor(above)));
+    const auto last = std::min(_rows.size(), static_cast<size_t>(std::max(0.0, std::ceil(below))) + 1);
+
+    for (size_t row = first; row < last; ++row) {
+        const BLRect where{_box.x, _box.y + (static_cast<double>(row) * step), _box.w, step};
+
+        const std::string &text = _rows[row];
+
+        if (marked && row >= from.row && row <= to.row) {
+            const size_t begins = row == from.row ? std::min(from.at, text.size()) : 0;
+            const size_t ends = row == to.row ? std::min(to.at, text.size()) : text.size();
+
+            // Measured and not kept: a row is drawn from glyphs, so nothing else
+            // would ever ask for these prefixes again.
+            const double left = painter.type().width_once(face, std::string_view(text).substr(0, begins));
+
+            // A row selected through to its end is washed a little past its last
+            // character, so a run of rows reads as one block.
+            const double right = ends >= text.size() && row < to.row
+                                         ? _box.w
+                                         : painter.type().width_once(face, std::string_view(text).substr(0, ends));
+
+            if (right > left) {
+                painter.fill(BLRect{where.x + left, where.y, right - left, step}, wash);
             }
-
-            return true;
         }
 
-        return false;
+        painter.row(face, where, text, _ink ? _ink(row) : Theme::palette().text);
     }
-
-    void TextView::lost_focus() {
-        Widget::lost_focus();
-
-        clear_selection();
-    }
-
-    void TextView::paint(const Painter &painter) {
-        if (_rows.empty()) {
-            return;
-        }
-
-        const BLFont &face = painter.font(_weight, _size);
-        const double step = painter.line_height(face);
-        const BLRgba32 wash = Theme::alpha(Theme::palette().accent, 0.3);
-
-        Spot from;
-        Spot to;
-
-        span(from, to);
-
-        const bool marked = from != to;
-
-        // Worked out from the clip rather than tested per row: a captured run holds
-        // thousands of them and a repaint only ever shows a screenful.
-        const BLRectI &clip = painter.clip();
-        const double above = (clip.y - _box.y) / step;
-        const double below = ((clip.y + clip.h) - _box.y) / step;
-
-        const auto first = static_cast<size_t>(std::max(0.0, std::floor(above)));
-        const auto last = std::min(_rows.size(),
-                                   static_cast<size_t>(std::max(0.0, std::ceil(below))) + 1);
-
-        for (size_t row = first; row < last; ++row) {
-            const BLRect where{_box.x, _box.y + (static_cast<double>(row) * step), _box.w, step};
-
-            const std::string &text = _rows[row];
-
-            if (marked && row >= from.row && row <= to.row) {
-                const size_t begins = row == from.row ? std::min(from.at, text.size()) : 0;
-                const size_t ends = row == to.row ? std::min(to.at, text.size()) : text.size();
-
-                // Measured and not kept: a row is drawn from glyphs, so nothing else
-                // would ever ask for these prefixes again.
-                const double left = painter.type().width_once(face, std::string_view(text).substr(0, begins));
-
-                // A row selected through to its end is washed a little past its last
-                // character, so a run of rows reads as one block.
-                const double right = ends >= text.size() && row < to.row
-                    ? _box.w
-                    : painter.type().width_once(face, std::string_view(text).substr(0, ends));
-
-                if (right > left) {
-                    painter.fill(BLRect{where.x + left, where.y, right - left, step}, wash);
-                }
-            }
-
-            painter.row(face, where, text, _ink ? _ink(row) : Theme::palette().text);
-        }
-    }
+}
 }

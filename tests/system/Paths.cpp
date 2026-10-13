@@ -22,53 +22,57 @@
 #include "ttk/system/Paths.h"
 
 namespace {
-    namespace fs = std::filesystem;
+namespace fs = std::filesystem;
 
-    constexpr std::array<const char *, 5> TOUCHED = {
-            "HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CONFIG_DIRS", "XDG_CACHE_HOME",
-    };
+constexpr std::array<const char *, 5> TOUCHED = {
+        "HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_CONFIG_DIRS",
+        "XDG_CACHE_HOME",
+};
 
-    std::optional<std::string> raw(const char *name) {
-        const char *value = std::getenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
+std::optional<std::string> raw(const char *name) {
+    const char *value = std::getenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
 
-        return value != nullptr ? std::optional<std::string>(value) : std::nullopt;
-    }
+    return value != nullptr ? std::optional<std::string>(value) : std::nullopt;
+}
 
-    void unset(const char *name) {
-        unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
-    }
+void unset(const char *name) {
+    unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
+}
 
-    class Paths : public ::testing::Test {
-    protected:
-        void SetUp() override {
-            for (std::size_t i = 0; i < TOUCHED.size(); ++i) {
-                _saved[i] = raw(TOUCHED[i]);
-            }
-
-            _application = ttk::Paths::application();
-            _executable = ttk::Paths::executable();
+class Paths : public ::testing::Test {
+protected:
+    void SetUp() override {
+        for (std::size_t i = 0; i < TOUCHED.size(); ++i) {
+            _saved[i] = raw(TOUCHED[i]);
         }
 
-        void TearDown() override {
-            for (std::size_t i = 0; i < TOUCHED.size(); ++i) {
-                if (const std::optional<std::string> &saved = _saved[i]; saved.has_value()) {
-                    ttk::Env::set(TOUCHED[i], saved->c_str());
-                } else {
-                    unset(TOUCHED[i]);
-                }
-            }
+        _application = ttk::Paths::application();
+        _executable = ttk::Paths::executable();
+    }
 
-            ttk::Paths::set_application(_application);
-            ttk::Paths::set_executable(_executable);
+    void TearDown() override {
+        for (std::size_t i = 0; i < TOUCHED.size(); ++i) {
+            if (const std::optional<std::string> &saved = _saved[i]; saved.has_value()) {
+                ttk::Env::set(TOUCHED[i], saved->c_str());
+            } else {
+                unset(TOUCHED[i]);
+            }
         }
 
-        static fs::path sandbox(const char *part) { return tests::Sandbox::root() / part; }
+        ttk::Paths::set_application(_application);
+        ttk::Paths::set_executable(_executable);
+    }
 
-    private:
-        std::array<std::optional<std::string>, TOUCHED.size()> _saved{};
-        std::string _application;
-        fs::path _executable;
-    };
+    static fs::path sandbox(const char *part) { return tests::Sandbox::root() / part; }
+
+private:
+    std::array<std::optional<std::string>, TOUCHED.size()> _saved{};
+    std::string _application;
+    fs::path _executable;
+};
 }
 
 TEST_F(Paths, ApplicationDefaultsToTinytk) {

@@ -20,110 +20,110 @@
 #include "ttk/system/Text.h"
 
 namespace {
-    using Strings = std::vector<std::string>;
+using Strings = std::vector<std::string>;
 
-    constexpr std::string_view UMLAUT = "\xC3\xA4";
-    constexpr std::string_view UMLAUT_UPPER = "\xC3\x84";
-    constexpr std::string_view JAPANESE = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
-    constexpr std::string_view GRIN = "\xF0\x9F\x98\x80";
+constexpr std::string_view UMLAUT = "\xC3\xA4";
+constexpr std::string_view UMLAUT_UPPER = "\xC3\x84";
+constexpr std::string_view JAPANESE = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
+constexpr std::string_view GRIN = "\xF0\x9F\x98\x80";
 
-    // Longer than two AVX2 vectors, so the scans run their vector loop and their tail.
-    constexpr std::size_t LONG = 100;
+// Longer than two AVX2 vectors, so the scans run their vector loop and their tail.
+constexpr std::size_t LONG = 100;
 
-    std::string repeat(const std::string_view piece, const std::size_t times) {
-        std::string out;
+std::string repeat(const std::string_view piece, const std::size_t times) {
+    std::string out;
 
-        for (std::size_t i = 0; i < times; ++i) {
-            out += piece;
-        }
-
-        return out;
+    for (std::size_t i = 0; i < times; ++i) {
+        out += piece;
     }
 
-    // Splits a Windows command line the way the C runtime does.
-    Strings windows_split(const std::string_view line) {
-        Strings out;
-        std::string current;
-        bool quoted = false;
-        bool started = false;
-        std::size_t at = 0;
+    return out;
+}
 
-        while (at < line.size()) {
-            const char letter = line[at];
+// Splits a Windows command line the way the C runtime does.
+Strings windows_split(const std::string_view line) {
+    Strings out;
+    std::string current;
+    bool quoted = false;
+    bool started = false;
+    std::size_t at = 0;
 
-            if (letter == '\\') {
-                std::size_t slashes = 0;
+    while (at < line.size()) {
+        const char letter = line[at];
 
-                while (at < line.size() && line[at] == '\\') {
-                    ++slashes;
+        if (letter == '\\') {
+            std::size_t slashes = 0;
+
+            while (at < line.size() && line[at] == '\\') {
+                ++slashes;
+                ++at;
+            }
+
+            started = true;
+
+            if (at < line.size() && line[at] == '"') {
+                current.append(slashes / 2, '\\');
+
+                if (slashes % 2 == 1) {
+                    current.push_back('"');
                     ++at;
                 }
-
-                started = true;
-
-                if (at < line.size() && line[at] == '"') {
-                    current.append(slashes / 2, '\\');
-
-                    if (slashes % 2 == 1) {
-                        current.push_back('"');
-                        ++at;
-                    }
-                } else {
-                    current.append(slashes, '\\');
-                }
-
-                continue;
+            } else {
+                current.append(slashes, '\\');
             }
 
-            if (letter == '"') {
-                quoted = !quoted;
-                started = true;
-                ++at;
+            continue;
+        }
 
-                continue;
-            }
-
-            if (!quoted && (letter == ' ' || letter == '\t' || letter == '\n')) {
-                if (started) {
-                    out.push_back(current);
-                    current.clear();
-                    started = false;
-                }
-
-                ++at;
-
-                continue;
-            }
-
-            current.push_back(letter);
+        if (letter == '"') {
+            quoted = !quoted;
             started = true;
             ++at;
+
+            continue;
         }
 
-        if (started) {
-            out.push_back(current);
+        if (!quoted && (letter == ' ' || letter == '\t' || letter == '\n')) {
+            if (started) {
+                out.push_back(current);
+                current.clear();
+                started = false;
+            }
+
+            ++at;
+
+            continue;
         }
 
-        return out;
+        current.push_back(letter);
+        started = true;
+        ++at;
     }
 
-    void unset(const char *name) {
-        unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
+    if (started) {
+        out.push_back(current);
     }
 
-    class TextParseArguments : public ::testing::Test {
-    protected:
-        void SetUp() override {
-            ttk::Env::set("TTK_TEST_WORD", "word");
-            ttk::Env::set("TTK_TEST_SPACED", "two words");
-            unset("TTK_TEST_UNSET");
-        }
+    return out;
+}
 
-        void TearDown() override {
-            unset("TTK_TEST_WORD");
-            unset("TTK_TEST_SPACED");
-        }
-    };
+void unset(const char *name) {
+    unsetenv(name); // NOLINT(concurrency-mt-unsafe): the tests run on one thread.
+}
+
+class TextParseArguments : public ::testing::Test {
+protected:
+    void SetUp() override {
+        ttk::Env::set("TTK_TEST_WORD", "word");
+        ttk::Env::set("TTK_TEST_SPACED", "two words");
+        unset("TTK_TEST_UNSET");
+    }
+
+    void TearDown() override {
+        unset("TTK_TEST_WORD");
+        unset("TTK_TEST_SPACED");
+    }
+};
 }
 
 TEST(TextLower, LowersAsciiLetters) {

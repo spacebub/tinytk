@@ -12,19 +12,19 @@
 #include <filesystem>
 
 namespace bench {
-    // A scratch tree the config, data and cache paths are pointed at, so no
-    // benchmark reads or writes the user's own files.
-    namespace Sandbox {
-        // Before anything reads an environment variable. Paths caches what it finds.
-        void enter();
+// A scratch tree the config, data and cache paths are pointed at, so no
+// benchmark reads or writes the user's own files.
+namespace Sandbox {
+// Before anything reads an environment variable. Paths caches what it finds.
+void enter();
 
-        void leave();
+void leave();
 
-        const std::filesystem::path &root();
+const std::filesystem::path &root();
 
-        // Empty and recreated. A benchmark that writes gets a clean one.
-        std::filesystem::path scratch(const char *name);
-    }
+// Empty and recreated. A benchmark that writes gets a clean one.
+std::filesystem::path scratch(const char *name);
+}
 
 }
 

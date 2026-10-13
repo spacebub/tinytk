@@ -11,12 +11,12 @@
 #include "support/Sandbox.h"
 
 namespace {
-    class Sandboxed final : public ::testing::Environment {
-    public:
-        void SetUp() override { tests::Sandbox::enter(); }
+class Sandboxed final : public ::testing::Environment {
+public:
+    void SetUp() override { tests::Sandbox::enter(); }
 
-        void TearDown() override { tests::Sandbox::leave(); }
-    };
+    void TearDown() override { tests::Sandbox::leave(); }
+};
 }
 
 int main(int argc, char **argv) {

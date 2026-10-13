@@ -18,375 +18,370 @@
 #include "ttk/util/Cache.h"
 
 namespace ttk {
-    namespace {
+namespace {
 
-        constexpr size_t KEPT = 256;
+constexpr size_t KEPT = 256;
 
-        struct Folded {
-            std::vector<Fold> lines;
-            size_t used = 0;
-        };
+struct Folded {
+    std::vector<Fold> lines;
+    size_t used = 0;
+};
 
-        Cache::RunMap<Folded> folds;
-        size_t asked = 0;
+Cache::RunMap<Folded> folds;
+size_t asked = 0;
 
-        std::vector<Fold> fold_once(Typeface &type, const BLFont &font, std::string_view run,
-                                   double room);
+std::vector<Fold> fold_once(Typeface &type, const BLFont &font, std::string_view run, double room);
 
-        // BLMatrix2D::type() classifies the matrix out of line, where the identity is told apart inline.
-        bool transformed(const BLContext &context) {
-            const BLMatrix2D &at = context.final_transform();
+// BLMatrix2D::type() classifies the matrix out of line, where the identity is told apart inline.
+bool transformed(const BLContext &context) {
+    const BLMatrix2D &at = context.final_transform();
 
-            return at.m00 != 1.0 || at.m01 != 0.0 || at.m10 != 0.0 || at.m11 != 1.0 || at.m20 != 0.0 || at.m21 != 0.0;
-        }
+    return at.m00 != 1.0 || at.m01 != 0.0 || at.m10 != 0.0 || at.m11 != 1.0 || at.m20 != 0.0 || at.m21 != 0.0;
+}
+}
+
+const std::vector<Fold> &fold_spans(Typeface &type, const BLFont &font, const std::string_view run, const double room) {
+    auto [held, fresh] = Cache::run_entry(folds,
+                                          Cache::RunView{
+                                                  .font = reinterpret_cast<std::uintptr_t>(&font),
+                                                  .at = std::lround(room * 4.0),
+                                                  .run = run,
+                                          },
+                                          KEPT);
+
+    held.used = ++asked;
+
+    if (fresh) {
+        held.lines = fold_once(type, font, run, room);
     }
 
-    const std::vector<Fold> &fold_spans(Typeface &type, const BLFont &font, const std::string_view run,
-                                       const double room) {
-        auto [held, fresh] = Cache::run_entry(folds,
-                                              Cache::RunView{
-                                                      .font = reinterpret_cast<std::uintptr_t>(&font),
-                                                      .at = std::lround(room * 4.0),
-                                                      .run = run,
-                                              },
-                                              KEPT);
+    return held.lines;
+}
 
-        held.used = ++asked;
+namespace {
 
-        if (fresh) {
-            held.lines = fold_once(type, font, run, room);
+std::vector<Fold> fold_once(Typeface &type, const BLFont &font, const std::string_view run, const double room) {
+    std::vector<Fold> lines;
+    std::string line;
+
+    // The line's width, kept as the sum of its words: each word is shaped once,
+    // where shaping the whole line per word was quadratic in its length.
+    double used = 0.0;
+
+    // Where the text held in `line` starts in `run`, and where it reaches to.
+    size_t from = 0;
+    size_t to = 0;
+
+    const auto flush = [&] {
+        lines.push_back(Fold{.text = line, .from = from, .to = to});
+        line.clear();
+        used = 0.0;
+    };
+
+    const double gap = type.width_word(font, " ");
+    size_t at = 0;
+
+    while (at <= run.size()) {
+        const size_t space = run.find_first_of(" \n", at);
+        const std::string_view word =
+                run.substr(at, space == std::string_view::npos ? std::string_view::npos : space - at);
+        const double wide = type.width_word(font, word);
+
+        if (line.empty()) {
+            from = at;
+            line.assign(word);
+            used = wide;
+        } else if (used + gap + wide > room) {
+            flush();
+            from = at;
+            line.assign(word);
+            used = wide;
+        } else {
+            line += ' ';
+            line += word;
+            used += gap + wide;
         }
 
-        return held.lines;
-    }
+        // A single word wider than the line is cut at the last character that fits,
+        // and never at less than one.
+        while (used > room && line.size() > 1) {
+            std::vector<size_t> cuts;
 
-    namespace {
+            for (size_t cut = 1; cut < line.size(); ++cut) {
+                if ((static_cast<unsigned char>(line[cut]) & 0xc0U) != 0x80U) {
+                    cuts.push_back(cut);
+                }
+            }
 
-        std::vector<Fold> fold_once(Typeface &type, const BLFont &font, const std::string_view run,
-                                   const double room) {
-            std::vector<Fold> lines;
-            std::string line;
+            if (cuts.empty()) {
+                break;
+            }
 
-            // The line's width, kept as the sum of its words: each word is shaped once,
-            // where shaping the whole line per word was quadratic in its length.
-            double used = 0.0;
+            size_t low = 0;
+            size_t high = cuts.size();
+            size_t fits = 0;
 
-            // Where the text held in `line` starts in `run`, and where it reaches to.
-            size_t from = 0;
-            size_t to = 0;
+            while (low < high) {
+                const size_t mid = low + ((high - low) / 2);
 
-            const auto flush = [&] {
-                lines.push_back(Fold{.text = line, .from = from, .to = to});
-                line.clear();
-                used = 0.0;
-            };
-
-            const double gap = type.width_word(font, " ");
-            size_t at = 0;
-
-            while (at <= run.size()) {
-                const size_t space = run.find_first_of(" \n", at);
-                const std::string_view word = run.substr(at, space == std::string_view::npos
-                    ? std::string_view::npos : space - at);
-                const double wide = type.width_word(font, word);
-
-                if (line.empty()) {
-                    from = at;
-                    line.assign(word);
-                    used = wide;
-                } else if (used + gap + wide > room) {
-                    flush();
-                    from = at;
-                    line.assign(word);
-                    used = wide;
+                if (type.width_once(font, std::string_view(line).substr(0, cuts[mid])) <= room) {
+                    fits = mid + 1;
+                    low = mid + 1;
                 } else {
-                    line += ' ';
-                    line += word;
-                    used += gap + wide;
+                    high = mid;
                 }
-
-                // A single word wider than the line is cut at the last character that fits,
-                // and never at less than one.
-                while (used > room && line.size() > 1) {
-                    std::vector<size_t> cuts;
-
-                    for (size_t cut = 1; cut < line.size(); ++cut) {
-                        if ((static_cast<unsigned char>(line[cut]) & 0xc0U) != 0x80U) {
-                            cuts.push_back(cut);
-                        }
-                    }
-
-                    if (cuts.empty()) {
-                        break;
-                    }
-
-                    size_t low = 0;
-                    size_t high = cuts.size();
-                    size_t fits = 0;
-
-                    while (low < high) {
-                        const size_t mid = low + ((high - low) / 2);
-
-                        if (type.width_once(font, std::string_view(line).substr(0, cuts[mid])) <= room) {
-                            fits = mid + 1;
-                            low = mid + 1;
-                        } else {
-                            high = mid;
-                        }
-                    }
-
-                    const size_t cut = cuts[fits == 0 ? 0 : fits - 1];
-                    const std::string rest = line.substr(cut);
-
-                    line.resize(cut);
-                    to = from + cut;
-
-                    flush();
-
-                    from = to;
-                    line = rest;
-                    used = type.width_once(font, line);
-                }
-
-                to = at + word.size();
-
-                if (space == std::string_view::npos) {
-                    break;
-                }
-
-                if (run[space] == '\n') {
-                    flush();
-                }
-
-                at = space + 1;
             }
 
-            if (!line.empty() || lines.empty()) {
-                lines.push_back(Fold{.text = line, .from = from, .to = to});
-            }
+            const size_t cut = cuts[fits == 0 ? 0 : fits - 1];
+            const std::string rest = line.substr(cut);
 
-            return lines;
+            line.resize(cut);
+            to = from + cut;
+
+            flush();
+
+            from = to;
+            line = rest;
+            used = type.width_once(font, line);
         }
 
-    }
+        to = at + word.size();
 
-    double wrap_height(Typeface &type, const BLFont &font, const std::string_view run,
-                      const double room) {
-        if (run.empty()) {
-            return 0.0;
+        if (space == std::string_view::npos) {
+            break;
         }
 
-        return static_cast<double>(fold_spans(type, font, run, room).size()) * type.line_height(font);
-    }
-
-    bool Painter::needed(const BLRect &box) const {
-        if (box.w <= 0.0 || box.h <= 0.0) {
-            return false;
+        if (run[space] == '\n') {
+            flush();
         }
 
-        if (box.x < _clip.x + _clip.w && box.x + box.w > _clip.x && box.y < _clip.y + _clip.h
-            && box.y + box.h > _clip.y) {
-            return true;
-        }
-
-        // The clip is in window pixels and `box` is not while a transform is set.
-        return _context != nullptr && transformed(*_context);
+        at = space + 1;
     }
 
-    void Painter::fill(const BLRect &box, const BLRgba32 tone) const {
-        if (tone.a() != 0 && needed(box)) {
-            _context->fill_rect(box, tone);
-        }
+    if (!line.empty() || lines.empty()) {
+        lines.push_back(Fold{.text = line, .from = from, .to = to});
     }
 
-    void Painter::round(const BLRect &box, const double radius, const BLRgba32 tone) const {
-        if (tone.a() == 0 || !needed(box)) {
-            return;
-        }
+    return lines;
+}
 
-        const double corner = std::min(radius, std::min(box.w, box.h) / 2.0);
+}
 
-        if (corner <= 0.0) {
-            _context->fill_rect(box, tone);
-
-            return;
-        }
-
-        _context->fill_round_rect(box, corner, corner, tone);
+double wrap_height(Typeface &type, const BLFont &font, const std::string_view run, const double room) {
+    if (run.empty()) {
+        return 0.0;
     }
 
-    void Painter::outline(const BLRect &box, const double radius, const double width,
-                          const BLRgba32 tone) const {
-        if (box.w <= width * 2.0 || box.h <= width * 2.0 || width <= 0.0 || tone.a() == 0 || !needed(box)) {
-            return;
-        }
+    return static_cast<double>(fold_spans(type, font, run, room).size()) * type.line_height(font);
+}
 
-        const BLRect inset{box.x + (width / 2.0), box.y + (width / 2.0), box.w - width, box.h - width};
-        const double corner = std::max(0.0, std::min(radius - (width / 2.0),
-                                                     std::min(inset.w, inset.h) / 2.0));
-
-        // Filled as the ring between the outer and the inner rounded rectangle, the
-        // inner wound the other way, which lands on the pixels a stroke would and
-        // measures a third cheaper.
-        const double outer = corner > 0.0 ? corner + (width / 2.0) : 0.0;
-        const double inner = corner > 0.0 ? std::max(0.0, corner - (width / 2.0)) : 0.0;
-
-        _ring.clear();
-        _ring.add_round_rect(BLRoundRect(box.x, box.y, box.w, box.h, outer, outer));
-        _ring.add_round_rect(BLRoundRect(box.x + width, box.y + width, box.w - (width * 2.0),
-                                         box.h - (width * 2.0), inner, inner),
-                             BL_GEOMETRY_DIRECTION_CCW);
-
-        _context->fill_path(_ring, tone);
+bool Painter::needed(const BLRect &box) const {
+    if (box.w <= 0.0 || box.h <= 0.0) {
+        return false;
     }
 
-    void Painter::circle(const BLPoint centre, const double radius, const BLRgba32 tone) const {
-        if (radius > 0.0 && tone.a() != 0
-            && needed(BLRect{centre.x - radius, centre.y - radius, radius * 2.0, radius * 2.0})) {
-            _context->fill_circle(centre.x, centre.y, radius, tone);
-        }
+    if (box.x < _clip.x + _clip.w && box.x + box.w > _clip.x && box.y < _clip.y + _clip.h && box.y + box.h > _clip.y) {
+        return true;
     }
 
-    void Painter::path(const BLPath &shape, const BLRgba32 tone) const {
-        if (tone.a() != 0) {
-            _context->fill_path(shape, tone);
-        }
+    // The clip is in window pixels and `box` is not while a transform is set.
+    return _context != nullptr && transformed(*_context);
+}
+
+void Painter::fill(const BLRect &box, const BLRgba32 tone) const {
+    if (tone.a() != 0 && needed(box)) {
+        _context->fill_rect(box, tone);
+    }
+}
+
+void Painter::round(const BLRect &box, const double radius, const BLRgba32 tone) const {
+    if (tone.a() == 0 || !needed(box)) {
+        return;
     }
 
-    void Painter::stroke(const BLPath &shape, const double width, const BLRgba32 tone) const {
-        if (tone.a() == 0 || width <= 0.0) {
-            return;
-        }
-        _context->set_stroke_width(width);
-        _context->set_stroke_cap(BL_STROKE_CAP_POSITION_START, BL_STROKE_CAP_ROUND);
-        _context->set_stroke_cap(BL_STROKE_CAP_POSITION_END, BL_STROKE_CAP_ROUND);
-        _context->set_stroke_join(BL_STROKE_JOIN_ROUND);
-        _context->stroke_path(shape, tone);
+    const double corner = std::min(radius, std::min(box.w, box.h) / 2.0);
+
+    if (corner <= 0.0) {
+        _context->fill_rect(box, tone);
+
+        return;
     }
 
-    const BLFont &Painter::font(const int weight, const float size) const {
-        return _type.at(weight, size);
+    _context->fill_round_rect(box, corner, corner, tone);
+}
+
+void Painter::outline(const BLRect &box, const double radius, const double width, const BLRgba32 tone) const {
+    if (box.w <= width * 2.0 || box.h <= width * 2.0 || width <= 0.0 || tone.a() == 0 || !needed(box)) {
+        return;
     }
 
-    double Painter::width(const BLFont &font, const std::string_view run) const {
-        return _type.width(font, run);
+    const BLRect inset{box.x + (width / 2.0), box.y + (width / 2.0), box.w - width, box.h - width};
+    const double corner = std::max(0.0, std::min(radius - (width / 2.0), std::min(inset.w, inset.h) / 2.0));
+
+    // Filled as the ring between the outer and the inner rounded rectangle, the
+    // inner wound the other way, which lands on the pixels a stroke would and
+    // measures a third cheaper.
+    const double outer = corner > 0.0 ? corner + (width / 2.0) : 0.0;
+    const double inner = corner > 0.0 ? std::max(0.0, corner - (width / 2.0)) : 0.0;
+
+    _ring.clear();
+    _ring.add_round_rect(BLRoundRect(box.x, box.y, box.w, box.h, outer, outer));
+    _ring.add_round_rect(
+            BLRoundRect(box.x + width, box.y + width, box.w - (width * 2.0), box.h - (width * 2.0), inner, inner),
+            BL_GEOMETRY_DIRECTION_CCW);
+
+    _context->fill_path(_ring, tone);
+}
+
+void Painter::circle(const BLPoint centre, const double radius, const BLRgba32 tone) const {
+    if (radius > 0.0 && tone.a() != 0
+        && needed(BLRect{centre.x - radius, centre.y - radius, radius * 2.0, radius * 2.0})) {
+        _context->fill_circle(centre.x, centre.y, radius, tone);
+    }
+}
+
+void Painter::path(const BLPath &shape, const BLRgba32 tone) const {
+    if (tone.a() != 0) {
+        _context->fill_path(shape, tone);
+    }
+}
+
+void Painter::stroke(const BLPath &shape, const double width, const BLRgba32 tone) const {
+    if (tone.a() == 0 || width <= 0.0) {
+        return;
+    }
+    _context->set_stroke_width(width);
+    _context->set_stroke_cap(BL_STROKE_CAP_POSITION_START, BL_STROKE_CAP_ROUND);
+    _context->set_stroke_cap(BL_STROKE_CAP_POSITION_END, BL_STROKE_CAP_ROUND);
+    _context->set_stroke_join(BL_STROKE_JOIN_ROUND);
+    _context->stroke_path(shape, tone);
+}
+
+const BLFont &Painter::font(const int weight, const float size) const {
+    return _type.at(weight, size);
+}
+
+double Painter::width(const BLFont &font, const std::string_view run) const {
+    return _type.width(font, run);
+}
+
+double Painter::line_height(const BLFont &font) const {
+    return _type.line_height(font);
+}
+
+const std::string &Painter::elide(const BLFont &font, const std::string_view run, const double room) const {
+    return _type.elide(font, run, static_cast<float>(room));
+}
+
+void Painter::text(const BLFont &font, const BLPoint top, const std::string_view run, const BLRgba32 tone) const {
+    _type.draw(*_context, font, top, run, tone);
+}
+
+void Painter::label(const BLFont &font,
+                    const BLRect &box,
+                    const Align align,
+                    const std::string_view run,
+                    const BLRgba32 tone) const {
+    if (run.empty() || box.w <= 0.0) {
+        return;
     }
 
-    double Painter::line_height(const BLFont &font) const {
-        return _type.line_height(font);
+    const std::string &shown = _type.elide(font, run, static_cast<float>(box.w));
+    const double taken = align == Align::Start ? 0.0 : _type.width(font, shown);
+
+    double x = box.x;
+
+    if (align == Align::Centre) {
+        x = box.x + ((box.w - taken) / 2.0);
+    } else if (align == Align::End) {
+        x = box.x + box.w - taken;
     }
 
-    const std::string &Painter::elide(const BLFont &font, const std::string_view run,
-                                      const double room) const {
-        return _type.elide(font, run, static_cast<float>(room));
+    _type.draw_centred(*_context, font, BLPoint{x, box.y}, static_cast<float>(box.h), shown, tone);
+}
+
+void Painter::row(const BLFont &font, const BLRect &box, const std::string_view run, const BLRgba32 tone) const {
+    if (run.empty() || box.w <= 0.0) {
+        return;
     }
 
-    void Painter::text(const BLFont &font, const BLPoint top, const std::string_view run,
-                       const BLRgba32 tone) const {
-        _type.draw(*_context, font, top, run, tone);
-    }
+    const BLFontMetrics metrics = font.metrics();
+    const double top = box.y + ((box.h - (metrics.ascent + metrics.descent)) / 2.0);
 
-    void Painter::label(const BLFont &font, const BLRect &box, const Align align,
-                        const std::string_view run, const BLRgba32 tone) const {
-        if (run.empty() || box.w <= 0.0) {
-            return;
-        }
+    _type.draw_once(*_context, font, BLPoint{box.x, top}, run, tone, box.w);
+}
 
-        const std::string &shown = _type.elide(font, run, static_cast<float>(box.w));
-        const double taken = align == Align::Start ? 0.0 : _type.width(font, shown);
+void Painter::tracked(const BLFont &font,
+                      const BLPoint top,
+                      const std::string_view run,
+                      const BLRgba32 tone,
+                      const double spacing) const {
+    _type.draw_tracked(*_context, font, top, run, tone, static_cast<float>(spacing));
+}
 
-        double x = box.x;
+double
+Painter::paragraph(const BLFont &font, const BLRect &box, const std::string_view run, const BLRgba32 tone) const {
+    const double step = _type.line_height(font);
+    const std::vector<Fold> &lines = fold_spans(_type, font, run, box.w);
+    const double height = static_cast<double>(lines.size()) * step;
 
-        if (align == Align::Centre) {
-            x = box.x + ((box.w - taken) / 2.0);
-        } else if (align == Align::End) {
-            x = box.x + box.w - taken;
-        }
-
-        _type.draw_centred(*_context, font, BLPoint{x, box.y}, static_cast<float>(box.h), shown, tone);
-    }
-
-    void Painter::row(const BLFont &font, const BLRect &box, const std::string_view run,
-                      const BLRgba32 tone) const {
-        if (run.empty() || box.w <= 0.0) {
-            return;
-        }
-
-        const BLFontMetrics metrics = font.metrics();
-        const double top = box.y + ((box.h - (metrics.ascent + metrics.descent)) / 2.0);
-
-        _type.draw_once(*_context, font, BLPoint{box.x, top}, run, tone, box.w);
-    }
-
-    void Painter::tracked(const BLFont &font, const BLPoint top, const std::string_view run,
-                          const BLRgba32 tone, const double spacing) const {
-        _type.draw_tracked(*_context, font, top, run, tone, static_cast<float>(spacing));
-    }
-
-    double Painter::paragraph(const BLFont &font, const BLRect &box, const std::string_view run,
-                              const BLRgba32 tone) const {
-        const double step = _type.line_height(font);
-        const std::vector<Fold> &lines = fold_spans(_type, font, run, box.w);
-        const double height = static_cast<double>(lines.size()) * step;
-
-        if (tone.a() == 0) {
-            return height;
-        }
-
-        size_t first = 0;
-        size_t last = lines.size();
-
-        if (step > 0.0) {
-            const double bleed = Typeface::bleed(font);
-            const auto count = static_cast<double>(lines.size());
-
-            first = static_cast<size_t>(std::clamp(std::floor((_clip.y - box.y - bleed) / step), 0.0, count));
-            last = static_cast<size_t>(std::clamp(std::ceil((_clip.y + _clip.h - box.y + bleed) / step), 0.0, count));
-
-            // The clip is in window pixels and `box` is not while a transform is set.
-            if ((first != 0 || last != lines.size()) && transformed(*_context)) {
-                first = 0;
-                last = lines.size();
-            }
-        }
-
-        for (size_t at = first; at < last; ++at) {
-            _type.draw(*_context, font, BLPoint{box.x, box.y + (static_cast<double>(at) * step)}, lines[at].text, tone);
-        }
-
+    if (tone.a() == 0) {
         return height;
     }
 
-    double Painter::wrap_height(const BLFont &font, const std::string_view run,
-                               const double room) const {
-        return ttk::wrap_height(_type, font, run, room);
-    }
+    size_t first = 0;
+    size_t last = lines.size();
 
-    void Painter::push(const BLRect &box) const {
-        _held.push_back(_clip);
+    if (step > 0.0) {
+        const double bleed = Typeface::bleed(font);
+        const auto count = static_cast<double>(lines.size());
 
-        const int left = std::max(_clip.x, static_cast<int>(std::floor(box.x)));
-        const int top = std::max(_clip.y, static_cast<int>(std::floor(box.y)));
-        const int right = std::min(_clip.x + _clip.w, static_cast<int>(std::ceil(box.x + box.w)));
-        const int bottom = std::min(_clip.y + _clip.h, static_cast<int>(std::ceil(box.y + box.h)));
+        first = static_cast<size_t>(std::clamp(std::floor((_clip.y - box.y - bleed) / step), 0.0, count));
+        last = static_cast<size_t>(std::clamp(std::ceil((_clip.y + _clip.h - box.y + bleed) / step), 0.0, count));
 
-        _clip = right > left && bottom > top ? BLRectI{left, top, right - left, bottom - top}
-                                             : BLRectI{NOWHERE, NOWHERE, 0, 0};
-
-        // Whole pixels, and the same ones `needed` answers for. A box off the grid,
-        // which any odd window width gives, leaves a fractional clip that a blit of
-        // a sprite through it lands skewed against.
-        _context->save();
-        _context->clip_to_rect(_clip);
-    }
-
-    void Painter::pop() const {
-        _context->restore();
-
-        if (!_held.empty()) {
-            _clip = _held.back();
-
-            _held.pop_back();
+        // The clip is in window pixels and `box` is not while a transform is set.
+        if ((first != 0 || last != lines.size()) && transformed(*_context)) {
+            first = 0;
+            last = lines.size();
         }
     }
+
+    for (size_t at = first; at < last; ++at) {
+        _type.draw(*_context, font, BLPoint{box.x, box.y + (static_cast<double>(at) * step)}, lines[at].text, tone);
+    }
+
+    return height;
+}
+
+double Painter::wrap_height(const BLFont &font, const std::string_view run, const double room) const {
+    return ttk::wrap_height(_type, font, run, room);
+}
+
+void Painter::push(const BLRect &box) const {
+    _held.push_back(_clip);
+
+    const int left = std::max(_clip.x, static_cast<int>(std::floor(box.x)));
+    const int top = std::max(_clip.y, static_cast<int>(std::floor(box.y)));
+    const int right = std::min(_clip.x + _clip.w, static_cast<int>(std::ceil(box.x + box.w)));
+    const int bottom = std::min(_clip.y + _clip.h, static_cast<int>(std::ceil(box.y + box.h)));
+
+    _clip = right > left && bottom > top ? BLRectI{left, top, right - left, bottom - top}
+                                         : BLRectI{NOWHERE, NOWHERE, 0, 0};
+
+    // Whole pixels, and the same ones `needed` answers for. A box off the grid,
+    // which any odd window width gives, leaves a fractional clip that a blit of
+    // a sprite through it lands skewed against.
+    _context->save();
+    _context->clip_to_rect(_clip);
+}
+
+void Painter::pop() const {
+    _context->restore();
+
+    if (!_held.empty()) {
+        _clip = _held.back();
+
+        _held.pop_back();
+    }
+}
 }

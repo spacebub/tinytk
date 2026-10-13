@@ -23,352 +23,352 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
-    //! Top of a window's widget tree, which routes input to widgets and collects what needs repainting.
+//! Top of a window's widget tree, which routes input to widgets and collects what needs repainting.
+//!
+//! A root holds the page, \ref content(), and \ref LAYERS layers painted over it in index order. It tracks the
+//! widget under the pointer, the one holding a press, the one with keyboard focus and the widgets that are
+//! animating, and it gathers the damaged rectangles and pixel moves of each frame for \ref compose().
+class Root {
+public:
+    //! Creates an empty root whose widgets lay text out with `type`, which must outlive the root.
+    explicit Root(Typeface &type) : _type(type), _painter(type) { _layers[POPUPS].floats(); }
+
+    //! \name Window
+    //! \{
+
+    //! Returns the page, the widget under every layer that holds the window's content. It is given the whole
+    //! window as its box.
+    Widget *content() { return &_page; }
+
+    //! Returns the layer at `index`, clamped to the last layer.
     //!
-    //! A root holds the page, \ref content(), and \ref LAYERS layers painted over it in index order. It tracks the
-    //! widget under the pointer, the one holding a press, the one with keyboard focus and the widgets that are
-    //! animating, and it gathers the damaged rectangles and pixel moves of each frame for \ref compose().
-    class Root {
-    public:
-        //! Creates an empty root whose widgets lay text out with `type`, which must outlive the root.
-        explicit Root(Typeface &type) : _type(type), _painter(type) { _layers[POPUPS].floats(); }
+    //! Layers cover the window and let the pointer through to what is under them. Each child of a layer is given
+    //! the whole window, except on \ref POPUPS, where a child keeps the box it was placed at.
+    Widget *layer(size_t index);
 
-        //! \name Window
-        //! \{
+    //! Number of layers over the page.
+    static constexpr size_t LAYERS = 4;
 
-        //! Returns the page, the widget under every layer that holds the window's content. It is given the whole
-        //! window as its box.
-        Widget *content() { return &_page; }
+    //! Index of the layer for dialogs, painted first over the page.
+    static constexpr size_t DIALOGS = 0;
+    //! Index of the layer for popups such as menus and dropdown lists, painted over dialogs.
+    static constexpr size_t POPUPS = 1;
+    //! Index of the layer for toasts, painted over popups.
+    static constexpr size_t NOTICES = 2;
+    //! Index of the layer for tooltips, painted over everything else.
+    static constexpr size_t TIPS = 3;
 
-        //! Returns the layer at `index`, clamped to the last layer.
-        //!
-        //! Layers cover the window and let the pointer through to what is under them. Each child of a layer is given
-        //! the whole window, except on \ref POPUPS, where a child keeps the box it was placed at.
-        Widget *layer(size_t index);
+    //! Sets the window size to `width` by `height` pixels.
+    //!
+    //! When the size changes, schedules a relayout and dismisses the open popup, see \ref dismiss().
+    void resize(double width, double height);
 
-        //! Number of layers over the page.
-        static constexpr size_t LAYERS = 4;
+    //! Returns the window width given to \ref resize().
+    double width() const { return _width; }
+    //! Returns the window height given to \ref resize().
+    double height() const { return _height; }
 
-        //! Index of the layer for dialogs, painted first over the page.
-        static constexpr size_t DIALOGS = 0;
-        //! Index of the layer for popups such as menus and dropdown lists, painted over dialogs.
-        static constexpr size_t POPUPS = 1;
-        //! Index of the layer for toasts, painted over popups.
-        static constexpr size_t NOTICES = 2;
-        //! Index of the layer for tooltips, painted over everything else.
-        static constexpr size_t TIPS = 3;
+    //! Schedules a layout of the whole tree, run by the next \ref settle().
+    void relayout() { _relayout = true; }
 
-        //! Sets the window size to `width` by `height` pixels.
-        //!
-        //! When the size changes, schedules a relayout and dismisses the open popup, see \ref dismiss().
-        void resize(double width, double height);
+    //! Runs a scheduled layout and returns true, or returns false when none is due.
+    //!
+    //! A change of the \ref Theme since the last layout also schedules one. The layout places the page and every
+    //! layer on the whole window, damages all of it, and moves the hover off a widget that is no longer under
+    //! the pointer.
+    bool settle();
 
-        //! Returns the window width given to \ref resize().
-        double width() const { return _width; }
-        //! Returns the window height given to \ref resize().
-        double height() const { return _height; }
+    //! \}
 
-        //! Schedules a layout of the whole tree, run by the next \ref settle().
-        void relayout() { _relayout = true; }
+    //! \name Damage
+    //! \{
 
-        //! Runs a scheduled layout and returns true, or returns false when none is due.
-        //!
-        //! A change of the \ref Theme since the last layout also schedules one. The layout places the page and every
-        //! layer on the whole window, damages all of it, and moves the hover off a widget that is no longer under
-        //! the pointer.
-        bool settle();
+    //! Marks `region` for repainting. An empty `region` is ignored.
+    //!
+    //! Regions are kept as given until \ref take(), \ref whole() or \ref shift() rounds them out to pixels, clips
+    //! them to the window and merges them through \ref Damage::add(). Once the window has a size, at most
+    //! \ref Damage::CROWDED are kept, and the next region merges them first. A region inside the one given last
+    //! is dropped at once.
+    void damage(const BLRect &region);
+    //! Replaces every pending region with the whole window.
+    void damage_all();
 
-        //! \}
+    //! Returns the pending regions and clears them.
+    //!
+    //! The list is owned by the root and overwritten by the next call.
+    const std::vector<BLRect> &take();
 
-        //! \name Damage
-        //! \{
+    //! Tests whether a repaint, layout or pixel move is pending.
+    bool dirty() const { return _relayout || !_pending.empty() || !_dirty.empty() || !_shifts.empty(); }
 
-        //! Marks `region` for repainting. An empty `region` is ignored.
-        //!
-        //! Regions are kept as given until \ref take(), \ref whole() or \ref shift() rounds them out to pixels, clips
-        //! them to the window and merges them through \ref Damage::add(). Once the window has a size, at most
-        //! \ref Damage::CROWDED are kept, and the next region merges them first. A region inside the one given last
-        //! is dropped at once.
-        void damage(const BLRect &region);
-        //! Replaces every pending region with the whole window.
-        void damage_all();
+    //! Tests whether the pending regions, merged, cover the whole window.
+    bool whole();
 
-        //! Returns the pending regions and clears them.
-        //!
-        //! The list is owned by the root and overwritten by the next call.
-        const std::vector<BLRect> &take();
+    //! Pixel move requested through \ref shift().
+    struct Shift {
+        //! Rectangle of pixels to move, rounded inward to whole pixels.
+        BLRectI region;
+        //! Vertical distance in pixels, positive downward.
+        int dy;
+    };
 
-        //! Tests whether a repaint, layout or pixel move is pending.
-        bool dirty() const { return _relayout || !_pending.empty() || !_dirty.empty() || !_shifts.empty(); }
+    //! Asks for the pixels of `region` to be moved by `dy` pixels vertically instead of being repainted, and
+    //! returns whether the move was accepted.
+    //!
+    //! Refused when any ancestor of `who` clips its children, or when a visible child of a layer above the one
+    //! holding `who` draws over `region`. The caller still damages what the move leaves uncovered, and repaints
+    //! everything itself when refused.
+    bool shift(const Widget *who, const BLRect &region, int dy);
 
-        //! Tests whether the pending regions, merged, cover the whole window.
-        bool whole();
+    //! Returns the moves accepted by \ref shift() since the last call and clears them.
+    //!
+    //! The list is owned by the root and overwritten by the next call.
+    const std::vector<Shift> &take_shifts();
 
-        //! Pixel move requested through \ref shift().
-        struct Shift {
-            //! Rectangle of pixels to move, rounded inward to whole pixels.
-            BLRectI region;
-            //! Vertical distance in pixels, positive downward.
-            int dy;
-        };
+    //! Paints the page and then every layer, clipped to `clip`, and over them a ring inside the box of the
+    //! focused widget while it holds focus from the keyboard and does not \ref Widget::paints_focus().
+    void paint(BLContext &context, const BLRectI &clip);
 
-        //! Asks for the pixels of `region` to be moved by `dy` pixels vertically instead of being repainted, and
-        //! returns whether the move was accepted.
-        //!
-        //! Refused when any ancestor of `who` clips its children, or when a visible child of a layer above the one
-        //! holding `who` draws over `region`. The caller still damages what the move leaves uncovered, and repaints
-        //! everything itself when refused.
-        bool shift(const Widget *who, const BLRect &region, int dy);
+    //! \}
 
-        //! Returns the moves accepted by \ref shift() since the last call and clears them.
-        //!
-        //! The list is owned by the root and overwritten by the next call.
-        const std::vector<Shift> &take_shifts();
+    //! \name Pointer
+    //! \{
 
-        //! Paints the page and then every layer, clipped to `clip`, and over them a ring inside the box of the
-        //! focused widget while it holds focus from the keyboard and does not \ref Widget::paints_focus().
-        void paint(BLContext &context, const BLRectI &clip);
+    //! Handles pointer motion to `[x, y]`.
+    //!
+    //! While a widget holds the press, it receives \ref Widget::drag(). Otherwise the hover moves to the widget
+    //! under the pointer, calling \ref Widget::leave(), \ref Widget::enter(), \ref Widget::hover() and
+    //! \ref Widget::within() as needed.
+    void motion(double x, double y);
+    //! Handles a button press.
+    //!
+    //! A press outside the \ref POPUPS layer while a popup is open dismisses it first, and goes no further when
+    //! it lands on nothing or on the popup's owner, see \ref set_dismiss(). The press is then offered to the
+    //! widget under the pointer and its ancestors until one takes it, which then holds the press. A press that
+    //! nothing takes clears keyboard focus. Any press hides the focus ring.
+    void press(const Pointer &at);
+    //! Handles a button release. The widget holding the press receives \ref Widget::release() and the hover
+    //! moves to whatever is under `at`. Does nothing when no widget holds the press.
+    void release(const Pointer &at);
+    //! Handles a wheel scroll of `steps` notches at `[x, y]`, offered to the widget there and then its ancestors
+    //! until one consumes it.
+    void wheel(double steps, double x, double y);
+    //! Handles the pointer leaving the window by clearing the hover. Ignored while a widget holds the press.
+    void leave();
 
-        //! \}
+    //! Returns the widget under the pointer, or null when there is none.
+    Widget *hovered() const { return _hovered; }
+    //! Returns the widget holding the press, or null when no press is held.
+    Widget *grabbed() const { return _grabbed; }
 
-        //! \name Pointer
-        //! \{
+    //! Returns the horizontal pointer position of the last motion, press or release.
+    double pointer_x() const { return _pointer.x; }
+    //! Returns the vertical pointer position of the last motion, press or release.
+    double pointer_y() const { return _pointer.y; }
 
-        //! Handles pointer motion to `[x, y]`.
-        //!
-        //! While a widget holds the press, it receives \ref Widget::drag(). Otherwise the hover moves to the widget
-        //! under the pointer, calling \ref Widget::leave(), \ref Widget::enter(), \ref Widget::hover() and
-        //! \ref Widget::within() as needed.
-        void motion(double x, double y);
-        //! Handles a button press.
-        //!
-        //! A press outside the \ref POPUPS layer while a popup is open dismisses it first, and goes no further when
-        //! it lands on nothing or on the popup's owner, see \ref set_dismiss(). The press is then offered to the
-        //! widget under the pointer and its ancestors until one takes it, which then holds the press. A press that
-        //! nothing takes clears keyboard focus. Any press hides the focus ring.
-        void press(const Pointer &at);
-        //! Handles a button release. The widget holding the press receives \ref Widget::release() and the hover
-        //! moves to whatever is under `at`. Does nothing when no widget holds the press.
-        void release(const Pointer &at);
-        //! Handles a wheel scroll of `steps` notches at `[x, y]`, offered to the widget there and then its ancestors
-        //! until one consumes it.
-        void wheel(double steps, double x, double y);
-        //! Handles the pointer leaving the window by clearing the hover. Ignored while a widget holds the press.
-        void leave();
+    //! Returns the cursor to show, taken from \ref Widget::cursor_at() of the widget holding the press, else of
+    //! the hovered widget, else \ref Cursor::Default.
+    Cursor cursor() const;
 
-        //! Returns the widget under the pointer, or null when there is none.
-        Widget *hovered() const { return _hovered; }
-        //! Returns the widget holding the press, or null when no press is held.
-        Widget *grabbed() const { return _grabbed; }
+    //! Makes `who` hold the press, so it receives all motion as \ref Widget::drag() and the next release,
+    //! whatever the pointer passes over. Null releases the hold without calling anything.
+    void grab(Widget *who);
 
-        //! Returns the horizontal pointer position of the last motion, press or release.
-        double pointer_x() const { return _pointer.x; }
-        //! Returns the vertical pointer position of the last motion, press or release.
-        double pointer_y() const { return _pointer.y; }
+    //! \}
 
-        //! Returns the cursor to show, taken from \ref Widget::cursor_at() of the widget holding the press, else of
-        //! the hovered widget, else \ref Cursor::Default.
-        Cursor cursor() const;
+    //! \name Keyboard
+    //! \{
 
-        //! Makes `who` hold the press, so it receives all motion as \ref Widget::drag() and the next release,
-        //! whatever the pointer passes over. Null releases the hold without calling anything.
-        void grab(Widget *who);
+    //! Offers `pressed` to the focused widget and then its ancestors, and returns true when one consumed it.
+    //!
+    //! Tab that no widget consumed, with or without Shift and Ctrl, moves focus through \ref focus_next() and
+    //! counts as consumed, though a held key moves it once. Alt+Tab is left alone. Return and Space that no
+    //! widget consumed press and release the focused control at its centre, so any control activates from the
+    //! keyboard, and count as consumed, though a held key acts once. Returns false for any other key nothing
+    //! consumed.
+    bool key(const Key &pressed);
+    //! Passes `text`, in UTF-8, to the focused widget. Ignored when nothing has focus.
+    void wrote(const std::string &text) const;
 
-        //! \}
+    //! Gives keyboard focus to `who`, or clears it when `who` is null. Does nothing when `who` already has it.
+    //!
+    //! Calls \ref Widget::lost_focus() on the old widget and \ref Widget::gained_focus() on the new one, then
+    //! \ref composing. Hides the focus ring, which only \ref focus_next() shows.
+    void focus(Widget *who);
+    //! Returns the widget with keyboard focus, or null.
+    Widget *focused() const { return _focused; }
 
-        //! \name Keyboard
-        //! \{
+    //! Moves focus to the next widget that takes focus, or the previous one when `backwards` is true.
+    //!
+    //! Only visible and enabled widgets that \ref Widget::takes_focus() count, in tree order unless
+    //! \ref Widget::set_tab_index() says otherwise, and the order wraps around. The candidates are taken from
+    //! the topmost visible and enabled layer that has any, otherwise from the page, so an open dialog keeps
+    //! focus to itself. Without a focused candidate, focus goes to the first one, or the last when `backwards`
+    //! is true. A popup registered through \ref set_dismiss() is dismissed when focus moves off its owner, or
+    //! off the \ref POPUPS layer when it has no owner. The widget focused is brought into view through
+    //! \ref Widget::reveal() on its ancestors and shown with a focus ring until the next press.
+    void focus_next(bool backwards);
 
-        //! Offers `pressed` to the focused widget and then its ancestors, and returns true when one consumed it.
-        //!
-        //! Tab that no widget consumed, with or without Shift and Ctrl, moves focus through \ref focus_next() and
-        //! counts as consumed, though a held key moves it once. Alt+Tab is left alone. Return and Space that no
-        //! widget consumed press and release the focused control at its centre, so any control activates from the
-        //! keyboard, and count as consumed, though a held key acts once. Returns false for any other key nothing
-        //! consumed.
-        bool key(const Key &pressed);
-        //! Passes `text`, in UTF-8, to the focused widget. Ignored when nothing has focus.
-        void wrote(const std::string &text) const;
+    //! Called after every focus change with the \ref Widget::takes_focus() of the newly focused widget, or false
+    //! when focus was cleared. The shell turns the platform's text input on or off with it.
+    std::function<void(bool)> composing;
 
-        //! Gives keyboard focus to `who`, or clears it when `who` is null. Does nothing when `who` already has it.
-        //!
-        //! Calls \ref Widget::lost_focus() on the old widget and \ref Widget::gained_focus() on the new one, then
-        //! \ref composing. Hides the focus ring, which only \ref focus_next() shows.
-        void focus(Widget *who);
-        //! Returns the widget with keyboard focus, or null.
-        Widget *focused() const { return _focused; }
+    //! Sets whether the window holds the desktop's keyboard focus, and wakes the focused widget when that
+    //! changes. The shell keeps it current. A caret neither shows nor blinks in an inactive window.
+    void set_active(bool active);
 
-        //! Moves focus to the next widget that takes focus, or the previous one when `backwards` is true.
-        //!
-        //! Only visible and enabled widgets that \ref Widget::takes_focus() count, in tree order unless
-        //! \ref Widget::set_tab_index() says otherwise, and the order wraps around. The candidates are taken from
-        //! the topmost visible and enabled layer that has any, otherwise from the page, so an open dialog keeps
-        //! focus to itself. Without a focused candidate, focus goes to the first one, or the last when `backwards`
-        //! is true. A popup registered through \ref set_dismiss() is dismissed when focus moves off its owner, or
-        //! off the \ref POPUPS layer when it has no owner. The widget focused is brought into view through
-        //! \ref Widget::reveal() on its ancestors and shown with a focus ring until the next press.
-        void focus_next(bool backwards);
+    //! Tests whether the window holds the desktop's keyboard focus. True until \ref set_active() says otherwise.
+    [[nodiscard]] bool active() const { return _active; }
 
-        //! Called after every focus change with the \ref Widget::takes_focus() of the newly focused widget, or false
-        //! when focus was cleared. The shell turns the platform's text input on or off with it.
-        std::function<void(bool)> composing;
+    //! \}
 
-        //! Sets whether the window holds the desktop's keyboard focus, and wakes the focused widget when that
-        //! changes. The shell keeps it current. A caret neither shows nor blinks in an inactive window.
-        void set_active(bool active);
+    //! \name Animation
+    //! \{
 
-        //! Tests whether the window holds the desktop's keyboard focus. True until \ref set_active() says otherwise.
-        [[nodiscard]] bool active() const { return _active; }
+    //! Adds `who` to the live widgets, whose \ref Widget::advance() runs every frame, and cancels its wake-up
+    //! from \ref wake_at().
+    void live(Widget *who);
 
-        //! \}
+    //! Schedules `who` to become live at the frame time `when`, so the loop can sleep until then.
+    //!
+    //! When `who` is already scheduled, the earlier of the two times is kept. It does not remove `who` from the
+    //! live widgets, which returning false from \ref Widget::advance() does.
+    void wake_at(Widget *who, double when);
 
-        //! \name Animation
-        //! \{
+    //! Drops every reference the root holds to `who` and its descendants: live, scheduled, hovered, holding the
+    //! press, focused and popup owner. \ref Widget::erase() and \ref Widget::clear() call it on what they destroy.
+    void forget(const Widget *who);
 
-        //! Adds `who` to the live widgets, whose \ref Widget::advance() runs every frame, and cancels its wake-up
-        //! from \ref wake_at().
-        void live(Widget *who);
+    //! Makes live the scheduled widgets due at or before `now`, then calls \ref Widget::advance() on every live
+    //! widget and drops those that return false.
+    void advance(double now);
 
-        //! Schedules `who` to become live at the frame time `when`, so the loop can sleep until then.
-        //!
-        //! When `who` is already scheduled, the earlier of the two times is kept. It does not remove `who` from the
-        //! live widgets, which returning false from \ref Widget::advance() does.
-        void wake_at(Widget *who, double when);
+    //! Tests whether any widget is live.
+    bool busy() const { return !_live.empty(); }
 
-        //! Drops every reference the root holds to `who` and its descendants: live, scheduled, hovered, holding the
-        //! press, focused and popup owner. \ref Widget::erase() and \ref Widget::clear() call it on what they destroy.
-        void forget(const Widget *who);
+    //! Returns the earliest frame time a scheduled widget is due, or -1 when none is scheduled.
+    [[nodiscard]] double waking() const;
 
-        //! Makes live the scheduled widgets due at or before `now`, then calls \ref Widget::advance() on every live
-        //! widget and drops those that return false.
-        void advance(double now);
+    //! Sets the frame time to `now`, in seconds. The shell sets it before each frame and each event.
+    void set_now(const double now) { _now = now; }
 
-        //! Tests whether any widget is live.
-        bool busy() const { return !_live.empty(); }
+    //! Returns the frame time in seconds, the clock every animation is started against.
+    double now() const { return _now; }
 
-        //! Returns the earliest frame time a scheduled widget is due, or -1 when none is scheduled.
-        [[nodiscard]] double waking() const;
+    //! \}
 
-        //! Sets the frame time to `now`, in seconds. The shell sets it before each frame and each event.
-        void set_now(const double now) { _now = now; }
+    //! Returns the typeface widgets lay text out with.
+    Typeface &type() const { return _type; }
 
-        //! Returns the frame time in seconds, the clock every animation is started against.
-        double now() const { return _now; }
+    //! \name Popups
+    //! \{
 
-        //! \}
-
-        //! Returns the typeface widgets lay text out with.
-        Typeface &type() const { return _type; }
-
-        //! \name Popups
-        //! \{
-
-        //! Registers `dismiss` as the way to close the open popup, which a press outside the \ref POPUPS layer calls.
-        //!
-        //! A press on `owner` or one of its descendants closes the popup and goes no further, so the control the
-        //! popup hangs off does not reopen it. When a popup is already registered and `dismiss` is not null, the
-        //! old one is dismissed first. A null `dismiss` clears the registration without calling it.
-        void set_dismiss(std::function<void()> dismiss, const Widget *owner = nullptr) {
-            // One at a time: what is already up closes rather than being left on the
-            // layer with nothing able to reach it.
-            if (_dismiss && dismiss) {
-                this->dismiss();
-            }
-
-            _dismiss = std::move(dismiss);
-            _owner = owner;
+    //! Registers `dismiss` as the way to close the open popup, which a press outside the \ref POPUPS layer calls.
+    //!
+    //! A press on `owner` or one of its descendants closes the popup and goes no further, so the control the
+    //! popup hangs off does not reopen it. When a popup is already registered and `dismiss` is not null, the
+    //! old one is dismissed first. A null `dismiss` clears the registration without calling it.
+    void set_dismiss(std::function<void()> dismiss, const Widget *owner = nullptr) {
+        // One at a time: what is already up closes rather than being left on the
+        // layer with nothing able to reach it.
+        if (_dismiss && dismiss) {
+            this->dismiss();
         }
 
-        //! Tests whether a popup is registered through \ref set_dismiss().
-        bool has_dismiss() const { return static_cast<bool>(_dismiss); }
+        _dismiss = std::move(dismiss);
+        _owner = owner;
+    }
 
-        //! Tests whether the press being handled closed a popup. A dialog under the popup uses it so the press does
-        //! not count as a click on its scrim.
-        bool just_dismissed() const { return _justDismissed; }
+    //! Tests whether a popup is registered through \ref set_dismiss().
+    bool has_dismiss() const { return static_cast<bool>(_dismiss); }
 
-        //! Clears the registered popup and calls its callback once. Does nothing when none is registered.
-        void dismiss();
+    //! Tests whether the press being handled closed a popup. A dialog under the popup uses it so the press does
+    //! not count as a click on its scrim.
+    bool just_dismissed() const { return _justDismissed; }
 
-        //! \}
+    //! Clears the registered popup and calls its callback once. Does nothing when none is registered.
+    void dismiss();
+
+    //! \}
+
+private:
+    void flush();
+
+    Widget *pick(double x, double y);
+
+    void hover_to(Widget *who, const Pointer &at);
+
+    struct Stop {
+        Widget *who;
+        int index;
+    };
+
+    static void gather(Widget *from, int inherited, std::vector<Stop> &out);
+
+    Widget *next_stop(bool backwards);
+
+    void enliven(Widget *who);
+
+    // A layer over the page. Its children are stretched to the window unless it
+    // floats them: a popup is anchored to the control it dropped from and keeps
+    // the box it was placed at.
+    class Page : public Widget {
+    public:
+        void floats() { _floats = true; }
+
+        void arrange(Typeface &type) override;
 
     private:
-        void flush();
-
-        Widget *pick(double x, double y);
-
-        void hover_to(Widget *who, const Pointer &at);
-
-        struct Stop {
-            Widget *who;
-            int index;
-        };
-
-        static void gather(Widget *from, int inherited, std::vector<Stop> &out);
-
-        Widget *next_stop(bool backwards);
-
-        void enliven(Widget *who);
-
-        // A layer over the page. Its children are stretched to the window unless it
-        // floats them: a popup is anchored to the control it dropped from and keeps
-        // the box it was placed at.
-        class Page : public Widget {
-        public:
-            void floats() { _floats = true; }
-
-            void arrange(Typeface &type) override;
-
-        private:
-            bool _floats = false;
-        };
-
-        Typeface &_type;
-
-        // One for every region of every frame, so its scratch is allocated once.
-        Painter _painter;
-
-        Page _page;
-        Page _layers[LAYERS];
-
-        // What damage() was given since the last take(), merged into the pixel set by flush().
-        std::vector<BLRect> _pending;
-        Damage _dirty;
-        std::vector<Shift> _shifts;
-
-        // What the takes handed out last, retaining capacity between frames.
-        std::vector<BLRect> _taken;
-        std::vector<Shift> _shifted;
-
-        // Scanned in full, which is cheap for the handful that animate at once.
-        std::vector<Widget *> _live;
-        std::vector<Widget *> _running;
-
-        struct Sleeper {
-            Widget *who;
-            double due;
-        };
-
-        std::vector<Sleeper> _sleeping;
-
-        Pointer _pointer{};
-
-        Widget *_hovered = nullptr;
-        Widget *_grabbed = nullptr;
-        Widget *_focused = nullptr;
-        bool _focusShown = false;
-        bool _active = true;
-
-        std::function<void()> _dismiss;
-        const Widget *_owner = nullptr;
-        bool _justDismissed = false;
-
-        double _width = 0.0;
-        double _height = 0.0;
-        double _now = 0.0;
-
-        bool _relayout = true;
-        std::uint32_t _revision = 0;
+        bool _floats = false;
     };
+
+    Typeface &_type;
+
+    // One for every region of every frame, so its scratch is allocated once.
+    Painter _painter;
+
+    Page _page;
+    Page _layers[LAYERS];
+
+    // What damage() was given since the last take(), merged into the pixel set by flush().
+    std::vector<BLRect> _pending;
+    Damage _dirty;
+    std::vector<Shift> _shifts;
+
+    // What the takes handed out last, retaining capacity between frames.
+    std::vector<BLRect> _taken;
+    std::vector<Shift> _shifted;
+
+    // Scanned in full, which is cheap for the handful that animate at once.
+    std::vector<Widget *> _live;
+    std::vector<Widget *> _running;
+
+    struct Sleeper {
+        Widget *who;
+        double due;
+    };
+
+    std::vector<Sleeper> _sleeping;
+
+    Pointer _pointer{};
+
+    Widget *_hovered = nullptr;
+    Widget *_grabbed = nullptr;
+    Widget *_focused = nullptr;
+    bool _focusShown = false;
+    bool _active = true;
+
+    std::function<void()> _dismiss;
+    const Widget *_owner = nullptr;
+    bool _justDismissed = false;
+
+    double _width = 0.0;
+    double _height = 0.0;
+    double _now = 0.0;
+
+    bool _relayout = true;
+    std::uint32_t _revision = 0;
+};
 }
 
 

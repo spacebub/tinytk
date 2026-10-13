@@ -30,20 +30,18 @@ int main() {
     page->pad(ttk::Theme::pad)->spacing(ttk::Theme::gap);
 
     page->append(std::make_unique<ttk::Label>("Hello from tinytk"))
-        ->font(ttk::Theme::palette().headingWeight, ttk::Theme::fontTitle);
+            ->font(ttk::Theme::palette().headingWeight, ttk::Theme::fontTitle);
 
-    page->append(std::make_unique<ttk::Button>("Say hello", [&notifier] {
-        notifier.success("Hello", "tinytk");
-    }));
+    page->append(std::make_unique<ttk::Button>("Say hello", [&notifier] { notifier.success("Hello", "tinytk"); }));
 
-    ttk::Toasts *toasts = shell.ui().layer(ttk::Root::NOTICES)->append(
-        std::make_unique<ttk::Toasts>([&notifier](const int id) { notifier.dismiss(id); }));
+    ttk::Toasts *toasts =
+            shell.ui().layer(ttk::Root::NOTICES)->append(std::make_unique<ttk::Toasts>([&notifier](const int id) {
+                notifier.dismiss(id);
+            }));
 
     // Posted rather than done in place: the news can arrive from inside a toast's
     // own frame, and posting also wakes a loop that had nothing else to do.
-    notifier.changed = [&] {
-        shell.post([&] { toasts->set_messages(notifier.messages()); });
-    };
+    notifier.changed = [&] { shell.post([&] { toasts->set_messages(notifier.messages()); }); };
 
     shell.closing = [&shell] { shell.stop(); };
     shell.run();

@@ -14,126 +14,124 @@
 #include "ttk/toolkit/overlays/Dialog.h"
 
 namespace ttk {
-    Label *Dialog::heading(Box *into, const std::string &text) {
-        Label *made = into->append(std::make_unique<Label>(text));
+Label *Dialog::heading(Box *into, const std::string &text) {
+    Label *made = into->append(std::make_unique<Label>(text));
 
-        made->font(Theme::palette().headingWeight, Theme::fontLarge)->tone(&Theme::Palette::text)->wrap();
+    made->font(Theme::palette().headingWeight, Theme::fontLarge)->tone(&Theme::Palette::text)->wrap();
 
-        return made;
+    return made;
+}
+
+Label *Dialog::body(Box *into, const std::string &text) {
+    Label *made = into->append(std::make_unique<Label>(text));
+
+    made->font(400, Theme::fontBody)->tone(&Theme::Palette::muted)->wrap();
+
+    return made;
+}
+
+Dialog::Dialog() {
+    _takesPointer = true;
+
+    _card = append(std::make_unique<Panel>());
+    _card->rounding = Theme::radius;
+
+    set_open(true);
+}
+
+void Dialog::set_open(const bool open) {
+    if (_open == open) {
+        return;
     }
 
-    Label *Dialog::body(Box *into, const std::string &text) {
-        Label *made = into->append(std::make_unique<Label>(text));
+    _open = open;
 
-        made->font(400, Theme::fontBody)->tone(&Theme::Palette::muted)->wrap();
+    set_visible(open);
 
-        return made;
+    if (open) {
+        _grown.set(0.95F);
+        _grow = true;
     }
 
-    Dialog::Dialog() {
-        _takesPointer = true;
+    invalidate();
+}
 
-        _card = append(std::make_unique<Panel>());
-        _card->rounding = Theme::radius;
+void Dialog::arrange(Typeface &type) {
+    if (_grow) {
+        _grow = false;
 
-        set_open(true);
+        _grown.run(1.0F, now(), 0.14, Anim::Curve::CubicOut);
+
+        wake();
     }
 
-    void Dialog::set_open(const bool open) {
-        if (_open == open) {
-            return;
-        }
+    const double wide = std::min(wanted, _box.w - 48.0);
+    const double want = tall > 0.0 ? tall : _card->natural_height(type, wide);
+    const double high = std::min(want, _box.h - 48.0);
 
-        _open = open;
+    _card->place(BLRect{_box.x + ((_box.w - wide) / 2.0), _box.y + ((_box.h - high) / 2.0), wide, high}, type);
+}
 
-        set_visible(open);
+void Dialog::paint(const Painter &painter) {
+    painter.fill(_box, Theme::palette().scrim);
 
-        if (open) {
-            _grown.set(0.95F);
-            _grow = true;
-        }
+    // The card grows into place. Blend2D can scale, so the transform is a real one.
+    const double grown = _grown.value() > 0.0 ? _grown.value() : 1.0;
+    const bool growing = grown < 0.999;
 
-        invalidate();
+    if (growing) {
+        const BLRect card = _card->box();
+
+        painter.context().save();
+        painter.context().scale(grown, grown);
+        painter.context().translate((card.x + (card.w / 2.0)) * ((1.0 / grown) - 1.0),
+                                    (card.y + (card.h / 2.0)) * ((1.0 / grown) - 1.0));
     }
 
-    void Dialog::arrange(Typeface &type) {
-        if (_grow) {
-            _grow = false;
+    Widget::paint(painter);
+    paint_over(painter);
 
-            _grown.run(1.0F, now(), 0.14, Anim::Curve::CubicOut);
+    if (growing) {
+        painter.context().restore();
+    }
+}
 
-            wake();
-        }
-
-        const double wide = std::min(wanted, _box.w - 48.0);
-        const double want = tall > 0.0 ? tall : _card->natural_height(type, wide);
-        const double high = std::min(want, _box.h - 48.0);
-
-        _card->place(BLRect{_box.x + ((_box.w - wide) / 2.0), _box.y + ((_box.h - high) / 2.0), wide,
-                            high},
-                     type);
+Widget *Dialog::at(const double x, const double y) {
+    if (!visible()) {
+        return nullptr;
     }
 
-    void Dialog::paint(const Painter &painter) {
-        painter.fill(_box, Theme::palette().scrim);
-
-        // The card grows into place. Blend2D can scale, so the transform is a real one.
-        const double grown = _grown.value() > 0.0 ? _grown.value() : 1.0;
-        const bool growing = grown < 0.999;
-
-        if (growing) {
-            const BLRect card = _card->box();
-
-            painter.context().save();
-            painter.context().scale(grown, grown);
-            painter.context().translate((card.x + (card.w / 2.0)) * ((1.0 / grown) - 1.0),
-                                        (card.y + (card.h / 2.0)) * ((1.0 / grown) - 1.0));
-        }
-
-        Widget::paint(painter);
-        paint_over(painter);
-
-        if (growing) {
-            painter.context().restore();
-        }
+    if (Widget *found = Widget::at(x, y); found != nullptr) {
+        return found;
     }
 
-    Widget *Dialog::at(const double x, const double y) {
-        if (!visible()) {
-            return nullptr;
-        }
+    // Anything the card does not want is still the dialog's, so the page under it
+    // never answers the pointer.
+    return this;
+}
 
-        if (Widget *found = Widget::at(x, y); found != nullptr) {
-            return found;
-        }
+bool Dialog::press(const Pointer &at) {
+    _onScrim = !_card->holds(at.x, at.y) && (root() == nullptr || !root()->just_dismissed());
 
-        // Anything the card does not want is still the dialog's, so the page under it
-        // never answers the pointer.
-        return this;
+    return true;
+}
+
+void Dialog::release(const Pointer &at) {
+    const bool scrim = _onScrim;
+
+    _onScrim = false;
+
+    // The callback can take the dialog down, so nothing of it is touched after.
+    if (scrim && !_card->holds(at.x, at.y) && dismissed) {
+        dismissed();
     }
+}
 
-    bool Dialog::press(const Pointer &at) {
-        _onScrim = !_card->holds(at.x, at.y) && (root() == nullptr || !root()->just_dismissed());
+bool Dialog::advance(const double now) {
+    _grown.advance(now);
 
-        return true;
-    }
+    invalidate();
 
-    void Dialog::release(const Pointer &at) {
-        const bool scrim = _onScrim;
-
-        _onScrim = false;
-
-        // The callback can take the dialog down, so nothing of it is touched after.
-        if (scrim && !_card->holds(at.x, at.y) && dismissed) {
-            dismissed();
-        }
-    }
-
-    bool Dialog::advance(const double now) {
-        _grown.advance(now);
-
-        invalidate();
-
-        return _grown.live();
-    }
+    return _grown.live();
+}
 }

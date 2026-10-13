@@ -25,50 +25,50 @@
 #include "ttk/system/Json.h"
 
 namespace {
-    namespace fs = std::filesystem;
-    namespace Json = ttk::Json;
+namespace fs = std::filesystem;
+namespace Json = ttk::Json;
 
-    using Strings = std::vector<std::string>;
+using Strings = std::vector<std::string>;
 
-    constexpr std::size_t LARGE = 100000;
+constexpr std::size_t LARGE = 100000;
 
-    Json::Doc parse(const std::string &text) {
-        std::string error;
-        Json::Doc doc = Json::read_data(text, &error);
+Json::Doc parse(const std::string &text) {
+    std::string error;
+    Json::Doc doc = Json::read_data(text, &error);
 
-        EXPECT_TRUE(doc.valid()) << text << ": " << error;
+    EXPECT_TRUE(doc.valid()) << text << ": " << error;
 
-        return doc;
-    }
+    return doc;
+}
 
-    std::string rejection(const std::string &text) {
-        std::string error;
-        const Json::Doc doc = Json::read_data(text, &error);
+std::string rejection(const std::string &text) {
+    std::string error;
+    const Json::Doc doc = Json::read_data(text, &error);
 
-        EXPECT_FALSE(doc.valid()) << text;
+    EXPECT_FALSE(doc.valid()) << text;
 
-        return error;
-    }
+    return error;
+}
 
-    std::string slurp(const fs::path &path) {
-        std::ifstream file(path, std::ios::binary);
+std::string slurp(const fs::path &path) {
+    std::ifstream file(path, std::ios::binary);
 
-        return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
-    }
+    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+}
 
-    void spill(const fs::path &path, const std::string_view text) {
-        std::ofstream file(path, std::ios::binary | std::ios::trunc);
+void spill(const fs::path &path, const std::string_view text) {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
 
-        file.write(text.data(), static_cast<std::streamsize>(text.size()));
-    }
+    file.write(text.data(), static_cast<std::streamsize>(text.size()));
+}
 
-    Strings field_names(yyjson_val *obj) {
-        Strings out;
+Strings field_names(yyjson_val *obj) {
+    Strings out;
 
-        Json::each_field(obj, [&out](const std::string_view key, yyjson_val *) { out.emplace_back(key); });
+    Json::each_field(obj, [&out](const std::string_view key, yyjson_val *) { out.emplace_back(key); });
 
-        return out;
-    }
+    return out;
+}
 }
 
 TEST(JsonDoc, DefaultIsInvalid) {

@@ -15,11 +15,11 @@
 //! Text on the system clipboard, through SDL.
 namespace ttk::Clipboard {
 
-    //! Returns the text on the clipboard as UTF-8, or an empty string when it holds no text or cannot be read.
-    std::string read();
+//! Returns the text on the clipboard as UTF-8, or an empty string when it holds no text or cannot be read.
+std::string read();
 
-    //! Replaces the clipboard's contents with `text`, which is UTF-8 and ends at its first nul byte.
-    void write(const std::string &text);
+//! Replaces the clipboard's contents with `text`, which is UTF-8 and ends at its first nul byte.
+void write(const std::string &text);
 
 }
 

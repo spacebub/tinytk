@@ -25,102 +25,102 @@
 #include "ttk/system/Paths.h"
 
 namespace {
-    namespace fs = std::filesystem;
-    namespace Notify = ttk::Notify;
+namespace fs = std::filesystem;
+namespace Notify = ttk::Notify;
 
-    constexpr const char *NO_BUS = "there is no session bus";
-    constexpr const char *NOT_TEXT = "the notification is not valid UTF-8";
-    constexpr const char *REFUSED = "the session bus refused the connection";
+constexpr const char *NO_BUS = "there is no session bus";
+constexpr const char *NOT_TEXT = "the notification is not valid UTF-8";
+constexpr const char *REFUSED = "the session bus refused the connection";
 
-    // Every case points the bus address at the sandbox, so no message can reach the real desktop.
-    class NotifyOffline : public ::testing::Test {
-    protected:
-        void SetUp() override {
-            Notify::stop();
-            _application = ttk::Paths::application();
-            _bus = tests::Sandbox::scratch("notify-bus") / "absent";
-            ttk::Env::set("DBUS_SESSION_BUS_ADDRESS", ("unix:path=" + _bus.string()).c_str());
-            ttk::Env::set("XDG_RUNTIME_DIR", tests::Sandbox::scratch("notify-runtime").c_str());
+// Every case points the bus address at the sandbox, so no message can reach the real desktop.
+class NotifyOffline : public ::testing::Test {
+protected:
+    void SetUp() override {
+        Notify::stop();
+        _application = ttk::Paths::application();
+        _bus = tests::Sandbox::scratch("notify-bus") / "absent";
+        ttk::Env::set("DBUS_SESSION_BUS_ADDRESS", ("unix:path=" + _bus.string()).c_str());
+        ttk::Env::set("XDG_RUNTIME_DIR", tests::Sandbox::scratch("notify-runtime").c_str());
+    }
+
+    void TearDown() override {
+        Notify::stop();
+        ttk::Paths::set_application(_application);
+    }
+
+    [[nodiscard]] const fs::path &bus() const { return _bus; }
+
+private:
+    std::string _application;
+    fs::path _bus;
+};
+
+// Answers the first authentication line with a rejection and hangs up.
+class RefusingBus {
+public:
+    explicit RefusingBus(const fs::path &path) : _socket(::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) {
+        sockaddr_un address{};
+        address.sun_family = AF_UNIX;
+        std::strncpy(address.sun_path, path.c_str(), sizeof(address.sun_path) - 1);
+
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): the sockets API takes the generic address.
+        _ready = _socket >= 0 && ::bind(_socket, reinterpret_cast<const sockaddr *>(&address), sizeof(address)) == 0
+                 && ::listen(_socket, 1) == 0;
+
+        if (_ready) {
+            _thread = std::thread([this] { serve(); });
+        }
+    }
+
+    ~RefusingBus() {
+        if (_thread.joinable()) {
+            _thread.join();
         }
 
-        void TearDown() override {
-            Notify::stop();
-            ttk::Paths::set_application(_application);
+        if (_socket >= 0) {
+            ::close(_socket);
+        }
+    }
+
+    RefusingBus(const RefusingBus &) = delete;
+    RefusingBus &operator=(const RefusingBus &) = delete;
+    RefusingBus(RefusingBus &&) = delete;
+    RefusingBus &operator=(RefusingBus &&) = delete;
+
+    [[nodiscard]] bool ready() const { return _ready; }
+
+private:
+    void serve() const {
+        const int peer = ::accept(_socket, nullptr, nullptr);
+
+        if (peer < 0) {
+            return;
         }
 
-        [[nodiscard]] const fs::path &bus() const { return _bus; }
+        std::string heard;
+        std::array<char, 256> buffer{};
 
-    private:
-        std::string _application;
-        fs::path _bus;
-    };
+        while (!heard.contains("\r\n")) {
+            const ssize_t got = ::read(peer, buffer.data(), buffer.size());
 
-    // Answers the first authentication line with a rejection and hangs up.
-    class RefusingBus {
-    public:
-        explicit RefusingBus(const fs::path &path) : _socket(::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) {
-            sockaddr_un address{};
-            address.sun_family = AF_UNIX;
-            std::strncpy(address.sun_path, path.c_str(), sizeof(address.sun_path) - 1);
-
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): the sockets API takes the generic address.
-            _ready = _socket >= 0 && ::bind(_socket, reinterpret_cast<const sockaddr *>(&address), sizeof(address)) == 0
-                     && ::listen(_socket, 1) == 0;
-
-            if (_ready) {
-                _thread = std::thread([this] { serve(); });
+            if (got <= 0) {
+                break;
             }
+
+            heard.append(buffer.data(), static_cast<std::size_t>(got));
         }
 
-        ~RefusingBus() {
-            if (_thread.joinable()) {
-                _thread.join();
-            }
+        constexpr std::string_view ANSWER = "REJECTED EXTERNAL\r\n";
 
-            if (_socket >= 0) {
-                ::close(_socket);
-            }
-        }
+        [[maybe_unused]] const ssize_t wrote = ::write(peer, ANSWER.data(), ANSWER.size());
 
-        RefusingBus(const RefusingBus &) = delete;
-        RefusingBus &operator=(const RefusingBus &) = delete;
-        RefusingBus(RefusingBus &&) = delete;
-        RefusingBus &operator=(RefusingBus &&) = delete;
+        ::close(peer);
+    }
 
-        [[nodiscard]] bool ready() const { return _ready; }
-
-    private:
-        void serve() const {
-            const int peer = ::accept(_socket, nullptr, nullptr);
-
-            if (peer < 0) {
-                return;
-            }
-
-            std::string heard;
-            std::array<char, 256> buffer{};
-
-            while (!heard.contains("\r\n")) {
-                const ssize_t got = ::read(peer, buffer.data(), buffer.size());
-
-                if (got <= 0) {
-                    break;
-                }
-
-                heard.append(buffer.data(), static_cast<std::size_t>(got));
-            }
-
-            constexpr std::string_view ANSWER = "REJECTED EXTERNAL\r\n";
-
-            [[maybe_unused]] const ssize_t wrote = ::write(peer, ANSWER.data(), ANSWER.size());
-
-            ::close(peer);
-        }
-
-        int _socket{-1};
-        bool _ready{false};
-        std::thread _thread;
-    };
+    int _socket{-1};
+    bool _ready{false};
+    std::thread _thread;
+};
 }
 
 TEST(NotifyMessage, DefaultsToNormalUrgencyAndServerTimeout) {

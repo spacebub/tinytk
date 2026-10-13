@@ -10,294 +10,292 @@
 
 #include <benchmark/benchmark.h>
 
-#include "ttk/draw/Theme.h"
-#include "ttk/toolkit/Painter.h"
 #include "support/Canvas.h"
 #include "support/Fixtures.h"
+#include "ttk/draw/Theme.h"
+#include "ttk/toolkit/Painter.h"
 
 namespace {
-    class Sheet {
-    public:
-        Sheet() : _canvas(1280, 800),
-                  _painter(_canvas.context(), _canvas.type(), BLRectI{0, 0, 1280, 800}) {}
+class Sheet {
+public:
+    Sheet() : _canvas(1280, 800), _painter(_canvas.context(), _canvas.type(), BLRectI{0, 0, 1280, 800}) {}
 
-        // Painting one damaged rectangle, with the context clipped to it as a frame does.
-        explicit Sheet(const BLRectI &clip) : _canvas(1280, 800), _painter(_canvas.context(), _canvas.type(), clip) {
-            _canvas.context().clip_to_rect(clip);
-        }
-
-        const ttk::Painter &painter() const { return _painter; }
-
-        bench::Canvas &canvas() { return _canvas; }
-
-        void flush() { _canvas.context().flush(BL_CONTEXT_FLUSH_SYNC); }
-
-    private:
-        bench::Canvas _canvas;
-        ttk::Painter _painter;
-    };
-
-    // Three rows across the middle of the paragraph's box, clear of the box the culled benchmarks draw.
-    constexpr BLRectI STRIP{0, 309, 1280, 3};
-
-    const std::string &prose() {
-        static const std::string made = bench::Fixtures::paragraph(12);
-
-        return made;
+    // Painting one damaged rectangle, with the context clipped to it as a frame does.
+    explicit Sheet(const BLRectI &clip) : _canvas(1280, 800), _painter(_canvas.context(), _canvas.type(), clip) {
+        _canvas.context().clip_to_rect(clip);
     }
 
-    void Painter_fill(benchmark::State &state) {
-        Sheet sheet;
+    const ttk::Painter &painter() const { return _painter; }
 
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().fill(BLRect{10, 10, 240, 42}, ttk::Theme::palette().surface);
-        }
+    bench::Canvas &canvas() { return _canvas; }
 
-        sheet.flush();
+    void flush() { _canvas.context().flush(BL_CONTEXT_FLUSH_SYNC); }
+
+private:
+    bench::Canvas _canvas;
+    ttk::Painter _painter;
+};
+
+// Three rows across the middle of the paragraph's box, clear of the box the culled benchmarks draw.
+constexpr BLRectI STRIP{0, 309, 1280, 3};
+
+const std::string &prose() {
+    static const std::string made = bench::Fixtures::paragraph(12);
+
+    return made;
+}
+
+void Painter_fill(benchmark::State &state) {
+    Sheet sheet;
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().fill(BLRect{10, 10, 240, 42}, ttk::Theme::palette().surface);
     }
 
-    BENCHMARK(Painter_fill);
+    sheet.flush();
+}
 
-    void Painter_fill_culled(benchmark::State &state) {
-        Sheet sheet(STRIP);
+BENCHMARK(Painter_fill);
 
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().fill(BLRect{10, 10, 240, 42}, ttk::Theme::palette().surface);
-        }
+void Painter_fill_culled(benchmark::State &state) {
+    Sheet sheet(STRIP);
 
-        sheet.flush();
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().fill(BLRect{10, 10, 240, 42}, ttk::Theme::palette().surface);
     }
 
-    BENCHMARK(Painter_fill_culled);
+    sheet.flush();
+}
 
-    void Painter_round(benchmark::State &state) {
-        Sheet sheet;
+BENCHMARK(Painter_fill_culled);
 
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().round(BLRect{10, 10, 240, 42}, ttk::Theme::radius, ttk::Theme::palette().surface);
-        }
+void Painter_round(benchmark::State &state) {
+    Sheet sheet;
 
-        sheet.flush();
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().round(BLRect{10, 10, 240, 42}, ttk::Theme::radius, ttk::Theme::palette().surface);
     }
 
-    BENCHMARK(Painter_round);
+    sheet.flush();
+}
 
-    void Painter_outline(benchmark::State &state) {
-        Sheet sheet;
+BENCHMARK(Painter_round);
 
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().outline(BLRect{10, 10, 240, 42}, ttk::Theme::radius, 1.0, ttk::Theme::palette().border);
-        }
+void Painter_outline(benchmark::State &state) {
+    Sheet sheet;
 
-        sheet.flush();
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().outline(BLRect{10, 10, 240, 42}, ttk::Theme::radius, 1.0, ttk::Theme::palette().border);
     }
 
-    BENCHMARK(Painter_outline);
+    sheet.flush();
+}
 
-    void Painter_circle(benchmark::State &state) {
-        Sheet sheet;
+BENCHMARK(Painter_outline);
 
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().circle(BLPoint{64, 64}, 9.0, ttk::Theme::palette().accent);
-        }
+void Painter_circle(benchmark::State &state) {
+    Sheet sheet;
 
-        sheet.flush();
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().circle(BLPoint{64, 64}, 9.0, ttk::Theme::palette().accent);
     }
 
-    BENCHMARK(Painter_circle);
+    sheet.flush();
+}
 
-    void Painter_needed(benchmark::State &state) {
-        Sheet sheet;
+BENCHMARK(Painter_circle);
 
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(sheet.painter().needed(BLRect{10, 10, 240, 42}));
-        }
+void Painter_needed(benchmark::State &state) {
+    Sheet sheet;
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(sheet.painter().needed(BLRect{10, 10, 240, 42}));
+    }
+}
+
+BENCHMARK(Painter_needed);
+
+void Painter_needed_culled(benchmark::State &state) {
+    Sheet sheet(STRIP);
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(sheet.painter().needed(BLRect{10, 10, 240, 42}));
+    }
+}
+
+BENCHMARK(Painter_needed_culled);
+
+void Painter_width(benchmark::State &state) {
+    Sheet sheet;
+
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+    const std::string run = "Ultra-Violence";
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(sheet.painter().width(font, run));
+    }
+}
+
+BENCHMARK(Painter_width);
+
+void Painter_elide(benchmark::State &state) {
+    Sheet sheet;
+
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+    const std::string run = "/games/doom/addons/Eviternity II RC1.wad";
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(&sheet.painter().elide(font, run, 180.0));
+    }
+}
+
+BENCHMARK(Painter_elide);
+
+void Painter_text(benchmark::State &state) {
+    Sheet sheet;
+
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+    const std::string run = "Knee Deep in the Dead";
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().text(font, BLPoint{10, 10}, run, ttk::Theme::palette().text);
     }
 
-    BENCHMARK(Painter_needed);
+    sheet.flush();
+}
 
-    void Painter_needed_culled(benchmark::State &state) {
-        Sheet sheet(STRIP);
+BENCHMARK(Painter_text);
 
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(sheet.painter().needed(BLRect{10, 10, 240, 42}));
-        }
+// Measured, elided and drawn: what a row of a list costs.
+void Painter_label(benchmark::State &state) {
+    Sheet sheet;
+
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+    const std::string run = "/games/doom/addons/Eviternity II RC1.wad";
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().label(font, BLRect{10, 10, 240, 24}, ttk::Align::Start, run, ttk::Theme::palette().text);
     }
 
-    BENCHMARK(Painter_needed_culled);
+    sheet.flush();
+}
 
-    void Painter_width(benchmark::State &state) {
-        Sheet sheet;
+BENCHMARK(Painter_label);
 
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
-        const std::string run = "Ultra-Violence";
+void Painter_tracked(benchmark::State &state) {
+    Sheet sheet;
 
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(sheet.painter().width(font, run));
-        }
+    const BLFont &font = sheet.painter().font(ttk::Typeface::semibold, ttk::Theme::fontTiny);
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().tracked(font, BLPoint{10, 10}, "ENGINES", ttk::Theme::palette().muted, 1.2);
     }
 
-    BENCHMARK(Painter_width);
+    sheet.flush();
+}
 
-    void Painter_elide(benchmark::State &state) {
-        Sheet sheet;
+BENCHMARK(Painter_tracked);
 
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
-        const std::string run = "/games/doom/addons/Eviternity II RC1.wad";
+void Painter_paragraph(benchmark::State &state) {
+    Sheet sheet;
 
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(&sheet.painter().elide(font, run, 180.0));
-        }
-    }
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
 
-    BENCHMARK(Painter_elide);
-
-    void Painter_text(benchmark::State &state) {
-        Sheet sheet;
-
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
-        const std::string run = "Knee Deep in the Dead";
-
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().text(font, BLPoint{10, 10}, run, ttk::Theme::palette().text);
-        }
-
-        sheet.flush();
-    }
-
-    BENCHMARK(Painter_text);
-
-    // Measured, elided and drawn: what a row of a list costs.
-    void Painter_label(benchmark::State &state) {
-        Sheet sheet;
-
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
-        const std::string run = "/games/doom/addons/Eviternity II RC1.wad";
-
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().label(font, BLRect{10, 10, 240, 24}, ttk::Align::Start, run,
-                                  ttk::Theme::palette().text);
-        }
-
-        sheet.flush();
-    }
-
-    BENCHMARK(Painter_label);
-
-    void Painter_tracked(benchmark::State &state) {
-        Sheet sheet;
-
-        const BLFont &font = sheet.painter().font(ttk::Typeface::semibold, ttk::Theme::fontTiny);
-
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().tracked(font, BLPoint{10, 10}, "ENGINES", ttk::Theme::palette().muted, 1.2);
-        }
-
-        sheet.flush();
-    }
-
-    BENCHMARK(Painter_tracked);
-
-    void Painter_paragraph(benchmark::State &state) {
-        Sheet sheet;
-
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
-
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(
                 sheet.painter().paragraph(font, BLRect{10, 10, 420, 600}, prose(), ttk::Theme::palette().text));
-        }
-
-        sheet.flush();
     }
 
-    BENCHMARK(Painter_paragraph);
+    sheet.flush();
+}
 
-    void Painter_paragraph_strip(benchmark::State &state) {
-        Sheet sheet(STRIP);
+BENCHMARK(Painter_paragraph);
 
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+void Painter_paragraph_strip(benchmark::State &state) {
+    Sheet sheet(STRIP);
 
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(
-                    sheet.painter().paragraph(font, BLRect{10, 10, 420, 600}, prose(), ttk::Theme::palette().text));
-        }
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
 
-        sheet.flush();
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(
+                sheet.painter().paragraph(font, BLRect{10, 10, 420, 600}, prose(), ttk::Theme::palette().text));
     }
 
-    BENCHMARK(Painter_paragraph_strip);
+    sheet.flush();
+}
 
-    void Painter_wrap_height(benchmark::State &state) {
-        Sheet sheet;
+BENCHMARK(Painter_paragraph_strip);
 
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+void Painter_wrap_height(benchmark::State &state) {
+    Sheet sheet;
 
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(sheet.painter().wrap_height(font, prose(), 420.0));
-        }
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(sheet.painter().wrap_height(font, prose(), 420.0));
+    }
+}
+
+BENCHMARK(Painter_wrap_height);
+
+// A fold is cached, so this is what a caller that has asked before pays.
+void Painter_fold_kept(benchmark::State &state) {
+    Sheet sheet;
+
+    ttk::Typeface &type = sheet.canvas().type();
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(ttk::fold_spans(type, font, prose(), 420.0).size());
+    }
+}
+
+BENCHMARK(Painter_fold_kept);
+
+// The width is stepped, so every turn folds afresh.
+void Painter_fold_spans(benchmark::State &state) {
+    Sheet sheet;
+
+    ttk::Typeface &type = sheet.canvas().type();
+    const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+
+    double room = 300.0;
+
+    for ([[maybe_unused]] auto step : state) {
+        room = room >= 520.0 ? 300.0 : room + 0.25;
+
+        benchmark::DoNotOptimize(ttk::fold_spans(type, font, prose(), room).size());
+    }
+}
+
+BENCHMARK(Painter_fold_spans);
+
+void Painter_push_pop(benchmark::State &state) {
+    Sheet sheet;
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().push(BLRect{10, 10, 400, 400});
+        sheet.painter().pop();
+    }
+}
+
+BENCHMARK(Painter_push_pop);
+
+// A panel as the controls draw one: fill, border and a heading.
+void Painter_panel(benchmark::State &state) {
+    Sheet sheet;
+
+    const BLFont &font = sheet.painter().font(ttk::Typeface::semibold, ttk::Theme::fontMedium);
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().round(BLRect{10, 10, 560, 180}, ttk::Theme::radius, ttk::Theme::palette().surface);
+        sheet.painter().outline(BLRect{10, 10, 560, 180}, ttk::Theme::radius, 1.0, ttk::Theme::palette().border);
+        sheet.painter().label(
+                font, BLRect{26, 22, 300, 24}, ttk::Align::Start, "Multiplayer", ttk::Theme::palette().text);
     }
 
-    BENCHMARK(Painter_wrap_height);
+    sheet.flush();
+}
 
-    // A fold is cached, so this is what a caller that has asked before pays.
-    void Painter_fold_kept(benchmark::State &state) {
-        Sheet sheet;
-
-        ttk::Typeface &type = sheet.canvas().type();
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
-
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(ttk::fold_spans(type, font, prose(), 420.0).size());
-        }
-    }
-
-    BENCHMARK(Painter_fold_kept);
-
-    // The width is stepped, so every turn folds afresh.
-    void Painter_fold_spans(benchmark::State &state) {
-        Sheet sheet;
-
-        ttk::Typeface &type = sheet.canvas().type();
-        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
-
-        double room = 300.0;
-
-        for ([[maybe_unused]] auto step : state) {
-            room = room >= 520.0 ? 300.0 : room + 0.25;
-
-            benchmark::DoNotOptimize(ttk::fold_spans(type, font, prose(), room).size());
-        }
-    }
-
-    BENCHMARK(Painter_fold_spans);
-
-    void Painter_push_pop(benchmark::State &state) {
-        Sheet sheet;
-
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().push(BLRect{10, 10, 400, 400});
-            sheet.painter().pop();
-        }
-    }
-
-    BENCHMARK(Painter_push_pop);
-
-    // A panel as the controls draw one: fill, border and a heading.
-    void Painter_panel(benchmark::State &state) {
-        Sheet sheet;
-
-        const BLFont &font = sheet.painter().font(ttk::Typeface::semibold, ttk::Theme::fontMedium);
-
-        for ([[maybe_unused]] auto step : state) {
-            sheet.painter().round(BLRect{10, 10, 560, 180}, ttk::Theme::radius, ttk::Theme::palette().surface);
-            sheet.painter().outline(BLRect{10, 10, 560, 180}, ttk::Theme::radius, 1.0, ttk::Theme::palette().border);
-            sheet.painter().label(font, BLRect{26, 22, 300, 24}, ttk::Align::Start, "Multiplayer",
-                                  ttk::Theme::palette().text);
-        }
-
-        sheet.flush();
-    }
-
-    BENCHMARK(Painter_panel);
+BENCHMARK(Painter_panel);
 }

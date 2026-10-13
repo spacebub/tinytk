@@ -15,17 +15,17 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
-    //! Horizontal hairline in the theme's border colour, used to divide a panel.
-    class Rule : public Widget {
-    public:
-        //! Creates a rule with a \ref fixedHeight of 1 pixel.
-        Rule() { fixedHeight = 1.0; }
+//! Horizontal hairline in the theme's border colour, used to divide a panel.
+class Rule : public Widget {
+public:
+    //! Creates a rule with a \ref fixedHeight of 1 pixel.
+    Rule() { fixedHeight = 1.0; }
 
-        //! Fills the top pixel row of \ref box() with the theme's border colour.
-        void paint(const Painter &painter) override {
-            painter.fill(BLRect{_box.x, _box.y, _box.w, 1.0}, Theme::palette().border);
-        }
-    };
+    //! Fills the top pixel row of \ref box() with the theme's border colour.
+    void paint(const Painter &painter) override {
+        painter.fill(BLRect{_box.x, _box.y, _box.w, 1.0}, Theme::palette().border);
+    }
+};
 }
 
 

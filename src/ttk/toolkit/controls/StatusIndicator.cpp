@@ -15,194 +15,198 @@
 #include "ttk/draw/Typeface.h"
 
 namespace ttk {
-    namespace {
+namespace {
 
-        // The tile is dark in both shades.
-        constexpr BLRgba32 TILE{0x9e000000};
+// The tile is dark in both shades.
+constexpr BLRgba32 TILE{0x9e000000};
 
-        // Left pad, dot, gap and right pad around the word.
-        constexpr double PAD = 10.0;
-        constexpr double DOT = 3.5;
-        constexpr double GAP = 6.0;
-        constexpr double TEXT = PAD + (DOT * 2.0) + GAP;
+// Left pad, dot, gap and right pad around the word.
+constexpr double PAD = 10.0;
+constexpr double DOT = 3.5;
+constexpr double GAP = 6.0;
+constexpr double TEXT = PAD + (DOT * 2.0) + GAP;
 
-        StatusIndicator::Tones palette_tones(const Theme::Palette &palette) {
-            return {.launching = palette.accentHover,
-                    .running = palette.success,
-                    .failing = palette.danger,
-                    .idle = palette.muted,};
-        }
+StatusIndicator::Tones palette_tones(const Theme::Palette &palette) {
+    return {
+            .launching = palette.accentHover,
+            .running = palette.success,
+            .failing = palette.danger,
+            .idle = palette.muted,
+    };
+}
 
-        StatusIndicator::Tones (*deriveTones)(const Theme::Palette &) = &palette_tones;
+StatusIndicator::Tones (*deriveTones)(const Theme::Palette &) = &palette_tones;
 
-        StatusIndicator::Tones derived{};
-        std::uint32_t derivedAt = 0;
+StatusIndicator::Tones derived{};
+std::uint32_t derivedAt = 0;
 
-        BLRgba32 tone_of(const StatusIndicator::Status status) {
-            if (derivedAt != Theme::revision()) {
-                derived = deriveTones(Theme::palette());
-                derivedAt = Theme::revision();
-            }
-
-            switch (status) {
-                case StatusIndicator::Status::Launching:
-                    return derived.launching;
-                case StatusIndicator::Status::Running:
-                    return derived.running;
-                case StatusIndicator::Status::Stopping:
-                case StatusIndicator::Status::Failed:
-                    return derived.failing;
-                case StatusIndicator::Status::Empty:
-                case StatusIndicator::Status::Closed:
-                    break;
-            }
-
-            return derived.idle;
-        }
-
-        std::string_view label_of(const StatusIndicator::Status status) {
-            switch (status) {
-                case StatusIndicator::Status::Launching:
-                    return "Launching";
-                case StatusIndicator::Status::Running:
-                    return "Running";
-                case StatusIndicator::Status::Stopping:
-                    return "Stopping";
-                case StatusIndicator::Status::Failed:
-                    return "Failed";
-                case StatusIndicator::Status::Empty:
-                case StatusIndicator::Status::Closed:
-                    break;
-            }
-
-            return "Closed";
-        }
-
+BLRgba32 tone_of(const StatusIndicator::Status status) {
+    if (derivedAt != Theme::revision()) {
+        derived = deriveTones(Theme::palette());
+        derivedAt = Theme::revision();
     }
 
-    void StatusIndicator::set_tones(Tones (*const derive)(const Theme::Palette &)) {
-        deriveTones = derive;
-        derivedAt = 0;
+    switch (status) {
+        case StatusIndicator::Status::Launching:
+            return derived.launching;
+        case StatusIndicator::Status::Running:
+            return derived.running;
+        case StatusIndicator::Status::Stopping:
+        case StatusIndicator::Status::Failed:
+            return derived.failing;
+        case StatusIndicator::Status::Empty:
+        case StatusIndicator::Status::Closed:
+            break;
     }
 
-    bool StatusIndicator::beats(const Status status) {
-        return status == Status::Launching || status == Status::Stopping;
+    return derived.idle;
+}
+
+std::string_view label_of(const StatusIndicator::Status status) {
+    switch (status) {
+        case StatusIndicator::Status::Launching:
+            return "Launching";
+        case StatusIndicator::Status::Running:
+            return "Running";
+        case StatusIndicator::Status::Stopping:
+            return "Stopping";
+        case StatusIndicator::Status::Failed:
+            return "Failed";
+        case StatusIndicator::Status::Empty:
+        case StatusIndicator::Status::Closed:
+            break;
     }
 
-    std::string StatusIndicator::say_of(const Status status, const std::string &reason) {
-        switch (status) {
-            case Status::Launching:
-                return "It has been started and is loading.";
-            case Status::Running:
-                return "It is up.";
-            case Status::Stopping:
-                return "It has been asked to quit. One still loading does not hear until it is up.";
-            case Status::Failed:
-                return reason.empty() ? "It did not start." : reason;
-            case Status::Empty:
-            case Status::Closed:
-                break;
-        }
+    return "Closed";
+}
 
-        return "It has been closed.";
+}
+
+void StatusIndicator::set_tones(Tones (*const derive)(const Theme::Palette &)) {
+    deriveTones = derive;
+    derivedAt = 0;
+}
+
+bool StatusIndicator::beats(const Status status) {
+    return status == Status::Launching || status == Status::Stopping;
+}
+
+std::string StatusIndicator::say_of(const Status status, const std::string &reason) {
+    switch (status) {
+        case Status::Launching:
+            return "It has been started and is loading.";
+        case Status::Running:
+            return "It is up.";
+        case Status::Stopping:
+            return "It has been asked to quit. One still loading does not hear until it is up.";
+        case Status::Failed:
+            return reason.empty() ? "It did not start." : reason;
+        case Status::Empty:
+        case Status::Closed:
+            break;
     }
 
-    double StatusIndicator::width_of(Typeface &type, const Status status) {
-        if (status == Status::Empty) {
-            return 0.0;
-        }
+    return "It has been closed.";
+}
 
-        return type.width(type.at(600, Theme::fontTiny), label_of(status)) + TEXT + PAD;
+double StatusIndicator::width_of(Typeface &type, const Status status) {
+    if (status == Status::Empty) {
+        return 0.0;
     }
 
-    BLRect StatusIndicator::render(const Painter &painter, const BLPoint at, const Status status,
-                                   const bool dim) {
-        if (status == Status::Empty) {
-            return {};
-        }
+    return type.width(type.at(600, Theme::fontTiny), label_of(status)) + TEXT + PAD;
+}
 
-        const BLFont &face = painter.font(600, Theme::fontTiny);
-        const std::string_view said = label_of(status);
-
-        const BLRect box{at.x, at.y, painter.width(face, said) + TEXT + PAD, HEIGHT};
-        const BLRgba32 tone = tone_of(status);
-        const double radius = box.h / 2.0;
-
-        painter.round(box, radius, TILE);
-        painter.outline(box, radius, 1.0, Theme::alpha(tone, 0.5));
-
-        painter.circle(BLPoint{box.x + PAD + DOT, box.y + (box.h / 2.0)}, DOT,
-                       dim && beats(status) ? Theme::alpha(tone, 0.2) : tone);
-        painter.label(face, BLRect{box.x + TEXT, box.y, box.w - TEXT, box.h}, Align::Start, said, tone);
-
-        return box;
+BLRect StatusIndicator::render(const Painter &painter, const BLPoint at, const Status status, const bool dim) {
+    if (status == Status::Empty) {
+        return {};
     }
 
-    void StatusIndicator::set(const Status status, const std::string_view reason) {
-        if (_status == status && _reason == reason) {
-            return;
-        }
+    const BLFont &face = painter.font(600, Theme::fontTiny);
+    const std::string_view said = label_of(status);
 
-        _status = status;
-        _reason = reason;
-        _dim = false;
-        _blinked = now();
+    const BLRect box{at.x, at.y, painter.width(face, said) + TEXT + PAD, HEIGHT};
+    const BLRgba32 tone = tone_of(status);
+    const double radius = box.h / 2.0;
 
-        retell();
+    painter.round(box, radius, TILE);
+    painter.outline(box, radius, 1.0, Theme::alpha(tone, 0.5));
+
+    painter.circle(BLPoint{box.x + PAD + DOT, box.y + (box.h / 2.0)},
+                   DOT,
+                   dim && beats(status) ? Theme::alpha(tone, 0.2) : tone);
+    painter.label(face, BLRect{box.x + TEXT, box.y, box.w - TEXT, box.h}, Align::Start, said, tone);
+
+    return box;
+}
+
+void StatusIndicator::set(const Status status, const std::string_view reason) {
+    if (_status == status && _reason == reason) {
+        return;
+    }
+
+    _status = status;
+    _reason = reason;
+    _dim = false;
+    _blinked = now();
+
+    retell();
+    invalidate();
+
+    if (beats(_status)) {
+        wake();
+    }
+}
+
+StatusIndicator *StatusIndicator::on_click(std::function<void()> clicked, std::string about) {
+    _clicked = std::move(clicked);
+    _about = std::move(about);
+    _takesPointer = _clicked != nullptr;
+    cursor = _takesPointer ? Cursor::Pointer : Cursor::Default;
+
+    retell();
+
+    return this;
+}
+
+void StatusIndicator::retell() {
+    hint = _status == Status::Empty ? std::string() : say_of(_status, _reason);
+
+    if (!hint.empty() && !_about.empty()) {
+        hint += " " + _about;
+    }
+}
+
+double StatusIndicator::natural_width(Typeface &type) {
+    return fixedWidth >= 0.0 ? fixedWidth : width_of(type, _status);
+}
+
+void StatusIndicator::paint(const Painter &painter) {
+    render(painter, BLPoint{_box.x, _box.y}, _status, _dim);
+}
+
+bool StatusIndicator::press(const Pointer & /*at*/) {
+    return _clicked != nullptr;
+}
+
+void StatusIndicator::release(const Pointer &at) {
+    if (_clicked && holds(at.x, at.y)) {
+        _clicked();
+    }
+}
+
+bool StatusIndicator::advance(const double now) {
+    if (!beats(_status)) {
+        return false;
+    }
+
+    if (now >= _blinked + BEAT) {
+        _blinked = now;
+        _dim = !_dim;
+
         invalidate();
-
-        if (beats(_status)) {
-            wake();
-        }
     }
 
-    StatusIndicator *StatusIndicator::on_click(std::function<void()> clicked, std::string about) {
-        _clicked = std::move(clicked);
-        _about = std::move(about);
-        _takesPointer = _clicked != nullptr;
-        cursor = _takesPointer ? Cursor::Pointer : Cursor::Default;
-
-        retell();
-
-        return this;
-    }
-
-    void StatusIndicator::retell() {
-        hint = _status == Status::Empty ? std::string() : say_of(_status, _reason);
-
-        if (!hint.empty() && !_about.empty()) {
-            hint += " " + _about;
-        }
-    }
-
-    double StatusIndicator::natural_width(Typeface &type) {
-        return fixedWidth >= 0.0 ? fixedWidth : width_of(type, _status);
-    }
-
-    void StatusIndicator::paint(const Painter &painter) {
-        render(painter, BLPoint{_box.x, _box.y}, _status, _dim);
-    }
-
-    bool StatusIndicator::press(const Pointer & /*at*/) { return _clicked != nullptr; }
-
-    void StatusIndicator::release(const Pointer &at) {
-        if (_clicked && holds(at.x, at.y)) {
-            _clicked();
-        }
-    }
-
-    bool StatusIndicator::advance(const double now) {
-        if (!beats(_status)) {
-            return false;
-        }
-
-        if (now >= _blinked + BEAT) {
-            _blinked = now;
-            _dim = !_dim;
-
-            invalidate();
-        }
-
-        return sleep_until(_blinked + BEAT);
-    }
+    return sleep_until(_blinked + BEAT);
+}
 }

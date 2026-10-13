@@ -18,48 +18,48 @@
 #endif
 
 namespace ttk {
-    std::string Env::get(const char *name) {
+std::string Env::get(const char *name) {
 #ifdef _MSC_VER
-        char *value = nullptr;
-        size_t length = 0;
+    char *value = nullptr;
+    size_t length = 0;
 
-        if (_dupenv_s(&value, &length, name) != 0 || value == nullptr) {
-            return {};
-        }
-
-        std::string held(value);
-
-        std::free(value);
-
-        return held;
-#else
-        // NOLINTNEXTLINE(concurrency-mt-unsafe): set() runs before any thread starts.
-        const char *value = std::getenv(name);
-
-        return value != nullptr ? std::string(value) : std::string();
-#endif
+    if (_dupenv_s(&value, &length, name) != 0 || value == nullptr) {
+        return {};
     }
 
-    void Env::set(const char *name, const char *value) {
+    std::string held(value);
+
+    std::free(value);
+
+    return held;
+#else
+    // NOLINTNEXTLINE(concurrency-mt-unsafe): set() runs before any thread starts.
+    const char *value = std::getenv(name);
+
+    return value != nullptr ? std::string(value) : std::string();
+#endif
+}
+
+void Env::set(const char *name, const char *value) {
 #ifdef _WIN32
-        const int wide = MultiByteToWideChar(CP_UTF8, 0, value, -1, nullptr, 0);
-        std::wstring held(static_cast<size_t>(wide), L'\0');
+    const int wide = MultiByteToWideChar(CP_UTF8, 0, value, -1, nullptr, 0);
+    std::wstring held(static_cast<size_t>(wide), L'\0');
 
-        MultiByteToWideChar(CP_UTF8, 0, value, -1, held.data(), wide);
+    MultiByteToWideChar(CP_UTF8, 0, value, -1, held.data(), wide);
 
-        const int narrow = MultiByteToWideChar(CP_UTF8, 0, name, -1, nullptr, 0);
-        std::wstring called(static_cast<size_t>(narrow), L'\0');
+    const int narrow = MultiByteToWideChar(CP_UTF8, 0, name, -1, nullptr, 0);
+    std::wstring called(static_cast<size_t>(narrow), L'\0');
 
-        MultiByteToWideChar(CP_UTF8, 0, name, -1, called.data(), narrow);
+    MultiByteToWideChar(CP_UTF8, 0, name, -1, called.data(), narrow);
 
-        SetEnvironmentVariableW(called.c_str(), held.c_str());
+    SetEnvironmentVariableW(called.c_str(), held.c_str());
 
-        // Windows keeps the C library's environment separate, and get() reads that one.
-        // NOLINTNEXTLINE(concurrency-mt-unsafe): runs before any thread starts.
-        _wputenv_s(called.c_str(), held.c_str());
+    // Windows keeps the C library's environment separate, and get() reads that one.
+    // NOLINTNEXTLINE(concurrency-mt-unsafe): runs before any thread starts.
+    _wputenv_s(called.c_str(), held.c_str());
 #else
-        // NOLINTNEXTLINE(concurrency-mt-unsafe): runs before any thread starts.
-        setenv(name, value, 1);
+    // NOLINTNEXTLINE(concurrency-mt-unsafe): runs before any thread starts.
+    setenv(name, value, 1);
 #endif
-    }
+}
 }

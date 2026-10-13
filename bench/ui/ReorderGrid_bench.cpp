@@ -16,113 +16,113 @@
 #include "ttk/toolkit/layout/ReorderGrid.h"
 
 namespace {
-    // What offsets() reads off a card.
-    struct Card {
-        double x = 0.0;
-        double y = 0.0;
+// What offsets() reads off a card.
+struct Card {
+    double x = 0.0;
+    double y = 0.0;
 
-        [[nodiscard]] double slide_x() const { return x; }
-        [[nodiscard]] double slide_y() const { return y; }
-    };
+    [[nodiscard]] double slide_x() const { return x; }
+    [[nodiscard]] double slide_y() const { return y; }
+};
 
-    // The library shelf's width, with the first card in hand two cells to the right of
-    // its own: the neighbours between are shuffled, which is the drag's usual shape.
-    class Shelf {
-    public:
-        explicit Shelf(const int count) : _cards(static_cast<size_t>(count)) {
-            grid.place(BLRect{0.0, 0.0, 1180.0, 800.0});
+// The library shelf's width, with the first card in hand two cells to the right of
+// its own: the neighbours between are shuffled, which is the drag's usual shape.
+class Shelf {
+public:
+    explicit Shelf(const int count) : _cards(static_cast<size_t>(count)) {
+        grid.place(BLRect{0.0, 0.0, 1180.0, 800.0});
 
-            for (Card &card : _cards) {
-                held.push_back(&card);
-            }
-
-            grid.grabbed(0, grid.cell_x(0) + 40.0, grid.cell_y(0) + 40.0);
-            grid.carried(count, grid.cell_x(2) + 40.0, grid.cell_y(0) + 40.0);
+        for (Card &card : _cards) {
+            held.push_back(&card);
         }
 
-        ttk::Widget page;
-        ttk::ReorderGrid grid{&page, {.top = 10.0, .narrowest = 244.0, .row_height = 232.0, .step = 8.0}};
+        grid.grabbed(0, grid.cell_x(0) + 40.0, grid.cell_y(0) + 40.0);
+        grid.carried(count, grid.cell_x(2) + 40.0, grid.cell_y(0) + 40.0);
+    }
 
-        std::vector<Card *> held;
+    ttk::Widget page;
+    ttk::ReorderGrid grid{&page, {.top = 10.0, .narrowest = 244.0, .row_height = 232.0, .step = 8.0}};
 
-    private:
-        std::vector<Card> _cards;
-    };
+    std::vector<Card *> held;
 
-    // A resize hands the grid a new width every frame.
-    void ReorderGrid_measure(benchmark::State &state) {
-        Shelf shelf(64);
+private:
+    std::vector<Card> _cards;
+};
 
-        double width = 1180.0;
-        double direction = -4.0;
+// A resize hands the grid a new width every frame.
+void ReorderGrid_measure(benchmark::State &state) {
+    Shelf shelf(64);
 
-        for ([[maybe_unused]] auto step : state) {
-            width += direction;
+    double width = 1180.0;
+    double direction = -4.0;
 
-            if (width < 900.0 || width > 1400.0) {
-                direction = -direction;
-            }
+    for ([[maybe_unused]] auto step : state) {
+        width += direction;
 
-            shelf.grid.measure(width);
+        if (width < 900.0 || width > 1400.0) {
+            direction = -direction;
+        }
 
-            benchmark::DoNotOptimize(shelf.grid.cell());
+        shelf.grid.measure(width);
+
+        benchmark::DoNotOptimize(shelf.grid.cell());
+    }
+}
+
+BENCHMARK(ReorderGrid_measure);
+
+// What the shelf's arrange reads per card per frame of a drag: the slot it shows
+// in and where that cell is.
+void ReorderGrid_cell_of(benchmark::State &state) {
+    const auto count = static_cast<int>(state.range(0));
+
+    Shelf shelf(count);
+
+    for ([[maybe_unused]] auto step : state) {
+        for (int index = 0; index < count; ++index) {
+            const int at = shelf.grid.slot(index);
+
+            benchmark::DoNotOptimize(shelf.grid.cell_x(at));
+            benchmark::DoNotOptimize(shelf.grid.cell_y(at));
         }
     }
 
-    BENCHMARK(ReorderGrid_measure);
+    state.SetItemsProcessed(state.iterations() * count);
+}
 
-    // What the shelf's arrange reads per card per frame of a drag: the slot it shows
-    // in and where that cell is.
-    void ReorderGrid_cell_of(benchmark::State &state) {
-        const auto count = static_cast<int>(state.range(0));
+BENCHMARK(ReorderGrid_cell_of)->Arg(8)->Arg(64)->Arg(512);
 
-        Shelf shelf(count);
+// One pointer report while a card is in hand: the target under it and the carry.
+void ReorderGrid_carried(benchmark::State &state) {
+    Shelf shelf(64);
 
-        for ([[maybe_unused]] auto step : state) {
-            for (int index = 0; index < count; ++index) {
-                const int at = shelf.grid.slot(index);
+    const double left = shelf.grid.cell_x(0);
+    const double y = shelf.grid.cell_y(1) + 40.0;
+    double x = left;
 
-                benchmark::DoNotOptimize(shelf.grid.cell_x(at));
-                benchmark::DoNotOptimize(shelf.grid.cell_y(at));
-            }
-        }
+    for ([[maybe_unused]] auto step : state) {
+        x = x > left + 900.0 ? left : x + 14.0;
 
-        state.SetItemsProcessed(state.iterations() * count);
+        shelf.grid.carried(64, x, y);
+
+        benchmark::DoNotOptimize(shelf.grid.target());
+    }
+}
+
+BENCHMARK(ReorderGrid_carried);
+
+// The drop: where every card stands, by the index it is about to take.
+void ReorderGrid_offsets(benchmark::State &state) {
+    const auto count = static_cast<int>(state.range(0));
+
+    Shelf shelf(count);
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(shelf.grid.offsets(shelf.held));
     }
 
-    BENCHMARK(ReorderGrid_cell_of)->Arg(8)->Arg(64)->Arg(512);
+    state.SetItemsProcessed(state.iterations() * count);
+}
 
-    // One pointer report while a card is in hand: the target under it and the carry.
-    void ReorderGrid_carried(benchmark::State &state) {
-        Shelf shelf(64);
-
-        const double left = shelf.grid.cell_x(0);
-        const double y = shelf.grid.cell_y(1) + 40.0;
-        double x = left;
-
-        for ([[maybe_unused]] auto step : state) {
-            x = x > left + 900.0 ? left : x + 14.0;
-
-            shelf.grid.carried(64, x, y);
-
-            benchmark::DoNotOptimize(shelf.grid.target());
-        }
-    }
-
-    BENCHMARK(ReorderGrid_carried);
-
-    // The drop: where every card stands, by the index it is about to take.
-    void ReorderGrid_offsets(benchmark::State &state) {
-        const auto count = static_cast<int>(state.range(0));
-
-        Shelf shelf(count);
-
-        for ([[maybe_unused]] auto step : state) {
-            benchmark::DoNotOptimize(shelf.grid.offsets(shelf.held));
-        }
-
-        state.SetItemsProcessed(state.iterations() * count);
-    }
-
-    BENCHMARK(ReorderGrid_offsets)->Arg(8)->Arg(64)->Arg(512);
+BENCHMARK(ReorderGrid_offsets)->Arg(8)->Arg(64)->Arg(512);
 }

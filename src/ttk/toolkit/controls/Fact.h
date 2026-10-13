@@ -18,25 +18,25 @@
 #include "ttk/toolkit/layout/Box.h"
 
 namespace ttk {
-    //! Column of a small upper case caption over a value in semibold body type.
-    class Fact : public Box {
-    public:
-        //! Creates a fact with `label` as the caption, styled by \ref Label::section(), and `value` below it.
-        Fact(std::string label, std::string value);
+//! Column of a small upper case caption over a value in semibold body type.
+class Fact : public Box {
+public:
+    //! Creates a fact with `label` as the caption, styled by \ref Label::section(), and `value` below it.
+    Fact(std::string label, std::string value);
 
-        //! Sets the value text to `value`, as \ref Label::set_text() does.
-        void set_value(std::string_view value) const;
+    //! Sets the value text to `value`, as \ref Label::set_text() does.
+    void set_value(std::string_view value) const;
 
-        //! Sets whether the value is shown as a file path, as \ref Label::path() does, and returns this fact.
-        Fact *path(bool value = true);
+    //! Sets whether the value is shown as a file path, as \ref Label::path() does, and returns this fact.
+    Fact *path(bool value = true);
 
-        //! Makes the value a link that calls `clicked`, with `tip` as its tooltip, and returns this fact.
-        Fact *on_click(std::string tip, std::function<void()> clicked);
+    //! Makes the value a link that calls `clicked`, with `tip` as its tooltip, and returns this fact.
+    Fact *on_click(std::string tip, std::function<void()> clicked);
 
-    private:
-        Label *_caption = nullptr;
-        Label *_value = nullptr;
-    };
+private:
+    Label *_caption = nullptr;
+    Label *_value = nullptr;
+};
 }
 
 

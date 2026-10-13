@@ -9,17 +9,17 @@
 #include "ttk/system/Notify.h"
 
 namespace ttk::Notify {
-    Id show(const Message & /*unused*/, const Id /*unused*/, std::string *why) {
-        if (why != nullptr) {
-            *why = "notifications are not supported here";
-        }
-
-        return 0;
+Id show(const Message & /*unused*/, const Id /*unused*/, std::string *why) {
+    if (why != nullptr) {
+        *why = "notifications are not supported here";
     }
 
-    void close(const Id /*unused*/) {
-    }
+    return 0;
+}
 
-    void stop() {
-    }
+void close(const Id /*unused*/) {
+}
+
+void stop() {
+}
 }

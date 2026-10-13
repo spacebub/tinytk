@@ -14,270 +14,266 @@
 #include "ttk/toolkit/layout/Scroll.h"
 
 namespace ttk {
-    namespace {
+namespace {
 
-        constexpr double STEP = 52.0;
-        constexpr double SHORTEST = 28.0;
-        constexpr double GLIDE = 0.045;
+constexpr double STEP = 52.0;
+constexpr double SHORTEST = 28.0;
+constexpr double GLIDE = 0.045;
 
+}
+
+
+Scroll::Scroll() {
+    // Empty room inside a scroller still answers the wheel. Without this a page
+    // of panels would only scroll when the pointer happened to be over a control.
+    _takesPointer = true;
+}
+
+Widget *Scroll::hold(Ptr child) {
+    clear();
+
+    _content = add(std::move(child));
+
+    return _content;
+}
+
+bool Scroll::scrollable() const {
+    return _reach > _box.h + 1.0;
+}
+
+bool Scroll::at_end() const {
+    return _offset >= std::floor(std::max(0.0, _reach - _box.h)) - 1.0;
+}
+
+void Scroll::refit(Typeface &type, const double lost) {
+    if (_content == nullptr) {
+        return;
     }
 
+    const bool ending = at_end();
 
-    Scroll::Scroll() {
-        // Empty room inside a scroller still answers the wheel. Without this a page
-        // of panels would only scroll when the pointer happened to be over a control.
-        _takesPointer = true;
+    _reach = _content->wanted_height(type, std::max({_content->minWidth, 0.0, _box.w}));
+    _offset = ending ? _reach : std::max(0.0, _offset - lost);
+
+    if (_gliding && !ending) {
+        _goal = std::max(0.0, _goal - lost);
+        _via = std::max(0.0, _via - lost);
+        _along = std::max(0.0, _along - lost);
     }
 
-    Widget *Scroll::hold(Ptr child) {
-        clear();
+    arrange(type);
+    invalidate();
+}
 
-        _content = add(std::move(child));
+BLRect Scroll::lane() const {
+    return BLRect{_box.x + _box.w - Theme::lane + 1.0, _box.y, 8.0, _box.h};
+}
 
-        return _content;
+BLRect Scroll::thumb() const {
+    const BLRect track = lane();
+    const double tall = std::max(SHORTEST, track.h * (_box.h / std::max(1.0, _reach)));
+    const double travel = std::max(0.0, track.h - tall);
+    const double over = std::max(1.0, _reach - _box.h);
+
+    return BLRect{
+            track.x + ((track.w - 5.0) / 2.0), track.y + (travel * std::clamp(_offset / over, 0.0, 1.0)), 5.0, tall};
+}
+
+void Scroll::scroll_to(const double offset) {
+    _gliding = false;
+
+    settle(offset);
+}
+
+void Scroll::settle(const double offset) {
+    // Whole pixels: the content lands crisp, and a scroll is a move of what is on
+    // screen rather than a repaint of it.
+    const double wanted = std::round(std::clamp(offset, 0.0, std::floor(std::max(0.0, _reach - _box.h))));
+
+    if (wanted == _offset) {
+        return;
     }
 
-    bool Scroll::scrollable() const {
-        return _reach > _box.h + 1.0;
+    const int dy = static_cast<int>(_offset - wanted);
+
+    _offset = wanted;
+
+    if (root() != nullptr) {
+        arrange(root()->type());
     }
 
-    bool Scroll::at_end() const {
-        return _offset >= std::floor(std::max(0.0, _reach - _box.h)) - 1.0;
-    }
-
-    void Scroll::refit(Typeface &type, const double lost) {
-        if (_content == nullptr) {
-            return;
-        }
-
-        const bool ending = at_end();
-
-        _reach = _content->wanted_height(type, std::max({_content->minWidth, 0.0, _box.w}));
-        _offset = ending ? _reach : std::max(0.0, _offset - lost);
-
-        if (_gliding && !ending) {
-            _goal = std::max(0.0, _goal - lost);
-            _via = std::max(0.0, _via - lost);
-            _along = std::max(0.0, _along - lost);
-        }
-
-        arrange(type);
+    if (root() == nullptr || !root()->shift(this, _box, dy)) {
         invalidate();
+
+        return;
     }
 
-    BLRect Scroll::lane() const {
-        return BLRect{_box.x + _box.w - Theme::lane + 1.0, _box.y, 8.0, _box.h};
+    // What came into view, a row at each edge and the part column at each side for
+    // a box off the pixel grid, and the bar, which did not move with the content.
+    const double bare = std::abs(static_cast<double>(dy));
+    const double left = std::ceil(_box.x);
+    const double right = std::floor(_box.x + _box.w);
+
+    invalidate(BLRect{_box.x, _box.y, _box.w, dy > 0 ? bare : 1.0});
+    invalidate(BLRect{_box.x, _box.y + _box.h - (dy < 0 ? bare : 1.0), _box.w, dy < 0 ? bare : 1.0});
+    invalidate(lane());
+
+    if (left > _box.x) {
+        invalidate(BLRect{_box.x, _box.y, left - _box.x, _box.h});
     }
 
-    BLRect Scroll::thumb() const {
-        const BLRect track = lane();
-        const double tall = std::max(SHORTEST, track.h * (_box.h / std::max(1.0, _reach)));
-        const double travel = std::max(0.0, track.h - tall);
-        const double over = std::max(1.0, _reach - _box.h);
+    if (right < _box.x + _box.w) {
+        invalidate(BLRect{right, _box.y, _box.x + _box.w - right, _box.h});
+    }
+}
 
-        return BLRect{track.x + ((track.w - 5.0) / 2.0),
-                      track.y + (travel * std::clamp(_offset / over, 0.0, 1.0)), 5.0, tall};
+void Scroll::set_reach(const double reach) {
+    _reach = reach;
+    _offset = std::clamp(_offset, 0.0, std::floor(std::max(0.0, _reach - _box.h)));
+}
+
+void Scroll::reveal(const BLRect &wanted) {
+    if (wanted.y < _box.y) {
+        scroll_to(_offset - (_box.y - wanted.y));
+    } else if (wanted.y + wanted.h > _box.y + _box.h) {
+        scroll_to(_offset + (wanted.y + wanted.h - _box.y - _box.h));
+    }
+}
+
+void Scroll::arrange(Typeface &type) {
+    if (_content == nullptr) {
+        return;
     }
 
-    void Scroll::scroll_to(const double offset) {
+    // The bar is drawn over the content, not beside it: taking width would relay
+    // the page out the moment the bar appeared, and lay it out again the moment it
+    // went. Every content here keeps a margin wider than the bar.
+    const double room = std::max({_content->minWidth, 0.0, _box.w});
+
+    _reach = _content->wanted_height(type, room);
+
+    // A content shorter than the view after a change would leave the offset past
+    // the end.
+    _offset = std::clamp(_offset, 0.0, std::floor(std::max(0.0, _reach - _box.h)));
+
+    _content->place(BLRect{_box.x, _box.y - _offset, room, std::max(_reach, _box.h)}, type);
+}
+
+bool Scroll::clips(BLRect &region) const {
+    region = _box;
+
+    return true;
+}
+
+void Scroll::paint(const Painter &painter) {
+    Widget::paint(painter);
+
+    if (!scrollable()) {
+        return;
+    }
+
+    const BLRect bar = thumb();
+
+    painter.round(bar, bar.w / 2.0, Theme::alpha(Theme::palette().borderStrong, _dragging ? 0.9 : 0.45));
+}
+
+bool Scroll::wheel(const double steps, const Pointer & /*at*/) {
+    if (!scrollable()) {
+        return false;
+    }
+
+    if (!_gliding) {
+        _gliding = true;
+        _goal = _offset;
+        _via = _offset;
+        _along = _offset;
+        _glided = now();
+    }
+
+    _goal = std::clamp(_goal - (steps * STEP), 0.0, std::floor(std::max(0.0, _reach - _box.h)));
+    wake();
+
+    return true;
+}
+
+bool Scroll::advance(const double now) {
+    if (!_gliding) {
+        return false;
+    }
+
+    // Two stages, so the speed builds from nothing and dies away rather than
+    // jumping at every turn of the wheel.
+    const double step = 1.0 - std::exp(-std::clamp(now - _glided, 0.0, 0.05) / GLIDE);
+
+    _glided = now;
+    _via += (_goal - _via) * step;
+    _along += (_via - _along) * step;
+
+    if (std::abs(_goal - _along) < 0.5 && std::abs(_goal - _via) < 0.5) {
+        _via = _goal;
+        _along = _goal;
         _gliding = false;
-
-        settle(offset);
     }
 
-    void Scroll::settle(const double offset) {
-        // Whole pixels: the content lands crisp, and a scroll is a move of what is on
-        // screen rather than a repaint of it.
-        const double wanted = std::round(std::clamp(offset, 0.0,
-                                                    std::floor(std::max(0.0, _reach - _box.h))));
+    settle(_along);
 
-        if (wanted == _offset) {
-            return;
-        }
+    return _gliding;
+}
 
-        const int dy = static_cast<int>(_offset - wanted);
-
-        _offset = wanted;
-
-        if (root() != nullptr) {
-            arrange(root()->type());
-        }
-
-        if (root() == nullptr || !root()->shift(this, _box, dy)) {
-            invalidate();
-
-            return;
-        }
-
-        // What came into view, a row at each edge and the part column at each side for
-        // a box off the pixel grid, and the bar, which did not move with the content.
-        const double bare = std::abs(static_cast<double>(dy));
-        const double left = std::ceil(_box.x);
-        const double right = std::floor(_box.x + _box.w);
-
-        invalidate(BLRect{_box.x, _box.y, _box.w, dy > 0 ? bare : 1.0});
-        invalidate(BLRect{_box.x, _box.y + _box.h - (dy < 0 ? bare : 1.0), _box.w,
-                          dy < 0 ? bare : 1.0});
-        invalidate(lane());
-
-        if (left > _box.x) {
-            invalidate(BLRect{_box.x, _box.y, left - _box.x, _box.h});
-        }
-
-        if (right < _box.x + _box.w) {
-            invalidate(BLRect{right, _box.y, _box.x + _box.w - right, _box.h});
-        }
+Widget *Scroll::at(const double x, const double y) {
+    if (!visible() || !holds(x, y)) {
+        return nullptr;
     }
 
-    void Scroll::set_reach(const double reach) {
-        _reach = reach;
-        _offset = std::clamp(_offset, 0.0, std::floor(std::max(0.0, _reach - _box.h)));
+    // The lane is answered before anything under it.
+    if (scrollable() && x >= lane().x) {
+        return this;
     }
 
-    void Scroll::reveal(const BLRect &wanted) {
-        if (wanted.y < _box.y) {
-            scroll_to(_offset - (_box.y - wanted.y));
-        } else if (wanted.y + wanted.h > _box.y + _box.h) {
-            scroll_to(_offset + (wanted.y + wanted.h - _box.y - _box.h));
-        }
+    return Widget::at(x, y);
+}
+
+bool Scroll::press(const Pointer &at) {
+    if (!scrollable() || at.x < lane().x) {
+        return false;
     }
 
-    void Scroll::arrange(Typeface &type) {
-        if (_content == nullptr) {
-            return;
-        }
+    const BLRect bar = thumb();
 
-        // The bar is drawn over the content, not beside it: taking width would relay
-        // the page out the moment the bar appeared, and lay it out again the moment it
-        // went. Every content here keeps a margin wider than the bar.
-        const double room = std::max({_content->minWidth, 0.0, _box.w});
-
-        _reach = _content->wanted_height(type, room);
-
-        // A content shorter than the view after a change would leave the offset past
-        // the end.
-        _offset = std::clamp(_offset, 0.0, std::floor(std::max(0.0, _reach - _box.h)));
-
-        _content->place(BLRect{_box.x, _box.y - _offset, room, std::max(_reach, _box.h)}, type);
-    }
-
-    bool Scroll::clips(BLRect &region) const {
-        region = _box;
+    if (at.y < bar.y || at.y >= bar.y + bar.h) {
+        // A press on the track jumps a page.
+        scroll_to(_offset + (at.y < bar.y ? -_box.h : _box.h));
 
         return true;
     }
 
-    void Scroll::paint(const Painter &painter) {
-        Widget::paint(painter);
+    _dragging = true;
+    _grabbed = bar.y;
+    _from = at.y;
 
-        if (!scrollable()) {
-            return;
-        }
+    invalidate(thumb());
 
-        const BLRect bar = thumb();
+    return true;
+}
 
-        painter.round(bar, bar.w / 2.0,
-                      Theme::alpha(Theme::palette().borderStrong, _dragging ? 0.9 : 0.45));
-    }
-
-    bool Scroll::wheel(const double steps, const Pointer & /*at*/) {
-        if (!scrollable()) {
-            return false;
-        }
-
-        if (!_gliding) {
-            _gliding = true;
-            _goal = _offset;
-            _via = _offset;
-            _along = _offset;
-            _glided = now();
-        }
-
-        _goal = std::clamp(_goal - (steps * STEP), 0.0,
-                           std::floor(std::max(0.0, _reach - _box.h)));
-        wake();
-
-        return true;
-    }
-
-    bool Scroll::advance(const double now) {
-        if (!_gliding) {
-            return false;
-        }
-
-        // Two stages, so the speed builds from nothing and dies away rather than
-        // jumping at every turn of the wheel.
-        const double step = 1.0 - std::exp(-std::clamp(now - _glided, 0.0, 0.05) / GLIDE);
-
-        _glided = now;
-        _via += (_goal - _via) * step;
-        _along += (_via - _along) * step;
-
-        if (std::abs(_goal - _along) < 0.5 && std::abs(_goal - _via) < 0.5) {
-            _via = _goal;
-            _along = _goal;
-            _gliding = false;
-        }
-
-        settle(_along);
-
-        return _gliding;
-    }
-
-    Widget *Scroll::at(const double x, const double y) {
-        if (!visible() || !holds(x, y)) {
-            return nullptr;
-        }
-
-        // The lane is answered before anything under it.
-        if (scrollable() && x >= lane().x) {
-            return this;
-        }
-
-        return Widget::at(x, y);
-    }
-
-    bool Scroll::press(const Pointer &at) {
-        if (!scrollable() || at.x < lane().x) {
-            return false;
-        }
-
-        const BLRect bar = thumb();
-
-        if (at.y < bar.y || at.y >= bar.y + bar.h) {
-            // A press on the track jumps a page.
-            scroll_to(_offset + (at.y < bar.y ? -_box.h : _box.h));
-
-            return true;
-        }
-
-        _dragging = true;
-        _grabbed = bar.y;
-        _from = at.y;
+void Scroll::release(const Pointer & /*at*/) {
+    if (_dragging) {
+        _dragging = false;
 
         invalidate(thumb());
+    }
+}
 
-        return true;
+void Scroll::drag(const Pointer &at) {
+    if (!_dragging) {
+        return;
     }
 
-    void Scroll::release(const Pointer & /*at*/) {
-        if (_dragging) {
-            _dragging = false;
+    const BLRect track = lane();
+    const double tall = thumb().h;
+    const double travel = std::max(1.0, track.h - tall);
+    const double over = std::max(0.0, _reach - _box.h);
 
-            invalidate(thumb());
-        }
-    }
-
-    void Scroll::drag(const Pointer &at) {
-        if (!_dragging) {
-            return;
-        }
-
-        const BLRect track = lane();
-        const double tall = thumb().h;
-        const double travel = std::max(1.0, track.h - tall);
-        const double over = std::max(0.0, _reach - _box.h);
-
-        scroll_to(std::clamp((_grabbed + at.y - _from - track.y) / travel, 0.0, 1.0) * over);
-    }
+    scroll_to(std::clamp((_grabbed + at.y - _from - track.y) / travel, 0.0, 1.0) * over);
+}
 }

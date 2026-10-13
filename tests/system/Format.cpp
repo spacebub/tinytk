@@ -19,23 +19,23 @@
 #include "ttk/util/Format.h"
 
 namespace {
-    namespace fs = std::filesystem;
+namespace fs = std::filesystem;
 
-    constexpr const char *ELLIPSIS = "\xE2\x80\xA6";
+constexpr const char *ELLIPSIS = "\xE2\x80\xA6";
 
-    constexpr unsigned long long KB = 1024ULL;
-    constexpr unsigned long long MB = KB * KB;
-    constexpr unsigned long long GB = MB * KB;
+constexpr unsigned long long KB = 1024ULL;
+constexpr unsigned long long MB = KB * KB;
+constexpr unsigned long long GB = MB * KB;
 
-    std::string home() {
-        return ttk::Format::from_path(ttk::Paths::home_directory());
-    }
+std::string home() {
+    return ttk::Format::from_path(ttk::Paths::home_directory());
+}
 
-    std::string touch(const fs::path &path) {
-        std::ofstream(path).put('x');
+std::string touch(const fs::path &path) {
+    std::ofstream(path).put('x');
 
-        return ttk::Format::from_path(path);
-    }
+    return ttk::Format::from_path(path);
+}
 }
 
 TEST(FormatFromPath, KeepsForwardSlashes) {

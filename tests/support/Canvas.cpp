@@ -12,105 +12,104 @@
 #include "ttk/toolkit/Compose.h"
 
 namespace tests {
-    namespace {
+namespace {
 
-        bool &loaded() {
-            static bool value = false;
+bool &loaded() {
+    static bool value = false;
 
-            return value;
-        }
+    return value;
+}
 
-    }
+}
 
-    ttk::Typeface &fonts() {
-        static ttk::Typeface type = [] {
-            ttk::Typeface made;
+ttk::Typeface &fonts() {
+    static ttk::Typeface type = [] {
+        ttk::Typeface made;
 
-            loaded() = made.load();
+        loaded() = made.load();
 
-            return made;
-        }();
+        return made;
+    }();
 
-        return type;
-    }
+    return type;
+}
 
-    bool fonts_loaded() {
-        fonts();
+bool fonts_loaded() {
+    fonts();
 
-        return loaded();
-    }
+    return loaded();
+}
 
-    Canvas::Canvas(const int width, const int height) : _root(fonts()), _width(width), _height(height) {
-        _surface.attach(width, height);
-        _root.resize(width, height);
-        _root.set_now(0.0);
-    }
+Canvas::Canvas(const int width, const int height) : _root(fonts()), _width(width), _height(height) {
+    _surface.attach(width, height);
+    _root.resize(width, height);
+    _root.set_now(0.0);
+}
 
-    Canvas::~Canvas() {
-        _surface.detach();
-    }
+Canvas::~Canvas() {
+    _surface.detach();
+}
 
-    std::size_t Canvas::frame() {
-        const std::size_t painted = ttk::compose(_root, _surface);
+std::size_t Canvas::frame() {
+    const std::size_t painted = ttk::compose(_root, _surface);
 
-        _surface.present();
+    _surface.present();
 
-        return painted;
-    }
+    return painted;
+}
 
-    std::size_t Canvas::frame_at(const double now) {
-        _root.set_now(now);
-        _root.advance(now);
+std::size_t Canvas::frame_at(const double now) {
+    _root.set_now(now);
+    _root.advance(now);
 
-        return frame();
-    }
+    return frame();
+}
 
-    std::size_t Canvas::full() {
-        _root.damage_all();
+std::size_t Canvas::full() {
+    _root.damage_all();
 
-        return frame();
-    }
+    return frame();
+}
 
-    std::vector<std::uint32_t> Canvas::pixels() const {
-        BLImageData data{};
-        std::vector<std::uint32_t> copy(static_cast<std::size_t>(_width) * static_cast<std::size_t>(_height));
+std::vector<std::uint32_t> Canvas::pixels() const {
+    BLImageData data{};
+    std::vector<std::uint32_t> copy(static_cast<std::size_t>(_width) * static_cast<std::size_t>(_height));
 
-        if (_surface.image().get_data(&data) != BL_SUCCESS) {
-            return copy;
-        }
-
-        for (int y = 0; y < _height; ++y) {
-            std::memcpy(copy.data() + (static_cast<std::ptrdiff_t>(y) * _width),
-                        static_cast<const std::uint8_t *>(data.pixel_data)
-                                + (static_cast<std::ptrdiff_t>(y) * data.stride),
-                        static_cast<std::size_t>(_width) * 4);
-        }
-
+    if (_surface.image().get_data(&data) != BL_SUCCESS) {
         return copy;
     }
 
-    std::uint32_t Canvas::at(const int x, const int y) const {
-        BLImageData data{};
-
-        if (x < 0 || y < 0 || x >= _width || y >= _height || _surface.image().get_data(&data) != BL_SUCCESS) {
-            return 0;
-        }
-
-        std::uint32_t pixel = 0;
-
-        std::memcpy(&pixel,
-                    static_cast<const std::uint8_t *>(data.pixel_data) + (static_cast<std::ptrdiff_t>(y) * data.stride)
-                            + (static_cast<std::ptrdiff_t>(x) * 4),
-                    4);
-
-        return pixel;
+    for (int y = 0; y < _height; ++y) {
+        std::memcpy(copy.data() + (static_cast<std::ptrdiff_t>(y) * _width),
+                    static_cast<const std::uint8_t *>(data.pixel_data) + (static_cast<std::ptrdiff_t>(y) * data.stride),
+                    static_cast<std::size_t>(_width) * 4);
     }
 
-    bool Canvas::matches_full() {
-        const std::vector<std::uint32_t> partial = pixels();
+    return copy;
+}
 
-        full();
+std::uint32_t Canvas::at(const int x, const int y) const {
+    BLImageData data{};
 
-        return partial == pixels();
+    if (x < 0 || y < 0 || x >= _width || y >= _height || _surface.image().get_data(&data) != BL_SUCCESS) {
+        return 0;
     }
+
+    std::uint32_t pixel = 0;
+
+    std::memcpy(&pixel,
+                static_cast<const std::uint8_t *>(data.pixel_data) + (static_cast<std::ptrdiff_t>(y) * data.stride)
+                        + (static_cast<std::ptrdiff_t>(x) * 4),
+                4);
+
+    return pixel;
+}
+
+bool Canvas::matches_full() {
+    const std::vector<std::uint32_t> partial = pixels();
+
+    full();
+
+    return partial == pixels();
+}
 }

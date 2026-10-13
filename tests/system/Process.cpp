@@ -22,104 +22,106 @@
 #include "ttk/system/Text.h"
 
 namespace {
-    namespace fs = std::filesystem;
-    namespace Process = ttk::Process;
+namespace fs = std::filesystem;
+namespace Process = ttk::Process;
 
-    using Clock = std::chrono::steady_clock;
+using Clock = std::chrono::steady_clock;
 
-    constexpr std::chrono::seconds PATIENCE{2};
-    constexpr int SLICE = 50;
-    constexpr int LONG_WAIT = 5000;
+constexpr std::chrono::seconds PATIENCE{2};
+constexpr int SLICE = 50;
+constexpr int LONG_WAIT = 5000;
 
-    struct Ended {
-        Process::State state{Process::State::Unknown};
-        int code{-1000};
-    };
+struct Ended {
+    Process::State state{Process::State::Unknown};
+    int code{-1000};
+};
 
-    Ended finish(const Process::Id id, const Process::Stream output = Process::NOTHING) {
-        const Clock::time_point deadline = Clock::now() + PATIENCE;
-        Ended ended;
+Ended finish(const Process::Id id, const Process::Stream output = Process::NOTHING) {
+    const Clock::time_point deadline = Clock::now() + PATIENCE;
+    Ended ended;
 
-        while (Clock::now() < deadline) {
-            ended.state = Process::poll(id, &ended.code);
+    while (Clock::now() < deadline) {
+        ended.state = Process::poll(id, &ended.code);
 
-            if (ended.state != Process::State::Running) {
-                return ended;
-            }
-
-            if (output != Process::NOTHING) {
-                Process::wait_for(output, Process::NOTHING, SLICE);
-            } else {
-                std::this_thread::yield();
-            }
+        if (ended.state != Process::State::Running) {
+            return ended;
         }
 
-        return ended;
+        if (output != Process::NOTHING) {
+            Process::wait_for(output, Process::NOTHING, SLICE);
+        } else {
+            std::this_thread::yield();
+        }
     }
 
-    // Reads until the end of the stream, which a pseudo-terminal reports once the child has gone.
-    std::string drain(const Process::Stream output) {
-        const Clock::time_point deadline = Clock::now() + PATIENCE;
-        std::string all;
-        std::string piece;
+    return ended;
+}
 
-        while (Clock::now() < deadline) {
-            if (!Process::read(output, piece)) {
-                break;
-            }
+// Reads until the end of the stream, which a pseudo-terminal reports once the child has gone.
+std::string drain(const Process::Stream output) {
+    const Clock::time_point deadline = Clock::now() + PATIENCE;
+    std::string all;
+    std::string piece;
 
-            if (piece.empty()) {
-                Process::wait_for(output, Process::NOTHING, SLICE);
-            }
-
-            all += piece;
+    while (Clock::now() < deadline) {
+        if (!Process::read(output, piece)) {
+            break;
         }
 
-        return all;
-    }
-
-    std::string first_line(const Process::Stream output) {
-        const Clock::time_point deadline = Clock::now() + PATIENCE;
-        std::string got;
-        std::string piece;
-
-        while (!got.contains('\n') && Clock::now() < deadline && Process::read(output, piece)) {
-            got += piece;
+        if (piece.empty()) {
             Process::wait_for(output, Process::NOTHING, SLICE);
         }
 
-        return got;
+        all += piece;
     }
 
-    struct Outcome {
-        bool started{false};
-        std::string error;
-        std::string output;
-        Ended ended;
-    };
+    return all;
+}
 
-    Outcome launch(const fs::path &program, const std::vector<std::string> &arguments, const fs::path &directory = {},
-                   const std::map<std::string, std::string> &environment = {}) {
-        Outcome result;
-        Process::Id id = 0;
-        Process::Stream output = Process::NOTHING;
+std::string first_line(const Process::Stream output) {
+    const Clock::time_point deadline = Clock::now() + PATIENCE;
+    std::string got;
+    std::string piece;
 
-        result.started = Process::start(program, arguments, directory, environment, &id, &output, &result.error);
+    while (!got.contains('\n') && Clock::now() < deadline && Process::read(output, piece)) {
+        got += piece;
+        Process::wait_for(output, Process::NOTHING, SLICE);
+    }
 
-        if (!result.started) {
-            return result;
-        }
+    return got;
+}
 
-        result.output = drain(output);
-        result.ended = finish(id, output);
-        Process::close_stream(output);
+struct Outcome {
+    bool started{false};
+    std::string error;
+    std::string output;
+    Ended ended;
+};
 
+Outcome launch(const fs::path &program,
+               const std::vector<std::string> &arguments,
+               const fs::path &directory = {},
+               const std::map<std::string, std::string> &environment = {}) {
+    Outcome result;
+    Process::Id id = 0;
+    Process::Stream output = Process::NOTHING;
+
+    result.started = Process::start(program, arguments, directory, environment, &id, &output, &result.error);
+
+    if (!result.started) {
         return result;
     }
 
-    double elapsed_seconds(const Clock::time_point since) {
-        return std::chrono::duration<double>(Clock::now() - since).count();
-    }
+    result.output = drain(output);
+    result.ended = finish(id, output);
+    Process::close_stream(output);
+
+    return result;
+}
+
+double elapsed_seconds(const Clock::time_point since) {
+    return std::chrono::duration<double>(Clock::now() - since).count();
+}
 }
 
 TEST(ProcessStart, TrueFinishesWithZero) {
@@ -277,8 +279,8 @@ TEST(ProcessStart, MissingProgramFails) {
 TEST(ProcessStart, MissingPathFails) {
     std::string error;
 
-    EXPECT_FALSE(Process::start(tests::Sandbox::scratch("process-missing") / "absent", {}, {}, {}, nullptr, nullptr,
-                                &error));
+    EXPECT_FALSE(Process::start(
+            tests::Sandbox::scratch("process-missing") / "absent", {}, {}, {}, nullptr, nullptr, &error));
     EXPECT_FALSE(error.empty());
 }
 

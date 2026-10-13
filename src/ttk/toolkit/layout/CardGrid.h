@@ -18,56 +18,56 @@
 #include "ttk/toolkit/layout/ReorderGrid.h"
 
 namespace ttk {
-    //! Grid of cards in as many equal columns as fit, which the user reorders by dragging a card onto another cell.
+//! Grid of cards in as many equal columns as fit, which the user reorders by dragging a card onto another cell.
+//!
+//! Cards must be added through \ref add(), which takes over their drag callbacks. While a card is carried the
+//! cards between its old and new cell shift by one, and after the drop every displaced card slides into place.
+class CardGrid : public Widget {
+public:
+    //! Creates a grid whose margins, gutter, narrowest column, row height and width step come from `metrics`.
+    explicit CardGrid(const ReorderGrid::Metrics &metrics) : _reorder(this, metrics) {}
+
+    //! Called after a drop has moved a card, with the index it left in `from` and the index it now holds in
+    //! `to`. Not called when a card is dropped back on its own cell. \ref cards() is already in the new order.
+    std::function<void(int from, int to)> reordered;
+
+    //! Appends `card` as the last card, makes it draggable and returns it.
     //!
-    //! Cards must be added through \ref add(), which takes over their drag callbacks. While a card is carried the
-    //! cards between its old and new cell shift by one, and after the drop every displaced card slides into place.
-    class CardGrid : public Widget {
-    public:
-        //! Creates a grid whose margins, gutter, narrowest column, row height and width step come from `metrics`.
-        explicit CardGrid(const ReorderGrid::Metrics &metrics) : _reorder(this, metrics) {}
+    //! Replaces the card's \ref Card::drag_started, \ref Card::drag_moved and \ref Card::drag_ended callbacks
+    //! and asks the root for a new layout.
+    Card *add(std::unique_ptr<Card> card);
 
-        //! Called after a drop has moved a card, with the index it left in `from` and the index it now holds in
-        //! `to`. Not called when a card is dropped back on its own cell. \ref cards() is already in the new order.
-        std::function<void(int from, int to)> reordered;
+    //! Destroys all children, cancels any drag in progress and asks the root for a new layout.
+    void clear_cards();
 
-        //! Appends `card` as the last card, makes it draggable and returns it.
-        //!
-        //! Replaces the card's \ref Card::drag_started, \ref Card::drag_moved and \ref Card::drag_ended callbacks
-        //! and asks the root for a new layout.
-        Card *add(std::unique_ptr<Card> card);
+    //! Returns the cards in grid order, left to right and then top to bottom.
+    [[nodiscard]] const std::vector<Card *> &cards() const { return _cards; }
 
-        //! Destroys all children, cancels any drag in progress and asks the root for a new layout.
-        void clear_cards();
+    //! Returns the height of the rows the cards fill at `width`, from the top margin to the bottom of the last
+    //! row, or 0 when there are no cards.
+    double natural_height(Typeface &type, double width) override;
 
-        //! Returns the cards in grid order, left to right and then top to bottom.
-        [[nodiscard]] const std::vector<Card *> &cards() const { return _cards; }
+    //! Places each card in its cell, offset by the drag or slide it is in, and repaints every card that moved.
+    void arrange(Typeface &type) override;
 
-        //! Returns the height of the rows the cards fill at `width`, from the top margin to the bottom of the last
-        //! row, or 0 when there are no cards.
-        double natural_height(Typeface &type, double width) override;
+    //! Paints the cards that intersect the area being repainted. The carried card, or the one still sliding to
+    //! where it was dropped, is painted last so it stays on top.
+    void paint(const Painter &painter) override;
 
-        //! Places each card in its cell, offset by the drag or slide it is in, and repaints every card that moved.
-        void arrange(Typeface &type) override;
+    //! Lays the grid out again for the frame time `now`, so the carried card follows the pointer and the others
+    //! slide. Returns true while a drag is in progress or any card is still sliding.
+    bool advance(double now) override;
 
-        //! Paints the cards that intersect the area being repainted. The carried card, or the one still sliding to
-        //! where it was dropped, is painted last so it stays on top.
-        void paint(const Painter &painter) override;
+private:
+    void land();
+    void settle(double now);
 
-        //! Lays the grid out again for the frame time `now`, so the carried card follows the pointer and the others
-        //! slide. Returns true while a drag is in progress or any card is still sliding.
-        bool advance(double now) override;
+    ReorderGrid _reorder;
+    std::vector<Card *> _cards;
 
-    private:
-        void land();
-        void settle(double now);
-
-        ReorderGrid _reorder;
-        std::vector<Card *> _cards;
-
-        std::vector<BLPoint> _settle;
-        int _settling = -1;
-    };
+    std::vector<BLPoint> _settle;
+    int _settling = -1;
+};
 }
 
 

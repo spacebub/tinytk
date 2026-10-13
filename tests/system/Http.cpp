@@ -21,45 +21,45 @@
 #include "ttk/system/Http.h"
 
 namespace {
-    namespace fs = std::filesystem;
+namespace fs = std::filesystem;
 
-    using Clock = std::chrono::steady_clock;
+using Clock = std::chrono::steady_clock;
 
-    constexpr std::chrono::seconds PATIENCE{2};
+constexpr std::chrono::seconds PATIENCE{2};
 
-    std::string slurp(const fs::path &path) {
-        std::ifstream file(path, std::ios::binary);
+std::string slurp(const fs::path &path) {
+    std::ifstream file(path, std::ios::binary);
 
-        return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+}
+
+void spill(const fs::path &path, const std::string_view text) {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+
+    file.write(text.data(), static_cast<std::streamsize>(text.size()));
+}
+
+std::string url_of(const fs::path &path) {
+    return "file://" + path.string();
+}
+
+bool settle(const ttk::Http::Fetch &fetch) {
+    const Clock::time_point deadline = Clock::now() + PATIENCE;
+
+    while (!fetch.done() && Clock::now() < deadline) {
+        std::this_thread::yield();
     }
 
-    void spill(const fs::path &path, const std::string_view text) {
-        std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    return fetch.done();
+}
 
-        file.write(text.data(), static_cast<std::streamsize>(text.size()));
-    }
+// Only file:// and malformed addresses are fetched, so nothing leaves the machine.
+class HttpFetch : public ::testing::Test {
+protected:
+    static void SetUpTestSuite() { ttk::Http::start(); }
 
-    std::string url_of(const fs::path &path) {
-        return "file://" + path.string();
-    }
-
-    bool settle(const ttk::Http::Fetch &fetch) {
-        const Clock::time_point deadline = Clock::now() + PATIENCE;
-
-        while (!fetch.done() && Clock::now() < deadline) {
-            std::this_thread::yield();
-        }
-
-        return fetch.done();
-    }
-
-    // Only file:// and malformed addresses are fetched, so nothing leaves the machine.
-    class HttpFetch : public ::testing::Test {
-    protected:
-        static void SetUpTestSuite() { ttk::Http::start(); }
-
-        static void TearDownTestSuite() { ttk::Http::stop(); }
-    };
+    static void TearDownTestSuite() { ttk::Http::stop(); }
+};
 }
 
 TEST_F(HttpFetch, KeepsTheBodyInMemory) {
