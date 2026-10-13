@@ -18,7 +18,8 @@
 #include "ttk/toolkit/Widget.h"
 
 namespace ttk {
-//! Text drawn on one line, elided to fit, or wrapped over several lines when \ref wrap() is set.
+//! Text drawn on one line, elided to fit, or wrapped over several lines when \ref wrap() is set, up to the count
+//! \ref elide() caps them at.
 //!
 //! A label does not take the pointer unless \ref on_click() makes it a link. The chained setters are meant for
 //! construction and neither repaint nor ask for a new layout.
@@ -50,6 +51,13 @@ public:
     //! this label.
     Label *wrap(bool value = true);
 
+    //! Caps a wrapped label at `rows` lines and returns this label. A positive count turns \ref wrap() on, since
+    //! only a wrapped label has lines to cap, and zero lifts the cap.
+    //!
+    //! Text that folds to more lines than that is cut at the end of the last one shown with an ellipsis, so the
+    //! label grows with its text up to the cap and no further.
+    Label *elide(int rows);
+
     //! Styles the label as a section caption, small semibold faint text upper cased with wide letter spacing,
     //! and returns it. Only ASCII letters are upper cased.
     Label *section();
@@ -74,7 +82,7 @@ public:
     double natural_width(Typeface &type) override;
 
     //! Returns \ref fixedHeight when it is set, otherwise one line height, or for a wrapped label the height
-    //! of the text wrapped at `width`.
+    //! of the text wrapped at `width`, over no more lines than \ref elide() allows.
     double natural_height(Typeface &type, double width) override;
 
     //! Paints the text. Paints nothing when the text is empty.
@@ -112,6 +120,9 @@ private:
     // The path shortened to fit the box, remeasured only when the room or the text changes.
     const std::string &fitted(Typeface &type, const BLFont &face);
 
+    // The lines up to the cap, the last cut with an ellipsis when more follow.
+    void paint_capped(const Painter &painter, const BLFont &face, BLRgba32 ink) const;
+
     std::string _text;
 
     std::function<void()> _clicked;
@@ -133,6 +144,9 @@ private:
     bool _tracked = false;
     bool _mono = false;
     bool _path = false;
+
+    // Lines a wrapped label shows at most. Zero shows them all.
+    int _rows = 0;
 
     // A path is fitted by dividing its box by the width of one character, so it is
     // always drawn in the fixed width face.

@@ -120,6 +120,7 @@ TEST(Label, ChainedSettersReturnTheLabel) {
     EXPECT_EQ(label.tone(&ttk::Theme::Palette::muted), &label);
     EXPECT_EQ(label.align(ttk::Align::Centre), &label);
     EXPECT_EQ(label.wrap(), &label);
+    EXPECT_EQ(label.elide(3), &label);
     EXPECT_EQ(label.section(), &label);
     EXPECT_EQ(label.mono(), &label);
     EXPECT_EQ(label.on_click([] {}), &label);
@@ -225,6 +226,36 @@ TEST_F(Painted, LabelWrapOffMeasuresOneLineAgain) {
     label.wrap()->wrap(false);
 
     EXPECT_DOUBLE_EQ(label.natural_height(type(), 120), line(400, ttk::Theme::fontBody));
+}
+
+TEST_F(Painted, LabelElidedHeightStopsAtTheRows) {
+    ttk::Label label(paragraph(4));
+    const double one = line(400, ttk::Theme::fontBody);
+
+    label.elide(2);
+
+    EXPECT_DOUBLE_EQ(label.natural_height(type(), 120), 2 * one);
+    EXPECT_DOUBLE_EQ(label.natural_height(type(), 100000), one) << "fewer lines than the cap were padded";
+
+    label.elide(0);
+
+    EXPECT_GT(label.natural_height(type(), 120), 3 * one) << "zero did not lift the cap";
+}
+
+TEST_F(Painted, LabelElideWrapsOnItsOwn) {
+    ttk::Label label(paragraph());
+
+    label.elide(3);
+
+    EXPECT_DOUBLE_EQ(label.natural_height(type(), 120), 3 * line(400, ttk::Theme::fontBody));
+}
+
+TEST_F(Painted, LabelElidedEmptyTextIsOneLine) {
+    ttk::Label label;
+
+    label.elide(2);
+
+    EXPECT_DOUBLE_EQ(label.natural_height(type(), 100), line(400, ttk::Theme::fontBody));
 }
 
 TEST_F(Painted, LabelSectionIsSmallTrackedUpperCase) {
@@ -452,6 +483,54 @@ TEST_F(Painted, LabelWrappedTextPaintsSeveralLines) {
     EXPECT_LT(drawn.top, 20 + (line(400, ttk::Theme::fontBody) / 2)) << "wrapped text does not start at the top";
 }
 
+TEST_F(Painted, LabelElidedTextPaintsNoMoreThanTheRows) {
+    auto made = std::make_unique<ttk::Label>(paragraph());
+    made->elide(2);
+    const Mounted mounted(std::move(made), BLRect{20, 20, 150, 200});
+    const widgets::Ink drawn = mounted.drawn(BLRectI{20, 20, 150, 200});
+    const double one = line(400, ttk::Theme::fontBody);
+
+    EXPECT_GT(drawn.bottom - drawn.top, one);
+    EXPECT_LE(drawn.bottom - drawn.top, (2 * one) + 2);
+    EXPECT_LE(drawn.right, 170) << "the cut line ran past the width";
+}
+
+// The lines before the cap fold as a paragraph does. The last one carries the rest, so it differs.
+TEST_F(Painted, LabelElidedLastLineEndsInAnEllipsis) {
+    auto capped = std::make_unique<ttk::Label>(paragraph());
+    auto whole = std::make_unique<ttk::Label>(paragraph());
+    capped->elide(2);
+    whole->wrap();
+    const Mounted cut(std::move(capped), BLRect{20, 20, 150, 200});
+    const Mounted plain(std::move(whole), BLRect{20, 20, 150, 200});
+    const int one = static_cast<int>(line(400, ttk::Theme::fontBody));
+    std::size_t first = 0;
+    std::size_t last = 0;
+
+    for (int y = 20; y < 20 + (2 * one); ++y) {
+        for (int x = 20; x < 170; ++x) {
+            const bool differs = cut.canvas.at(x, y) != plain.canvas.at(x, y);
+
+            (y < 20 + one ? first : last) += differs ? 1U : 0U;
+        }
+    }
+
+    EXPECT_EQ(first, 0U) << "the first line was not drawn as it folds";
+    EXPECT_GT(last, 0U) << "the last line was drawn as it folds, with no ellipsis";
+}
+
+TEST_F(Painted, LabelUnderTheCapPaintsAsAWrappedOne) {
+    auto capped = std::make_unique<ttk::Label>("Two lines of words that fold once in this width");
+    auto whole = std::make_unique<ttk::Label>("Two lines of words that fold once in this width");
+    capped->elide(4);
+    whole->wrap();
+    const Mounted cut(std::move(capped), BLRect{20, 20, 150, 200});
+    const Mounted plain(std::move(whole), BLRect{20, 20, 150, 200});
+
+    EXPECT_GT(cut.drawn(BLRectI{20, 20, 150, 200}).pixels, 0U);
+    EXPECT_EQ(cut.canvas.pixels(), plain.canvas.pixels());
+}
+
 TEST_F(Painted, LabelElidesTextWiderThanItsBox) {
     constexpr BLRect narrow{20, 20, 80, 30};
     const Mounted mounted(paragraph(), narrow);
@@ -586,6 +665,28 @@ TEST_F(Painted, LabelWrappedSetTextOfTheSameHeightKeepsTheLayout) {
     const std::size_t painted = column.canvas.frame();
 
     EXPECT_LE(painted, widgets::area(column.label->box()));
+    EXPECT_TRUE(column.canvas.matches_full());
+}
+
+TEST_F(Painted, LabelElidedSetTextRelayoutsOnlyUpToTheCap) {
+    auto made = std::make_unique<ttk::Label>("One line");
+    made->elide(2);
+    Column column(std::move(made));
+    const double was = column.label->box().h;
+
+    column.label->set_text(paragraph(4));
+
+    EXPECT_TRUE(column.canvas.root().settle()) << "a capped label that grew to its cap asked for no layout";
+    EXPECT_DOUBLE_EQ(column.label->box().h, 2 * line(400, ttk::Theme::fontBody));
+    EXPECT_GT(column.label->box().h, was);
+
+    column.label->set_text(paragraph(8));
+
+    EXPECT_FALSE(column.canvas.root().settle()) << "a capped label past its cap asked for a layout";
+    EXPECT_TRUE(column.canvas.root().dirty());
+
+    column.canvas.frame();
+
     EXPECT_TRUE(column.canvas.matches_full());
 }
 

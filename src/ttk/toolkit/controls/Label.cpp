@@ -7,6 +7,9 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <cstddef>
+#include <string>
+#include <vector>
 
 #include "ttk/draw/Typeface.h"
 #include "ttk/system/Text.h"
@@ -68,6 +71,16 @@ Label *Label::align(const Align where) {
 
 Label *Label::wrap(const bool value) {
     _wrap = value;
+
+    return this;
+}
+
+Label *Label::elide(const int rows) {
+    _rows = std::max(0, rows);
+
+    if (_rows > 0) {
+        _wrap = true;
+    }
 
     return this;
 }
@@ -190,7 +203,10 @@ double Label::natural_height(Typeface &type, const double width) {
         return type.line_height(face);
     }
 
-    _tall = _text.empty() ? type.line_height(face) : wrap_height(type, face, _text, width);
+    const size_t lines = fold_spans(type, face, _text, width).size();
+    const size_t shown = _rows > 0 ? std::min(lines, static_cast<size_t>(_rows)) : lines;
+
+    _tall = static_cast<double>(shown) * type.line_height(face);
 
     return _tall;
 }
@@ -205,6 +221,12 @@ void Label::paint(const Painter &painter) {
 
     if (_path) {
         painter.label(face, _box, _place, fitted(painter.type(), face), ink);
+
+        return;
+    }
+
+    if (_wrap && _rows > 0) {
+        paint_capped(painter, face, ink);
 
         return;
     }
@@ -233,5 +255,31 @@ void Label::paint(const Painter &painter) {
     }
 
     painter.label(face, _box, _place, _text, ink);
+}
+
+void Label::paint_capped(const Painter &painter, const BLFont &face, const BLRgba32 ink) const {
+    const double step = painter.line_height(face);
+    const std::vector<Fold> &lines = fold_spans(painter.type(), face, _text, _box.w);
+    const auto most = static_cast<size_t>(_rows);
+    const size_t shown = std::min(lines.size(), most);
+
+    for (size_t at = 0; at + 1 < shown; ++at) {
+        painter.text(face, BLPoint{_box.x, _box.y + (static_cast<double>(at) * step)}, lines[at].text, ink);
+    }
+
+    const double y = _box.y + (static_cast<double>(shown - 1) * step);
+
+    if (lines.size() <= most) {
+        painter.text(face, BLPoint{_box.x, y}, lines[shown - 1].text, ink);
+
+        return;
+    }
+
+    // The last line shown carries the rest of the text, cut where it runs out of room.
+    std::string rest = _text.substr(lines[shown - 1].from);
+
+    std::ranges::replace(rest, '\n', ' ');
+
+    painter.row(face, BLRect{_box.x, y, _box.w, step}, rest, ink);
 }
 }

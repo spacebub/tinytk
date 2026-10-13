@@ -186,7 +186,12 @@ ttk::Label *link(ttk::Box *row, const std::string &text, std::function<void()> c
 void restyle(Gallery &gallery) {
     ttk::Label *label = gallery.label;
 
-    label->font(400, ttk::Theme::fontBody)->tone(&ttk::Theme::Palette::text)->mono(false)->path(false)->wrap(false);
+    label->font(400, ttk::Theme::fontBody)
+            ->tone(&ttk::Theme::Palette::text)
+            ->mono(false)
+            ->path(false)
+            ->elide(0)
+            ->wrap(false);
 
     switch (gallery.style) {
         case 0:
@@ -209,10 +214,16 @@ void restyle(Gallery &gallery) {
             label->set_text(
                     "/home/user/.local/share/gallery/a/path/that/is/elided/from/the/middle/when/room/runs/out.txt");
             break;
-        default:
+        case 5:
             label->wrap();
             label->set_text("A wrapped paragraph folds at spaces and keeps going for as many lines as the "
                             "width asks for, which is how a note under a control or the body of a dialog is set.");
+            break;
+        default:
+            label->elide(2);
+            label->set_text("A paragraph elided to two lines folds like a wrapped one and is cut with an ellipsis "
+                            "where the second runs out, for a summary that must not push what is under it down "
+                            "the page however much it has to say.");
             break;
     }
 
@@ -317,7 +328,7 @@ void controls(Gallery &gallery, ttk::Box *page) {
     gallery.label->stretch = 1.0;
     gallery.label->hint = "Click for the next style";
     gallery.label->on_click([&gallery] {
-        gallery.style = (gallery.style + 1) % 6;
+        gallery.style = (gallery.style + 1) % 7;
         restyle(gallery);
     });
     restyle(gallery);
