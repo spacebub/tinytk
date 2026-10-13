@@ -387,6 +387,7 @@ TEST_F(Painted, TransformedShapesAreNotCulledByTheClip) {
 
     const ttk::Painter painter(context, tests::fonts(), {20, 20, 30, 30});
 
+    painter.transformed(true);
     painter.round({-10, -10, 20, 20}, 3, BLRgba32(0xffabcdef));
     context.restore();
     canvas.surface().present();

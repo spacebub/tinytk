@@ -424,11 +424,13 @@ TEST_F(Drawn, NeededAcceptsAnyBoxUnderATransform) {
 
     ours.save();
     ours.translate(100, 100);
+    narrow.transformed(true);
 
     EXPECT_TRUE(narrow.needed({-1000, -1000, 1, 1}));
     EXPECT_FALSE(narrow.needed({0, 0, 0, 10})) << "an empty box is rejected under a transform too";
 
     ours.restore();
+    narrow.transformed(false);
 
     EXPECT_FALSE(narrow.needed({-1000, -1000, 1, 1}));
 }
@@ -437,6 +439,7 @@ TEST_F(Drawn, ShapesUnderATransformAreNotCulledByTheClip) {
     const ttk::Painter narrow(ours, tests::fonts(), {20, 20, 40, 40});
 
     ours.translate(30, 30);
+    narrow.transformed(true);
     narrow.fill({-5, -5, 10, 10}, INK);
 
     EXPECT_FALSE(blank());

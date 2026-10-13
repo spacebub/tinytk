@@ -32,12 +32,6 @@ size_t asked = 0;
 
 std::vector<Fold> fold_once(Typeface &type, const BLFont &font, std::string_view run, double room);
 
-// BLMatrix2D::type() classifies the matrix out of line, where the identity is told apart inline.
-bool transformed(const BLContext &context) {
-    const BLMatrix2D &at = context.final_transform();
-
-    return at.m00 != 1.0 || at.m01 != 0.0 || at.m10 != 0.0 || at.m11 != 1.0 || at.m20 != 0.0 || at.m21 != 0.0;
-}
 }
 
 const std::vector<Fold> &fold_spans(Typeface &type, const BLFont &font, const std::string_view run, const double room) {
@@ -184,8 +178,7 @@ bool Painter::needed(const BLRect &box) const {
         return true;
     }
 
-    // The clip is in window pixels and `box` is not while a transform is set.
-    return _context != nullptr && transformed(*_context);
+    return _transformed;
 }
 
 void Painter::fill(const BLRect &box, const BLRgba32 tone) const {
@@ -332,18 +325,12 @@ Painter::paragraph(const BLFont &font, const BLRect &box, const std::string_view
     size_t first = 0;
     size_t last = lines.size();
 
-    if (step > 0.0) {
+    if (step > 0.0 && !_transformed) {
         const double bleed = Typeface::bleed(font);
         const auto count = static_cast<double>(lines.size());
 
         first = static_cast<size_t>(std::clamp(std::floor((_clip.y - box.y - bleed) / step), 0.0, count));
         last = static_cast<size_t>(std::clamp(std::ceil((_clip.y + _clip.h - box.y + bleed) / step), 0.0, count));
-
-        // The clip is in window pixels and `box` is not while a transform is set.
-        if ((first != 0 || last != lines.size()) && transformed(*_context)) {
-            first = 0;
-            last = lines.size();
-        }
     }
 
     for (size_t at = first; at < last; ++at) {

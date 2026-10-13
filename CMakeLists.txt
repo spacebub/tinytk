@@ -54,6 +54,10 @@ else ()
     if (NOT APPLE)
         list(APPEND TTK_COMPILE_FLAGS "$<$<CONFIG:RELEASE>:-fno-plt>")
     endif ()
+
+    # A function starts on a cache line, so a neighbour that changes size cannot move a hot loop
+    # across a fetch boundary and cost it a few percent between releases.
+    list(APPEND TTK_COMPILE_FLAGS "$<$<CONFIG:RELEASE>:-falign-functions=64>")
 endif ()
 
 # The binaries are the consumer's, so what strips them is only set up when this is one.

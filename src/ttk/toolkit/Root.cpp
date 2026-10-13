@@ -16,6 +16,15 @@
 namespace ttk {
 namespace {
 
+BLRect enclose(const BLRect &one, const BLRect &two) {
+    const double left = std::min(one.x, two.x);
+    const double top = std::min(one.y, two.y);
+    const double right = std::max(one.x + one.w, two.x + two.w);
+    const double bottom = std::max(one.y + one.h, two.y + two.h);
+
+    return BLRect{left, top, right - left, bottom - top};
+}
+
 bool under(const ttk::Widget *who, const ttk::Widget *of) {
     for (; who != nullptr; who = who->parent()) {
         if (who == of) {
@@ -101,6 +110,13 @@ void Root::damage(const BLRect &region) {
         return;
     }
 
+    // Too many to be worth keeping apart: the rest of the frame folds into one.
+    if (_crowded) {
+        _bound = enclose(_bound, region);
+
+        return;
+    }
+
     // A pointer reports many times between two frames and asks for the same
     // rectangle each time, so the one just given is the case worth taking first.
     if (!_pending.empty()) {
@@ -112,20 +128,34 @@ void Root::damage(const BLRect &region) {
         }
     }
 
-    // A root without a size has no pixels to merge into, so its regions wait for one.
-    if (_pending.size() >= Damage::CROWDED && _width > 0.0 && _height > 0.0) {
-        flush();
+    _pending.push_back(region);
+
+    if (_pending.size() <= Damage::CROWDED) {
+        return;
     }
 
-    _pending.push_back(region);
+    _bound = _pending.front();
+
+    for (const BLRect &held : _pending) {
+        _bound = enclose(_bound, held);
+    }
+
+    _pending.clear();
+    _crowded = true;
 }
 
 void Root::damage_all() {
     _pending.clear();
+    _crowded = false;
     _dirty.all();
 }
 
 void Root::flush() {
+    if (_crowded) {
+        _dirty.add(_bound);
+        _crowded = false;
+    }
+
     for (const BLRect &region : _pending) {
         _dirty.add(region);
     }

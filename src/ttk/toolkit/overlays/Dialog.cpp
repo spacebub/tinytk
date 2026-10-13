@@ -86,6 +86,7 @@ void Dialog::paint(const Painter &painter) {
         painter.context().scale(grown, grown);
         painter.context().translate((card.x + (card.w / 2.0)) * ((1.0 / grown) - 1.0),
                                     (card.y + (card.h / 2.0)) * ((1.0 / grown) - 1.0));
+        painter.transformed(true);
     }
 
     Widget::paint(painter);
@@ -93,6 +94,7 @@ void Dialog::paint(const Painter &painter) {
 
     if (growing) {
         painter.context().restore();
+        painter.transformed(false);
     }
 }
 

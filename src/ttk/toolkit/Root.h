@@ -86,9 +86,9 @@ public:
     //! Marks `region` for repainting. An empty `region` is ignored.
     //!
     //! Regions are kept as given until \ref take(), \ref whole() or \ref shift() rounds them out to pixels, clips
-    //! them to the window and merges them through \ref Damage::add(). Once the window has a size, at most
-    //! \ref Damage::CROWDED are kept, and the next region merges them first. A region inside the one given last
-    //! is dropped at once.
+    //! them to the window and merges them through \ref Damage::add(). A region inside the one given last is dropped
+    //! at once. Once more than \ref Damage::CROWDED are pending they fold into their bounding rectangle, which every
+    //! further region joins until the next \ref take(): a frame that busy is repainted nearly whole anyway.
     void damage(const BLRect &region);
     //! Replaces every pending region with the whole window.
     void damage_all();
@@ -99,7 +99,7 @@ public:
     const std::vector<BLRect> &take();
 
     //! Tests whether a repaint, layout or pixel move is pending.
-    bool dirty() const { return _relayout || !_pending.empty() || !_dirty.empty() || !_shifts.empty(); }
+    bool dirty() const { return _relayout || _crowded || !_pending.empty() || !_dirty.empty() || !_shifts.empty(); }
 
     //! Tests whether the pending regions, merged, cover the whole window.
     bool whole();
@@ -330,8 +330,11 @@ private:
     Page _page;
     Page _layers[LAYERS];
 
-    // What damage() was given since the last take(), merged into the pixel set by flush().
+    // What damage() was given since the last take(), merged into the pixel set by flush(). Past CROWDED of them
+    // only the rectangle round the lot is kept.
     std::vector<BLRect> _pending;
+    BLRect _bound{};
+    bool _crowded = false;
     Damage _dirty;
     std::vector<Shift> _shifts;
 

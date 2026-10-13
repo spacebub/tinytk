@@ -25,18 +25,19 @@ BLRectI enclose(const BLRectI &one, const BLRectI &two) {
     return {left, top, right - left, bottom - top};
 }
 
-bool covers(const BLRectI &outer, const BLRectI &inner) {
-    return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w
-           && inner.y + inner.h <= outer.y + outer.h;
+// Width and height of where the two meet, at or below zero where they stand apart.
+// One holds the other when the meeting is as large as it is.
+BLSizeI meeting(const BLRectI &one, const BLRectI &two) {
+    return {std::min(one.x + one.w, two.x + two.w) - std::max(one.x, two.x),
+            std::min(one.y + one.h, two.y + two.h) - std::max(one.y, two.y)};
 }
 
 // Clean pixels the bounding rectangle of the two would repaint.
-int64_t excess(const BLRectI &one, const BLRectI &two) {
+int64_t excess(const BLRectI &one, const BLRectI &two, const BLSizeI met) {
     const BLRectI bound = enclose(one, two);
-    const int w = std::max(0, std::min(one.x + one.w, two.x + two.w) - std::max(one.x, two.x));
-    const int h = std::max(0, std::min(one.y + one.h, two.y + two.h) - std::max(one.y, two.y));
+    const int64_t shared = met.w > 0 && met.h > 0 ? int64_t{met.w} * met.h : 0;
 
-    return (int64_t{bound.w} * bound.h) - (int64_t{one.w} * one.h) - (int64_t{two.w} * two.h) + (int64_t{w} * h);
+    return (int64_t{bound.w} * bound.h) - (int64_t{one.w} * one.h) - (int64_t{two.w} * two.h) + shared;
 }
 }
 
@@ -47,21 +48,22 @@ void Damage::resize(const int width, const int height) {
 }
 
 BLRectI Damage::clamp_to(const BLRect &region) const {
+    const auto wide = static_cast<double>(_width);
+    const auto tall = static_cast<double>(_height);
     const double right_edge = region.x + region.w;
     const double bottom_edge = region.y + region.h;
 
-    // A sum of the four is finite only when each of them is.
-    if (_width <= 0 || _height <= 0 || !(region.w > 0.0) || !(region.h > 0.0)
-        || !std::isfinite(region.x + region.y + right_edge + bottom_edge)) {
+    // Written so that a NaN anywhere fails a comparison and is turned away with the rest, and an infinite
+    // far edge, which no comparison catches, fails the last test.
+    if (!(region.w > 0.0) || !(region.h > 0.0) || !(region.x < wide) || !(region.y < tall) || !(right_edge > 0.0)
+        || !(bottom_edge > 0.0) || !std::isfinite(right_edge + bottom_edge)) {
         return {};
     }
 
-    const auto wide = static_cast<double>(_width);
-    const auto tall = static_cast<double>(_height);
-    const int left = static_cast<int>(std::floor(std::clamp(region.x, 0.0, wide)));
-    const int top = static_cast<int>(std::floor(std::clamp(region.y, 0.0, tall)));
-    const int right = static_cast<int>(std::ceil(std::clamp(right_edge, 0.0, wide)));
-    const int bottom = static_cast<int>(std::ceil(std::clamp(bottom_edge, 0.0, tall)));
+    const int left = static_cast<int>(std::floor(std::max(region.x, 0.0)));
+    const int top = static_cast<int>(std::floor(std::max(region.y, 0.0)));
+    const int right = static_cast<int>(std::ceil(std::min(right_edge, wide)));
+    const int bottom = static_cast<int>(std::ceil(std::min(bottom_edge, tall)));
 
     return right <= left || bottom <= top ? BLRectI{} : BLRectI{left, top, right - left, bottom - top};
 }
@@ -84,7 +86,8 @@ void Damage::add(const BLRect &region) {
         // A pointer can report a hundred moves between two frames, and each of them
         // asks for the same rectangle. Without this the widget under it is painted
         // once per report rather than once per frame.
-        if (covers(held, inside)) {
+        if (inside.x >= held.x && inside.y >= held.y && inside.x + inside.w <= held.x + held.w
+            && inside.y + inside.h <= held.y + held.h) {
             if (kept != at) {
                 const auto from = _regions.begin() + static_cast<ptrdiff_t>(at);
 
@@ -95,12 +98,14 @@ void Damage::add(const BLRect &region) {
             return;
         }
 
-        if (covers(inside, held)) {
+        const BLSizeI met = meeting(inside, held);
+
+        if (met.w >= held.w && met.h >= held.h) {
             continue;
         }
 
         if (least != 0) {
-            const int64_t cost = excess(inside, held);
+            const int64_t cost = excess(inside, held, met);
 
             if (cost < least) {
                 least = cost;
@@ -124,31 +129,28 @@ void Damage::add(const BLRect &region) {
 
     _regions.erase(_regions.begin() + static_cast<ptrdiff_t>(partner));
 
-    // A join can bring the result within reach of another rectangle, so the pass
-    // repeats while it still finds one.
-    for (bool merged = true; merged;) {
-        size_t left = 0;
+    // What the joined rectangle now covers or nearly covers goes in with it. A chain
+    // past that waits for the next region to arrive in the area.
+    size_t left = 0;
 
-        merged = false;
+    for (const BLRectI held : _regions) {
+        const BLSizeI met = meeting(joined, held);
 
-        for (const BLRectI held : _regions) {
-            if (covers(joined, held)) {
-                continue;
-            }
-
-            if (excess(joined, held) <= WALK) {
-                joined = enclose(joined, held);
-                merged = true;
-
-                continue;
-            }
-
-            _regions[left] = held;
-            ++left;
+        if (met.w >= held.w && met.h >= held.h) {
+            continue;
         }
 
-        _regions.resize(left);
+        if (excess(joined, held, met) <= WALK) {
+            joined = enclose(joined, held);
+
+            continue;
+        }
+
+        _regions[left] = held;
+        ++left;
     }
+
+    _regions.resize(left);
 
     _regions.push_back(joined);
 }

@@ -72,6 +72,7 @@ public:
         _context = &context;
         _clip = clip;
         _held.clear();
+        _transformed = false;
     }
 
     //! Returns the Blend2D context, for drawing the painter does not cover. Restore any state changed on it.
@@ -88,10 +89,16 @@ public:
 
     //! Tests whether any of `box` lies inside \ref clip(). Use it to skip painting what is not being repainted.
     //!
-    //! Returns false for an empty box. While the context has a transform it returns true for any other box, as
-    //! \ref clip() is in window pixels and `box` is not. Otherwise it returns false for every box while
-    //! \ref clip() is empty.
+    //! Returns false for an empty box. While the painter has been told of a transform through \ref transformed()
+    //! it returns true for any other box, as \ref clip() is in window pixels and `box` is not. Otherwise it returns
+    //! false for every box while \ref clip() is empty.
     bool needed(const BLRect &box) const;
+
+    //! Tells the painter whether \ref context() carries a transform. \ref aim() resets it.
+    //!
+    //! While it does, \ref needed() accepts every box that is not empty and \ref paragraph() culls no line, since
+    //! neither can be tested against \ref clip() in window pixels.
+    void transformed(const bool on) const { _transformed = on; }
 
     //! Fills `box` with `tone`.
     void fill(const BLRect &box, BLRgba32 tone) const;
@@ -176,6 +183,7 @@ private:
     Typeface &_type;
 
     mutable BLRectI _clip{NOWHERE, NOWHERE, 0, 0};
+    mutable bool _transformed = false;
     mutable std::vector<BLRectI> _held;
 
     // Kept between outlines, so one allocates nothing.
