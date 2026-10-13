@@ -91,4 +91,43 @@ namespace {
     }
 
     BENCHMARK(TextEdit_type);
+
+    // A focused, numbered editor's caret blinking, each frame one toggle of it and nothing else.
+    void TextEdit_caret_blink(benchmark::State &state) {
+        bench::Canvas canvas(1280, 800);
+        ttk::TextEdit *edit = bench::mount(canvas, std::make_unique<ttk::TextEdit>(), 960.0, 640.0);
+
+        edit->numbered();
+        edit->set_text(lines_of(200));
+        canvas.ui().focus(edit);
+        canvas.full();
+
+        double now = 0.0;
+
+        for ([[maybe_unused]] auto step : state) {
+            now += 0.6;
+
+            benchmark::DoNotOptimize(canvas.frame_at(now));
+        }
+    }
+
+    BENCHMARK(TextEdit_caret_blink);
+
+    // A thin strip across a screenful of numbered rows, as a scroll or a caret leaves behind.
+    void TextEdit_paint_strip(benchmark::State &state) {
+        bench::Canvas canvas(1280, 800);
+        ttk::TextEdit *edit = bench::mount(canvas, std::make_unique<ttk::TextEdit>(), 960.0, 800.0);
+
+        edit->numbered();
+        edit->set_text(lines_of(2000));
+        canvas.full();
+
+        for ([[maybe_unused]] auto step : state) {
+            canvas.ui().damage(BLRect{0.0, 400.0, 960.0, 3.0});
+
+            benchmark::DoNotOptimize(canvas.frame());
+        }
+    }
+
+    BENCHMARK(TextEdit_paint_strip);
 }

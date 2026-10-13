@@ -446,6 +446,28 @@ namespace {
 
     BENCHMARK(TextBox_caret_move);
 
+    // A focused field's caret blinking, each frame one toggle of it and nothing else.
+    void TextBox_caret_blink(benchmark::State &state) {
+        auto held = std::make_unique<ttk::TextBox>([](const std::string &) {});
+
+        held->set_text("gzdoom -iwad DOOM2.WAD -file eviternity.wad -skill 4");
+
+        ttk::TextBox *made = bench::mount(sheet(), std::move(held), 420.0, 32.0);
+
+        sheet().ui().focus(made);
+        sheet().full();
+
+        double now = 0.0;
+
+        for ([[maybe_unused]] auto step : state) {
+            now += 0.6;
+
+            benchmark::DoNotOptimize(sheet().frame_at(now));
+        }
+    }
+
+    BENCHMARK(TextBox_caret_blink);
+
     void MultistateSwitch_hover(benchmark::State &state) {
         ttk::MultistateSwitch *made = bench::mount(sheet(), multistate_switch());
 

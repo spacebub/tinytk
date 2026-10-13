@@ -21,6 +21,11 @@ namespace {
         Sheet() : _canvas(1280, 800),
                   _painter(_canvas.context(), _canvas.type(), BLRectI{0, 0, 1280, 800}) {}
 
+        // Painting one damaged rectangle, with the context clipped to it as a frame does.
+        explicit Sheet(const BLRectI &clip) : _canvas(1280, 800), _painter(_canvas.context(), _canvas.type(), clip) {
+            _canvas.context().clip_to_rect(clip);
+        }
+
         const ttk::Painter &painter() const { return _painter; }
 
         bench::Canvas &canvas() { return _canvas; }
@@ -31,6 +36,9 @@ namespace {
         bench::Canvas _canvas;
         ttk::Painter _painter;
     };
+
+    // Three rows across the middle of the paragraph's box, clear of the box the culled benchmarks draw.
+    constexpr BLRectI STRIP{0, 309, 1280, 3};
 
     const std::string &prose() {
         static const std::string made = bench::Fixtures::paragraph(12);
@@ -49,6 +57,18 @@ namespace {
     }
 
     BENCHMARK(Painter_fill);
+
+    void Painter_fill_culled(benchmark::State &state) {
+        Sheet sheet(STRIP);
+
+        for ([[maybe_unused]] auto step : state) {
+            sheet.painter().fill(BLRect{10, 10, 240, 42}, ttk::Theme::palette().surface);
+        }
+
+        sheet.flush();
+    }
+
+    BENCHMARK(Painter_fill_culled);
 
     void Painter_round(benchmark::State &state) {
         Sheet sheet;
@@ -95,6 +115,16 @@ namespace {
     }
 
     BENCHMARK(Painter_needed);
+
+    void Painter_needed_culled(benchmark::State &state) {
+        Sheet sheet(STRIP);
+
+        for ([[maybe_unused]] auto step : state) {
+            benchmark::DoNotOptimize(sheet.painter().needed(BLRect{10, 10, 240, 42}));
+        }
+    }
+
+    BENCHMARK(Painter_needed_culled);
 
     void Painter_width(benchmark::State &state) {
         Sheet sheet;
@@ -182,6 +212,21 @@ namespace {
     }
 
     BENCHMARK(Painter_paragraph);
+
+    void Painter_paragraph_strip(benchmark::State &state) {
+        Sheet sheet(STRIP);
+
+        const BLFont &font = sheet.painter().font(ttk::Typeface::regular, ttk::Theme::fontBody);
+
+        for ([[maybe_unused]] auto step : state) {
+            benchmark::DoNotOptimize(
+                    sheet.painter().paragraph(font, BLRect{10, 10, 420, 600}, prose(), ttk::Theme::palette().text));
+        }
+
+        sheet.flush();
+    }
+
+    BENCHMARK(Painter_paragraph_strip);
 
     void Painter_wrap_height(benchmark::State &state) {
         Sheet sheet;
