@@ -6,7 +6,6 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
-#include <algorithm>
 #include <cstdlib>
 #include <string>
 
@@ -16,48 +15,27 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+
+#include "ttk/system/Text.h"
 #endif
 
 namespace ttk {
-#ifdef _WIN32
-namespace {
-std::wstring widen(const char *text) {
-    const int wide = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
-    std::wstring held(static_cast<size_t>(wide), L'\0');
-
-    MultiByteToWideChar(CP_UTF8, 0, text, -1, held.data(), wide);
-    held.resize(static_cast<size_t>(std::max(wide - 1, 0)));
-
-    return held;
-}
-
-std::string narrow(const wchar_t *text) {
-    const int size = WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
-    std::string held(static_cast<size_t>(size), '\0');
-
-    WideCharToMultiByte(CP_UTF8, 0, text, -1, held.data(), size, nullptr, nullptr);
-    held.resize(static_cast<size_t>(std::max(size - 1, 0)));
-
-    return held;
-}
-}
-#endif
-
 std::string Env::get(const char *name) {
 #ifdef _WIN32
-    // The wide copy, since the narrow one is in the ANSI code page rather than UTF-8.
-    wchar_t *value = nullptr;
-    size_t length = 0;
+    // The Win32 copy, since children inherit it and it can hold an empty value.
+    const std::wstring called = Text::widen(name);
+    const DWORD room = GetEnvironmentVariableW(called.c_str(), nullptr, 0);
 
-    if (_wdupenv_s(&value, &length, widen(name).c_str()) != 0 || value == nullptr) {
+    if (room == 0) {
         return {};
     }
 
-    std::string held = narrow(value);
+    std::wstring value(room, L'\0');
+    const DWORD written = GetEnvironmentVariableW(called.c_str(), value.data(), room);
 
-    std::free(value);
+    value.resize(written);
 
-    return held;
+    return Text::narrow(value);
 #else
     // NOLINTNEXTLINE(concurrency-mt-unsafe): set() runs before any thread starts.
     const char *value = std::getenv(name);
@@ -68,19 +46,19 @@ std::string Env::get(const char *name) {
 
 void Env::set(const char *name, const char *value) {
 #ifdef _WIN32
-    const std::wstring held = widen(value);
-    const std::wstring called = widen(name);
+    const std::wstring held = Text::widen(value);
+    const std::wstring called = Text::widen(name);
 
-    // The C library ends the process over a variable longer than it holds.
-    if (called.size() + 1 + held.size() >= _MAX_ENV) {
+    // The C library ends the process over a name or a value this long, and Win32 refuses one too.
+    if (called.size() >= _MAX_ENV || held.size() >= _MAX_ENV) {
         return;
     }
 
-    SetEnvironmentVariableW(called.c_str(), held.c_str());
-
-    // Windows keeps the C library's environment separate, and get() reads that one.
+    // The C library may write the Win32 copy too, removing it for an empty value, so the Win32 write goes last.
     // NOLINTNEXTLINE(concurrency-mt-unsafe): runs before any thread starts.
     _wputenv_s(called.c_str(), held.c_str());
+
+    SetEnvironmentVariableW(called.c_str(), held.c_str());
 #else
     // NOLINTNEXTLINE(concurrency-mt-unsafe): runs before any thread starts.
     setenv(name, value, 1);
@@ -89,7 +67,12 @@ void Env::set(const char *name, const char *value) {
 
 void Env::unset(const char *name) {
 #ifdef _WIN32
-    const std::wstring called = widen(name);
+    const std::wstring called = Text::widen(name);
+
+    // No variable has a name this long, and the C library ends the process over one.
+    if (called.size() >= _MAX_ENV) {
+        return;
+    }
 
     SetEnvironmentVariableW(called.c_str(), nullptr);
 

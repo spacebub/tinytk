@@ -10,6 +10,7 @@
 #include <bit>
 #include <charconv>
 #include <cstdint>
+#include <limits>
 #include <ranges>
 
 #ifdef __AVX2__
@@ -23,6 +24,12 @@
 
 #include "ttk/system/Env.h"
 #include "ttk/system/Text.h"
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 namespace ttk {
 namespace {
@@ -475,6 +482,47 @@ std::string quote_argument(const std::string_view argument) {
 
     return quoted;
 }
+
+#ifdef _WIN32
+std::wstring widen(const std::string_view value) {
+    // A zero length is an error to the conversion rather than an empty result.
+    if (value.empty() || value.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return {};
+    }
+
+    const int size = static_cast<int>(value.size());
+    const int wide = MultiByteToWideChar(CP_UTF8, 0, value.data(), size, nullptr, 0);
+
+    if (wide <= 0) {
+        return {};
+    }
+
+    std::wstring out(static_cast<size_t>(wide), L'\0');
+
+    MultiByteToWideChar(CP_UTF8, 0, value.data(), size, out.data(), wide);
+
+    return out;
+}
+
+std::string narrow(const std::wstring_view value) {
+    if (value.empty() || value.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return {};
+    }
+
+    const int size = static_cast<int>(value.size());
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, value.data(), size, nullptr, 0, nullptr, nullptr);
+
+    if (bytes <= 0) {
+        return {};
+    }
+
+    std::string out(static_cast<size_t>(bytes), '\0');
+
+    WideCharToMultiByte(CP_UTF8, 0, value.data(), size, out.data(), bytes, nullptr, nullptr);
+
+    return out;
+}
+#endif
 
 }
 }

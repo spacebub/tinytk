@@ -16,6 +16,8 @@
 #define NOMINMAX
 #include <windows.h>
 #include <winhttp.h>
+
+#include "ttk/system/Text.h"
 #else
 #include <curl/curl.h>
 #endif
@@ -47,17 +49,6 @@ struct Sink {
 };
 
 #ifdef _WIN32
-
-std::wstring widen(const std::string &value) {
-    const int wide = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-    std::wstring out(static_cast<size_t>(wide > 0 ? wide - 1 : 0), L'\0');
-
-    if (wide > 1) {
-        MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, out.data(), wide);
-    }
-
-    return out;
-}
 
 struct Handle {
     HINTERNET value{nullptr};
@@ -152,7 +143,7 @@ void Http::Fetch::work() {
         }
     }
 
-    const std::wstring url = widen(_url);
+    const std::wstring url = Text::widen(_url);
     URL_COMPONENTS parts = {};
     wchar_t host[256] = {};
     wchar_t path[4096] = {};
@@ -179,7 +170,7 @@ void Http::Fetch::work() {
         return;
     }
 
-    const Handle session{WinHttpOpen(widen(agent()).c_str(),
+    const Handle session{WinHttpOpen(Text::widen(agent()).c_str(),
                                      WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                      WINHTTP_NO_PROXY_NAME,
                                      WINHTTP_NO_PROXY_BYPASS,
@@ -219,7 +210,7 @@ void Http::Fetch::work() {
         return;
     }
 
-    const std::wstring accept = _accept.empty() ? L"" : L"Accept: " + widen(_accept) + L"\r\n";
+    const std::wstring accept = _accept.empty() ? L"" : L"Accept: " + Text::widen(_accept) + L"\r\n";
     const wchar_t *headers = accept.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : accept.c_str();
 
     if (!WinHttpSendRequest(request.value, headers, headers == nullptr ? 0 : -1L, WINHTTP_NO_REQUEST_DATA, 0, 0, 0)

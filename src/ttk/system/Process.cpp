@@ -202,10 +202,8 @@ bool start(const std::filesystem::path &program,
     std::wstring command = L"\"" + program.wstring() + L"\"";
 
     for (const std::string &argument : arguments) {
-        const std::string quoted = Text::quote_argument(argument);
-
         command.push_back(L' ');
-        command.append(std::filesystem::path(quoted).wstring());
+        command.append(Text::widen(Text::quote_argument(argument)));
     }
 
     STARTUPINFOW startup = {};
@@ -242,10 +240,10 @@ bool start(const std::filesystem::path &program,
     restore.reserve(environment.size());
 
     for (const auto &[name, value] : environment) {
-        std::wstring wide = std::filesystem::path(name).wstring();
+        std::wstring wide = Text::widen(name);
 
         restore.emplace_back(wide, environment_variable(wide));
-        SetEnvironmentVariableW(wide.c_str(), std::filesystem::path(value).wstring().c_str());
+        SetEnvironmentVariableW(wide.c_str(), Text::widen(value).c_str());
     }
 
     // CreateProcessW may modify the command line.

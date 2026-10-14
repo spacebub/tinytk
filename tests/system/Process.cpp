@@ -25,6 +25,7 @@
 #endif
 
 #include "support/Sandbox.h"
+#include "ttk/system/Env.h"
 #include "ttk/system/Process.h"
 #include "ttk/system/Text.h"
 
@@ -671,6 +672,20 @@ TEST(ProcessStart, RunsInTheWorkingDirectory) {
 
     ASSERT_TRUE(result.started) << result.error;
     EXPECT_TRUE(fs::equivalent(fs::path(ttk::Text::trim(result.output)), directory)) << result.output;
+}
+
+TEST(ProcessStart, PassesUtf8Arguments) {
+    // cmd prints in the console code page, so it reports the match through its exit status instead.
+    const std::string japanese = "\xE6\x97\xA5\xE6\x9C\xAC";
+
+    ttk::Env::set("TTK_TEST_UTF8", japanese.c_str());
+
+    const Outcome result = launch("cmd", {"/c", "if", "%TTK_TEST_UTF8%==" + japanese, "exit", "5"});
+
+    ttk::Env::unset("TTK_TEST_UTF8");
+
+    ASSERT_TRUE(result.started) << result.error;
+    EXPECT_EQ(result.ended.code, 5) << "the argument matches the value Env set";
 }
 
 TEST(ProcessStart, AddsEnvironmentVariables) {

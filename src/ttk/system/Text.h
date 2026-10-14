@@ -14,8 +14,8 @@
 #include <string_view>
 #include <vector>
 
-//! Byte string helpers: ASCII case handling, number parsing, splitting, natural ordering, UTF-8 counting and
-//! command line quoting.
+//! Byte string helpers: ASCII case handling, number parsing, splitting, natural ordering, UTF-8 counting,
+//! command line quoting and, on Windows, conversion to and from UTF-16.
 namespace ttk::Text {
 
 //! Returns `value` with the ASCII letters `A` to `Z` lowered. Every other byte is copied unchanged.
@@ -82,6 +82,14 @@ namespace ttk::Text {
 //! Otherwise it is wrapped in double quotes, embedded quotes are escaped, and backslashes are doubled only
 //! where they precede a quote or the closing quote, which is how Windows splits its command lines.
 [[nodiscard]] std::string quote_argument(std::string_view argument);
+
+#ifdef _WIN32
+//! Returns the UTF-8 `value` as UTF-16 for the wide Windows calls. An invalid sequence becomes U+FFFD.
+[[nodiscard]] std::wstring widen(std::string_view value);
+
+//! Returns the UTF-16 `value` from a wide Windows call as UTF-8. An unpaired surrogate becomes U+FFFD.
+[[nodiscard]] std::string narrow(std::wstring_view value);
+#endif
 }
 
 

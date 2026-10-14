@@ -21,7 +21,9 @@ namespace ttk::Env {
 //! Sets the environment variable `name` to `value`, replacing any existing value. Both are UTF-8.
 //!
 //! On Windows both the Win32 environment and the C runtime's copy are set, since libraries read either. A
-//! variable there holds at most 32767 characters, so a longer one is left as it was.
+//! name or a value there holds at most 32766 UTF-16 code units, so a longer one leaves the variable as it was.
+//! The C runtime cannot hold an empty value, so an empty `value` removes its copy while the Win32 environment,
+//! which get() reads and children inherit, keeps the variable defined.
 //!
 //! \note Not thread safe. Call it before any other thread starts.
 void set(const char *name, const char *value);

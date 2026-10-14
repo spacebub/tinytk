@@ -111,10 +111,7 @@ bool Desktop::open(const std::string &target, std::string *why) {
     }
 
 #ifdef _WIN32
-    const int wide = MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, nullptr, 0);
-    std::wstring wanted(static_cast<size_t>(wide), L'\0');
-
-    MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, wanted.data(), wide);
+    const std::wstring wanted = Text::widen(target);
 
     // ShellExecute returns <= 32 on failure.
     const auto answer =

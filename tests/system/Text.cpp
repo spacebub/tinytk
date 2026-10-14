@@ -832,3 +832,26 @@ TEST(TextQuoteArgument, JoinedArgumentsSplitBackApart) {
 
     EXPECT_EQ(windows_split(ttk::Text::join(quoted, " ")), arguments);
 }
+
+#ifdef _WIN32
+TEST(TextWiden, ConvertsUtf8ToUtf16) {
+    EXPECT_EQ(ttk::Text::widen(std::string(JAPANESE) + " " + std::string(GRIN)), L"\u65E5\u672C\u8A9E \U0001F600");
+}
+
+TEST(TextWiden, StopsAtTheEndOfTheView) {
+    EXPECT_EQ(ttk::Text::widen(std::string_view("abc").substr(0, 2)), L"ab");
+}
+
+TEST(TextWiden, InvalidSequenceBecomesAReplacement) {
+    EXPECT_EQ(ttk::Text::widen("a\xFF!"), L"a\uFFFD!");
+}
+
+TEST(TextNarrow, ConvertsUtf16ToUtf8) {
+    EXPECT_EQ(ttk::Text::narrow(L"\u65E5\u672C\u8A9E \U0001F600"), std::string(JAPANESE) + " " + std::string(GRIN));
+}
+
+TEST(TextNarrow, EmptyStaysEmpty) {
+    EXPECT_EQ(ttk::Text::narrow(L""), "");
+    EXPECT_EQ(ttk::Text::widen(""), L"");
+}
+#endif
