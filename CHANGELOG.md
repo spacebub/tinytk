@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.4 - 2026-10-15
+
+### Fixed
+
+- `Root` attaches its page and layers on construction, so a widget added before the first
+  `settle()` has a root from the start. A `wake()` or `now()` from a sync that runs before the
+  first frame is no longer lost, and a tween started there runs
+
 ## 1.5.3 - 2026-10-14
 
 ### Added
