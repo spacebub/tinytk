@@ -7,7 +7,6 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -105,7 +104,7 @@ size_t step(const std::string_view run, const size_t at) {
 }
 
 // The code point starting at `at`. Only one or two bytes behind its lead are read, which is all a combining
-// mark takes; a longer sequence gives back its lead byte, which is not a mark.
+// mark takes. A longer sequence gives back its lead byte, which is not a mark.
 char32_t code_at(const std::string_view run, const size_t at) {
     const auto byte = [&](const size_t index) {
         return index < run.size() ? static_cast<char32_t>(static_cast<unsigned char>(run[index])) : char32_t{0};
@@ -150,10 +149,10 @@ size_t cluster_step(const std::string_view run, const size_t at) {
     return wide;
 }
 
-// Blend2D does not apply GPOS mark attachment, so a font that gives its combining marks an advance and counts
-// on GPOS to place them would have each one stand beside its base. Such a mark loses its advance and is centred
-// over the base instead. A mark the font gives no advance is placed by the font itself and is left alone.
-// Returns whether a mark was moved.
+// Blend2D applies no GPOS mark attachment, so a mark that keeps an advance, or whose ink is centred at or past
+// its origin, stands beside its base. Such a mark is centred over the base and loses its advance. A mark with
+// no advance and ink left of its origin is placed by the font.
+// NOLINTNEXTLINE(misc-const-correctness): the placements are written through a const buffer's pointer.
 bool settle_marks(const BLFont &font, BLGlyphBuffer &buffer, const std::string_view run) {
     if (!may_combine(run)) {
         return false;
@@ -164,32 +163,47 @@ bool settle_marks(const BLFont &font, BLGlyphBuffer &buffer, const std::string_v
     const BLGlyphInfo *info = buffer.info_data();
     BLGlyphPlacement *placed = buffer.placement_data();
     size_t base = count;
+    size_t bounded = count;
+    BLBoxI under{};
+    int ahead = 0;
     bool moved = false;
 
     for (size_t at = 0; at < count; ++at) {
         if (!combining(code_at(run, info[at].cluster))) {
             base = at;
+            ahead = placed[at].advance.x;
 
             continue;
         }
 
-        if (base == count || placed[at].advance.x == 0) {
+        ahead += placed[at].advance.x;
+
+        // A glyph the font lacks may be drawn as a box, which must not cover the base.
+        if (base == count || ids[at] == 0) {
             continue;
         }
 
-        const std::array<std::uint32_t, 2> pair{ids[base], ids[at]};
-        std::array<BLBoxI, 2> ink{};
+        BLBoxI over{};
 
-        if (font.get_glyph_bounds(pair.data(), sizeof(std::uint32_t), ink.data(), pair.size()) != BL_SUCCESS) {
+        if (font.get_glyph_bounds(&ids[at], sizeof(std::uint32_t), &over, 1) != BL_SUCCESS
+            || (placed[at].advance.x == 0 && over.x0 + over.x1 < 0)) {
             continue;
+        }
+
+        if (bounded != base) {
+            if (font.get_glyph_bounds(&ids[base], sizeof(std::uint32_t), &under, 1) != BL_SUCCESS) {
+                continue;
+            }
+
+            bounded = base;
         }
 
         // A base without ink, a space, centres on its advance.
-        const int under = ink[0].x1 > ink[0].x0 ? (ink[0].x0 + ink[0].x1) / 2 : placed[base].advance.x / 2;
-        const int over = (ink[1].x0 + ink[1].x1) / 2;
+        const int middle = under.x1 > under.x0 ? (under.x0 + under.x1) / 2 : placed[base].advance.x / 2;
 
-        // The pen stands past the base, and past any marks between, which no longer move it.
-        placed[at].placement.x = placed[base].placement.x + under - over - placed[base].advance.x;
+        // The pen stands past the base and the marks between it and this one.
+        ahead -= placed[at].advance.x;
+        placed[at].placement.x = placed[base].placement.x + middle - ((over.x0 + over.x1) / 2) - ahead;
         placed[at].advance.x = 0;
         moved = true;
     }
@@ -197,14 +211,25 @@ bool settle_marks(const BLFont &font, BLGlyphBuffer &buffer, const std::string_v
     return moved;
 }
 
+bool shape_settled(const BLFont &font, BLGlyphBuffer &buffer, const std::string_view run) {
+    buffer.set_utf8_text(run.data(), run.size());
+    font.shape(buffer);
+
+    return settle_marks(font, buffer, run);
+}
+
 // The sideways reach of a run's ink over every glyph where it is placed. Blend2D measures it from the first and
 // last glyph alone, at their pens, which misses a mark moved back over its base.
-void widen_to_ink(const BLFont &font, const BLGlyphBuffer &buffer, BLBox &ink) {
+void widen_to_ink(const BLFont &font, const BLGlyphBuffer &buffer, std::vector<BLBoxI> &each, BLBox &ink) {
     const size_t count = buffer.size();
-    std::vector<BLBoxI> each(count);
 
-    if (count == 0
-        || font.get_glyph_bounds(buffer.content(), sizeof(std::uint32_t), each.data(), count) != BL_SUCCESS) {
+    if (count == 0) {
+        return;
+    }
+
+    each.resize(count);
+
+    if (font.get_glyph_bounds(buffer.content(), sizeof(std::uint32_t), each.data(), count) != BL_SUCCESS) {
         return;
     }
 
@@ -379,17 +404,14 @@ Typeface::Shaped &Typeface::shaped(const BLFont &font, const std::string_view ru
 
     BLTextMetrics metrics{};
 
-    made.buffer.set_utf8_text(run.data(), run.size());
-    font.shape(made.buffer);
-
-    const bool moved = settle_marks(font, made.buffer, run);
+    const bool moved = shape_settled(font, made.buffer, run);
 
     if (font.get_text_metrics(made.buffer, metrics) == BL_SUCCESS) {
         made.width = static_cast<float>(metrics.advance.x);
         made.ink = metrics.bounding_box;
 
         if (moved) {
-            widen_to_ink(font, made.buffer, made.ink);
+            widen_to_ink(font, made.buffer, _bounds, made.ink);
         }
     }
 
@@ -470,9 +492,7 @@ float Typeface::width_once(const BLFont &font, const std::string_view run) {
 
     BLTextMetrics metrics{};
 
-    _scratch.set_utf8_text(run.data(), run.size());
-    font.shape(_scratch);
-    settle_marks(font, _scratch, run);
+    shape_settled(font, _scratch, run);
 
     return font.get_text_metrics(_scratch, metrics) == BL_SUCCESS ? static_cast<float>(metrics.advance.x) : 0.0F;
 }
@@ -535,8 +555,9 @@ Typeface::elide_once(const BLFont &font, const std::string_view run, const float
     _cuts.clear();
     _cuts.push_back(0);
 
-    for (size_t at = 0; at < run.size(); at += step(run, at)) {
-        _cuts.push_back(at + step(run, at));
+    for (size_t at = 0; at < run.size();) {
+        at += cluster_step(run, at);
+        _cuts.push_back(at);
     }
 
     std::string candidate;
@@ -743,9 +764,7 @@ void Typeface::make(const BLFont &font, const std::uint32_t id, const std::uint3
 Typeface::Cut Typeface::shape_to(const BLFont &font, const std::string_view run, const double room) {
     const double m00 = font.matrix().m00;
 
-    _scratch.set_utf8_text(run.data(), run.size());
-    font.shape(_scratch);
-    settle_marks(font, _scratch, run);
+    shape_settled(font, _scratch, run);
 
     const size_t count = _scratch.size();
     const BLGlyphPlacement *placed = _scratch.placement_data();
@@ -947,21 +966,22 @@ size_t Typeface::nearest(const BLFont &font, const std::string_view run, const f
         return 0;
     }
 
-    _scratch.set_utf8_text(run.data(), run.size());
-    font.shape(_scratch);
-    settle_marks(font, _scratch, run);
+    shape_settled(font, _scratch, run);
 
     const size_t count = _scratch.size();
     const BLGlyphPlacement *placed = _scratch.placement_data();
     const BLGlyphInfo *info = _scratch.info_data();
     const double m00 = font.matrix().m00;
+    const bool marks = may_combine(run);
 
     size_t best = 0;
     double closest = std::numeric_limits<double>::max();
     double pen = 0.0;
 
     for (size_t at = 0; at < count; ++at) {
-        if (const double gap = std::abs(pen - x); gap < closest) {
+        // The offset before a mark falls inside its base's character.
+        if (const double gap = std::abs(pen - x);
+            gap < closest && !(marks && combining(code_at(run, info[at].cluster)))) {
             closest = gap;
             best = info[at].cluster;
         }

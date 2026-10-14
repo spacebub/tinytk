@@ -236,6 +236,7 @@ private:
     BLGlyphBuffer _scratch;
     std::vector<size_t> _cuts;
     std::vector<double> _pens;
+    std::vector<BLBoxI> _bounds;
 
     Cache::RunMap<Row> _rows;
 };

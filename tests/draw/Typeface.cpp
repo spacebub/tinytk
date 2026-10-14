@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -41,6 +42,25 @@ std::vector<std::size_t> boundaries(const std::string_view run) {
     }
 
     return cuts;
+}
+
+struct Mark {
+    std::uint32_t id = 0;
+    std::int32_t advance = 0;
+};
+
+// The glyph and advance `font` gives the mark behind the base in `pair`, as Blend2D shapes it.
+Mark mark_of(const BLFont &font, const std::string_view pair) {
+    BLGlyphBuffer buffer;
+
+    buffer.set_utf8_text(pair.data(), pair.size());
+    font.shape(buffer);
+
+    if (buffer.size() != 2) {
+        return {};
+    }
+
+    return Mark{.id = buffer.content()[1], .advance = buffer.placement_data()[1].advance.x};
 }
 
 TEST(Typeface, PickPassesProportionalWeightsThrough) {
@@ -117,6 +137,15 @@ protected:
     static ttk::Typeface &type() { return tests::fonts(); }
 
     static const BLFont &body() { return tests::fonts().at(ttk::Typeface::regular, 14); }
+
+    static const BLFont &mono() { return tests::fonts().at(ttk::Typeface::mono, 14); }
+
+    // Whether the mono face gives U+0301 an advance, so the mark stands beside its base unless it is moved.
+    static bool mono_mark_stands_aside() {
+        const Mark mark = mark_of(mono(), "e\xcc\x81");
+
+        return mark.id != 0 && mark.advance > 0;
+    }
 };
 
 TEST_F(Typed, LoadGivesEveryWeightAFace) {
@@ -232,12 +261,31 @@ TEST_F(Typed, CombiningMarkAddsNoAdvance) {
 }
 
 TEST_F(Typed, CombiningMarkMatchesThePrecomposedWidth) {
-    EXPECT_NEAR(type().width(body(), "e\xcc\x81"), type().width(body(), "\xc3\xa9"), 0.5F);
+    if (!mono_mark_stands_aside()) {
+        GTEST_SKIP() << "the mono face gives U+0301 no advance";
+    }
+
+    EXPECT_NEAR(type().width(mono(), "e\xcc\x81"), type().width(mono(), "\xc3\xa9"), 0.5F);
 }
 
 TEST_F(Typed, TrackingKeepsAMarkOnItsBase) {
-    EXPECT_FLOAT_EQ(type().width_tracked(body(), "e\xcc\x81", 2.0F), type().width_tracked(body(), "e", 2.0F))
+    if (!mono_mark_stands_aside()) {
+        GTEST_SKIP() << "the mono face gives U+0301 no advance";
+    }
+
+    EXPECT_FLOAT_EQ(type().width_tracked(mono(), "e\xcc\x81", 2.0F), type().width_tracked(mono(), "e", 2.0F))
             << "a mark is not a letter of its own to space out";
+}
+
+TEST_F(Typed, MissingMarkStaysBesideItsBase) {
+    const Mark mark = mark_of(body(), "a\xe2\x83\x9d");
+
+    if (mark.id != 0 || mark.advance <= 0) {
+        GTEST_SKIP() << "the body face has U+20DD";
+    }
+
+    EXPECT_GT(type().width(body(), "a\xe2\x83\x9d"), type().width(body(), "a") + 1.0F)
+            << "the glyph for a missing mark was laid over its base";
 }
 
 TEST_F(Typed, TrackedWidthAddsTrackingBetweenCharacters) {
@@ -295,6 +343,27 @@ TEST_F(Typed, ElideCutsOnCharacterBoundaries) {
         const std::size_t kept = cut.size() - ELLIPSIS.size();
 
         EXPECT_FALSE(continuation(run, kept)) << "cut inside a character at room " << room;
+    }
+}
+
+TEST_F(Typed, ElideKeepsAMarkWithItsBase) {
+    // U+20DD is missing from most faces, and the glyph that stands in for it keeps its advance.
+    const std::string run = "cafe\xcc\x81 au lait, cafe\xe2\x83\x9d noir";
+
+    for (const BLFont *font : {&body(), &mono()}) {
+        for (int step = 0; static_cast<float>(step) * 0.5F < type().width(*font, run); ++step) {
+            const float room = static_cast<float>(step) * 0.5F;
+            const std::string cut = type().elide(*font, run, room);
+
+            if (cut.empty()) {
+                continue;
+            }
+
+            const std::string_view rest = std::string_view(run).substr(cut.size() - ELLIPSIS.size());
+
+            EXPECT_FALSE(rest.starts_with("\xcc\x81") || rest.starts_with("\xe2\x83\x9d"))
+                    << "cut between a letter and its mark: " << cut;
+        }
     }
 }
 
@@ -368,6 +437,21 @@ TEST_F(Typed, NearestNeverSplitsACharacter) {
 
         ASSERT_LE(at, run.size());
         EXPECT_FALSE(continuation(run, at)) << "offset " << at << " at x " << x;
+    }
+}
+
+TEST_F(Typed, NearestKeepsAMarkWithItsBase) {
+    const std::string_view run = "e\xcc\x81x";
+
+    for (const BLFont *font : {&body(), &mono()}) {
+        const float wide = type().width(*font, run);
+        std::set<std::size_t> found;
+
+        for (int step = 0; static_cast<float>(step) * 0.25F < wide + 3.0F; ++step) {
+            found.insert(type().nearest(*font, run, -1.0F + (static_cast<float>(step) * 0.25F)));
+        }
+
+        EXPECT_EQ(found, (std::set<std::size_t>{0, 3, 4})) << "a caret went between the e and its accent";
     }
 }
 
@@ -684,14 +768,18 @@ TEST_F(Drawn, CombiningMarksDrawInsideTheLineBox) {
 }
 
 TEST_F(Drawn, CombiningMarkSitsOverItsBase) {
+    if (!mono_mark_stands_aside()) {
+        GTEST_SKIP() << "the mono face gives U+0301 no advance";
+    }
+
     const BLPoint top{20.0, 20.0};
 
-    type().draw(context, body(), top, "e", BLRgba32(0xffffffff));
+    type().draw(context, mono(), top, "e", BLRgba32(0xffffffff));
 
     const tests::Ink plain = settle();
 
     context.fill_all(BLRgba32(GROUND));
-    type().draw(context, body(), top, "e\xcc\x81", BLRgba32(0xffffffff));
+    type().draw(context, mono(), top, "e\xcc\x81", BLRgba32(0xffffffff));
 
     const tests::Ink marked = settle();
 
