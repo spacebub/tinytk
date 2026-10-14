@@ -31,7 +31,10 @@ namespace ttk {
 class Root {
 public:
     //! Creates an empty root whose widgets lay text out with `type`, which must outlive the root.
-    explicit Root(Typeface &type) : _type(type), _painter(type) { _layers[POPUPS].floats(); }
+    //!
+    //! The page and every layer belong to the root from the start, so a widget added to them can read the clock
+    //! and \ref Widget::wake() before the first \ref settle().
+    explicit Root(Typeface &type);
 
     //! \name Window
     //! \{

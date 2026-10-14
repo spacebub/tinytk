@@ -211,7 +211,9 @@ TEST_F(Rooted, SettlePlacesThePageAndEveryLayerOnTheWindow) {
     }
 }
 
-TEST_F(Rooted, SettleAttachesThePageAndLayersToTheRoot) {
+TEST(Root, ThePageAndLayersBelongToTheRootFromTheStart) {
+    ttk::Root root(tests::fonts());
+
     EXPECT_EQ(root.content()->root(), &root);
 
     for (std::size_t index = 0; index < ttk::Root::LAYERS; ++index) {
@@ -219,18 +221,25 @@ TEST_F(Rooted, SettleAttachesThePageAndLayersToTheRoot) {
     }
 }
 
-TEST(Root, SettleAttachesWidgetsAddedBeforeIt) {
+TEST(Root, WidgetsAddedBeforeTheFirstSettleBelongToTheRoot) {
     ttk::Root root(tests::fonts());
     auto *child = root.content()->append(std::make_unique<tests::Probe>());
     const auto *grandchild = child->append(std::make_unique<tests::Probe>());
 
-    EXPECT_EQ(child->root(), nullptr);
-
-    root.resize(WIDTH, HEIGHT);
-    root.settle();
-
     EXPECT_EQ(child->root(), &root);
     EXPECT_EQ(grandchild->root(), &root);
+}
+
+// A window syncs its state into the tree once before the first frame lays it out.
+TEST(Root, AWakeBeforeTheFirstSettleIsKept) {
+    ttk::Root root(tests::fonts());
+    const auto *child = root.content()->append(std::make_unique<tests::Probe>());
+
+    root.set_now(2.5);
+    child->wake();
+
+    EXPECT_TRUE(root.busy());
+    EXPECT_DOUBLE_EQ(child->now(), 2.5);
 }
 
 TEST_F(Rooted, PageAndPlainLayersStretchTheirChildrenToTheWindow) {

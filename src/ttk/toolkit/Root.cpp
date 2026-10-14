@@ -57,6 +57,16 @@ void Root::Page::arrange(Typeface &type) {
     }
 }
 
+Root::Root(Typeface &type) : _type(type), _painter(type) {
+    _layers[POPUPS].floats();
+
+    _page.attach(this);
+
+    for (Page &over : _layers) {
+        over.attach(this);
+    }
+}
+
 void Root::resize(const double width, const double height) {
     if (width == _width && height == _height) {
         return;
