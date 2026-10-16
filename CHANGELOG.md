@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.6.0 - 2026-10-16
+
+### Added
+
+- `TextEdit::Decorator`, attached with `TextEdit::decorate`, colours runs of a line, washes a
+  line, marks it in the gutter or draws it instead of its text. It is asked only about lines
+  being repainted, and an editor without one does no extra work
+- `TextEdit::selected`, `caret`, `on_select`, `select`, `go_to` and `insert`, and the line
+  lookups `line_count`, `line_of`, `line_start` and `line_end` made public
+- `Spinner`, a turning arc for work under way, with `Spinner::render` to paint one inside
+  another widget
+- `Painter::row` and `Typeface::draw_once` take bands that colour stretches of a line from one
+  composed mask
+- Benchmarks of a decorated TextEdit page and of typing into 50 000 lines
+- `MultistateSwitch::fill` spreads the choices across the whole width of the box
+- `TextEdit::spot` and `text_box` give where a character and the text are on screen, and
+  `TextEdit::on_scroll` tells when the view scrolls, for something laid over the text to follow it
+- `Root::set_modified_activation`, off, leaves Return and Space held with Ctrl or Alt to the
+  window's shortcuts instead of clicking the focused control, which they still do by default
+- `TextEdit::bare` draws the editor on the window's background, without its own body, border
+  and gutter shading
+
+### Fixed
+
+- A label elided to its rows measured its text as one run but folded it word by word, so at
+  exactly its natural width it could break its own text and elide it
+- A widget that repainted while the root was being destroyed wrote into the root's freed damage
+  lists. The root now detaches its tree first, so such a widget finds no root
+
 ## 1.5.4 - 2026-10-15
 
 ### Fixed
