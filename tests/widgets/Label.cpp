@@ -229,6 +229,17 @@ TEST_F(Painted, LabelWrapOffMeasuresOneLineAgain) {
     EXPECT_DOUBLE_EQ(label.natural_height(type(), 120), line(400, ttk::Theme::fontBody));
 }
 
+TEST_F(Painted, LabelElidedToOneRowFitsOnOneRowAtItsNaturalWidth) {
+    for (const std::string_view text : {"recompute open balances", "index on invoice customer", "a b c d e f g"}) {
+        ttk::Label label{std::string(text)};
+        const BLFont &face = type().at(600, 16.0F);
+
+        label.font(600, 16.0F)->elide(1);
+
+        EXPECT_EQ(ttk::fold_spans(type(), face, text, label.natural_width(type())).size(), 1U) << text;
+    }
+}
+
 TEST_F(Painted, LabelElidedHeightStopsAtTheRows) {
     ttk::Label label(paragraph(4));
     const double one = line(400, ttk::Theme::fontBody);

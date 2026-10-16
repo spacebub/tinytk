@@ -97,6 +97,43 @@ TEST(Root, ContentIsOneWidgetForTheLifeOfTheRoot) {
     EXPECT_EQ(root.content(), root.content());
 }
 
+namespace {
+// Repaints as it goes, as a widget that detaches a decorator in its destructor does.
+class Leaving final : public ttk::Widget {
+public:
+    explicit Leaving(bool &rooted) : _rooted(rooted) {}
+
+    ~Leaving() override {
+        _rooted = root() != nullptr;
+        invalidate();
+    }
+
+    Leaving(const Leaving &) = delete;
+    Leaving &operator=(const Leaving &) = delete;
+    Leaving(Leaving &&) = delete;
+    Leaving &operator=(Leaving &&) = delete;
+
+private:
+    bool &_rooted;
+};
+}
+
+TEST(Root, WidgetsTakenDownWithTheRootFindItGone) {
+    bool onPage = true;
+    bool onLayer = true;
+
+    {
+        ttk::Root root(tests::fonts());
+
+        root.resize(100.0, 100.0);
+        root.content()->append(std::make_unique<Leaving>(onPage));
+        root.layer(ttk::Root::POPUPS)->append(std::make_unique<Leaving>(onLayer));
+    }
+
+    EXPECT_FALSE(onPage) << "a widget on the page still saw the root while it was taken down";
+    EXPECT_FALSE(onLayer) << "a widget on a layer still saw the root while it was taken down";
+}
+
 TEST(Root, EveryLayerIsItsOwnWidget) {
     ttk::Root root(tests::fonts());
 

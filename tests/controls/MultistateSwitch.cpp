@@ -158,6 +158,31 @@ TEST_F(SwitchTest, TheLanesFollowTheWords) {
     EXPECT_EQ(picked, (std::vector<int>{10, 10, 20, 20, 30, 30}));
 }
 
+TEST_F(SwitchTest, AFillingSwitchSharesItsWidthEqually) {
+    make()->fill();
+    canvas.frame();
+
+    const double share = (BOX.w - 8.0) / 3.0;
+
+    controls::click(canvas.root(), BOX.x + 4.0 + (share * 2.5), BOX.y + (BOX.h / 2.0));
+    controls::click(canvas.root(), BOX.x + 4.0 + (share * 1.5), BOX.y + (BOX.h / 2.0));
+    controls::click(canvas.root(), BOX.x + 4.0 + (share * 0.5), BOX.y + (BOX.h / 2.0));
+
+    EXPECT_EQ(picked, (std::vector<int>{30, 20, 10}));
+}
+
+TEST_F(SwitchTest, FillingLeavesTheNaturalWidthAlone) {
+    ttk::MultistateSwitch made(nullptr);
+
+    made.set_options(choices());
+
+    const double natural = made.natural_width(tests::fonts());
+
+    made.fill();
+
+    EXPECT_DOUBLE_EQ(made.natural_width(tests::fonts()), natural);
+}
+
 TEST_F(SwitchTest, ClickingPastTheWordsReportsNothing) {
     make();
 

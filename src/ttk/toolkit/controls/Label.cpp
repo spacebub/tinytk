@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ttk/draw/Typeface.h"
@@ -18,6 +19,43 @@
 #include "ttk/util/Format.h"
 
 namespace ttk {
+namespace {
+
+// A wrapped label folds its words the way fold_spans does, adding each one's width to the line's. Measured as one
+// run the line can come out a hair narrower, and a label given exactly that width would then break its own text.
+double folded_width(Typeface &type, const BLFont &face, const std::string_view text) {
+    const double gap = type.width_word(face, " ");
+    double widest = 0.0;
+    double line = 0.0;
+    bool first = true;
+    size_t at = 0;
+
+    while (at <= text.size()) {
+        const size_t end = text.find_first_of(" \n", at);
+        const std::string_view word =
+                text.substr(at, end == std::string_view::npos ? std::string_view::npos : end - at);
+
+        line += (first ? 0.0 : gap) + type.width_word(face, word);
+        first = false;
+        widest = std::max(widest, line);
+
+        if (end == std::string_view::npos) {
+            break;
+        }
+
+        if (text[end] == '\n') {
+            line = 0.0;
+            first = true;
+        }
+
+        at = end + 1;
+    }
+
+    return widest;
+}
+
+}
+
 void Label::set_text(const std::string_view text) {
     if (_text == text) {
         return;
@@ -189,7 +227,11 @@ double Label::natural_width(Typeface &type) {
 
     const BLFont &face = type.at(face_weight(), _size);
 
-    return _tracked ? type.width_tracked(face, _upper, 0.9F) : type.width(face, _text);
+    if (_tracked) {
+        return type.width_tracked(face, _upper, 0.9F);
+    }
+
+    return _wrap ? folded_width(type, face, _text) : type.width(face, _text);
 }
 
 double Label::natural_height(Typeface &type, const double width) {

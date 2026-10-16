@@ -54,6 +54,10 @@ public:
     //! selection callback.
     void set_current(int value);
 
+    //! Sets whether the choices share the whole width of the box equally instead of each taking its word's
+    //! width from the left edge, and returns this. \ref natural_width() is the same either way.
+    MultistateSwitch *fill(bool value = true);
+
     //! Returns the value last given to \ref set_current(), or nothing before the first call.
     [[nodiscard]] std::optional<int> current() const { return _current; }
 
@@ -108,6 +112,7 @@ private:
     Anim::Tween _markX;
     Anim::Tween _markWidth;
     bool _marked = false;
+    bool _fill = false;
 };
 }
 

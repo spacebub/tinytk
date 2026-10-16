@@ -67,6 +67,14 @@ Root::Root(Typeface &type) : _type(type), _painter(type) {
     }
 }
 
+Root::~Root() {
+    _page.attach(nullptr);
+
+    for (Page &over : _layers) {
+        over.attach(nullptr);
+    }
+}
+
 void Root::resize(const double width, const double height) {
     if (width == _width && height == _height) {
         return;
@@ -431,8 +439,10 @@ bool Root::key(const Key &pressed) {
         return true;
     }
 
-    if ((pressed.code == Code::Return || pressed.code == Code::Space) && _focused != nullptr
-        && _focused->takes_focus()) {
+    const bool modified = pressed.ctrl || pressed.alt;
+
+    if ((pressed.code == Code::Return || pressed.code == Code::Space) && (!modified || _modifiedActivation)
+        && _focused != nullptr && _focused->takes_focus()) {
         if (!pressed.repeat) {
             const BLRect box = _focused->box();
             const Pointer at{.x = box.x + (box.w / 2.0), .y = box.y + (box.h / 2.0)};

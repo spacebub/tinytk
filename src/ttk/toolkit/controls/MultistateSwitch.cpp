@@ -64,15 +64,33 @@ void MultistateSwitch::set_current(const int value) {
     wake();
 }
 
+MultistateSwitch *MultistateSwitch::fill(const bool value) {
+    if (_fill == value) {
+        return this;
+    }
+
+    _fill = value;
+    _marked = false;
+
+    if (root() != nullptr) {
+        root()->relayout();
+    }
+
+    invalidate();
+
+    return this;
+}
+
 void MultistateSwitch::measure_lanes(Typeface &type) {
     const BLFont &face = type.at(400, Theme::fontBody);
+    const double share = _options.empty() ? 0.0 : std::max(0.0, _box.w - 8.0) / static_cast<double>(_options.size());
 
     double x = _box.x + 4.0;
 
     _lanes.clear();
 
     for (const Choice &option : _options) {
-        const double wide = type.width(face, option.label) + 34.0;
+        const double wide = _fill ? share : type.width(face, option.label) + 34.0;
 
         _lanes.emplace_back(x, _box.y + 4.0, wide, _box.h - 8.0);
 

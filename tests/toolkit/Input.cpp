@@ -964,6 +964,31 @@ TEST_F(Routed, ReturnRefusedByTheControlIsNotReleased) {
     EXPECT_TRUE(button->releasedAt.empty());
 }
 
+TEST_F(Routed, ReturnWithCtrlOrAltActivatesTheFocusedControlByDefault) {
+    tests::Probe *button = popup({10, 20, 40, 30}, "button");
+
+    root.focus(button);
+
+    EXPECT_TRUE(root.key({.code = ttk::Code::Return, .ctrl = true}));
+    EXPECT_TRUE(root.key({.code = ttk::Code::Space, .alt = true}));
+    EXPECT_EQ(button->pressedAt.size(), 2U);
+}
+
+TEST_F(Routed, ReturnWithCtrlOrAltCanBeLeftForTheShortcuts) {
+    tests::Probe *button = popup({10, 20, 40, 30}, "button");
+
+    root.set_modified_activation(false);
+    root.focus(button);
+
+    EXPECT_FALSE(root.key({.code = ttk::Code::Return, .ctrl = true}));
+    EXPECT_FALSE(root.key({.code = ttk::Code::Return, .ctrl = true, .shift = true}));
+    EXPECT_FALSE(root.key({.code = ttk::Code::Space, .alt = true}));
+    EXPECT_TRUE(button->pressedAt.empty());
+
+    EXPECT_TRUE(root.key({.code = ttk::Code::Return}));
+    EXPECT_EQ(button->pressedAt.size(), 1U) << "a plain Return stopped activating";
+}
+
 TEST_F(Routed, ReturnOnAWidgetThatTakesNoFocusIsNotConsumed) {
     tests::Probe *panel = group(root.layer(ttk::Root::POPUPS), {10, 20, 40, 30}, "panel");
 

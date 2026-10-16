@@ -36,6 +36,15 @@ public:
     //! and \ref Widget::wake() before the first \ref settle().
     explicit Root(Typeface &type);
 
+    //! Detaches the page and the layers before anything else of the root goes, so a widget that invalidates
+    //! or asks for a frame while it is destroyed finds no root rather than one half taken down.
+    ~Root();
+
+    Root(const Root &) = delete;
+    Root &operator=(const Root &) = delete;
+    Root(Root &&) = delete;
+    Root &operator=(Root &&) = delete;
+
     //! \name Window
     //! \{
 
@@ -187,9 +196,14 @@ public:
     //! Tab that no widget consumed, with or without Shift and Ctrl, moves focus through \ref focus_next() and
     //! counts as consumed, though a held key moves it once. Alt+Tab is left alone. Return and Space that no
     //! widget consumed press and release the focused control at its centre, so any control activates from the
-    //! keyboard, and count as consumed, though a held key acts once. Returns false for any other key nothing
-    //! consumed.
+    //! keyboard, and count as consumed, though a held key acts once. Held with Ctrl or Alt they do the same
+    //! unless \ref set_modified_activation() turned that off. Returns false for any other key nothing consumed.
     bool key(const Key &pressed);
+
+    //! Sets whether Return and Space held with Ctrl or Alt activate the focused control, as they do by default.
+    //! Off, such a key that no widget consumed is left unconsumed, so it reaches the window's shortcuts, as a
+    //! window that runs something on Ctrl+Return wants whatever has focus.
+    void set_modified_activation(const bool value) { _modifiedActivation = value; }
     //! Passes `text`, in UTF-8, to the focused widget. Ignored when nothing has focus.
     void wrote(const std::string &text) const;
 
@@ -367,6 +381,7 @@ private:
     std::function<void()> _dismiss;
     const Widget *_owner = nullptr;
     bool _justDismissed = false;
+    bool _modifiedActivation = true;
 
     double _width = 0.0;
     double _height = 0.0;
