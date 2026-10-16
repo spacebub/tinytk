@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -43,6 +44,16 @@ public:
     static constexpr int mono = 1;
     //! Weight that selects the bold monospace face.
     static constexpr int monoBold = 2;
+
+    //! A stretch of a line drawn in a colour of its own by the \ref draw_once() that takes bands.
+    struct Band {
+        //! Pixels from the start of the line to where the stretch begins.
+        double from = 0.0;
+        //! Pixels from the start of the line to where the stretch ends.
+        double to = 0.0;
+        //! Colour of the stretch.
+        BLRgba32 tone{};
+    };
 
     //! Returns `weight` when `fixed` is false. Otherwise returns \ref monoBold for a `weight` of \ref semibold
     //! or more and \ref mono below it.
@@ -119,6 +130,19 @@ public:
     //! drawn most recently. Use it for long text such as logs, where lines are drawn and scrolled past.
     void
     draw_once(BLContext &context, const BLFont &font, BLPoint top, std::string_view run, BLRgba32 tone, double room);
+
+    //! Draws `run` as the \ref draw_once() above does, with each of `bands` in its own colour and the rest in `tone`.
+    //!
+    //! `bands` are in order and do not overlap. A pixel column belongs to the band its centre falls in, so a band
+    //! that starts and ends on character boundaries of a fixed-width face colours whole characters. Drawn from the
+    //! same composed line as a run without bands, which costs one blit per band.
+    void draw_once(BLContext &context,
+                   const BLFont &font,
+                   BLPoint top,
+                   std::string_view run,
+                   BLRgba32 tone,
+                   double room,
+                   std::span<const Band> bands);
 
     //! Returns the byte offset in `run` of the character boundary nearest `x` pixels from its start.
     //!
@@ -201,6 +225,8 @@ private:
 
     // Lays the run in `_scratch`, up to its cut, into a mask of its own.
     void compose(const BLFont &font, const Cut &cut, double room, Row &into);
+
+    Row &composed(const BLFont &font, std::string_view run, double room);
 
     std::string elide_once(const BLFont &font, std::string_view run, float room, float tracking);
 

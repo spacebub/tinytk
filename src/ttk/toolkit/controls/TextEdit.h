@@ -36,6 +36,72 @@ public:
         Shown,
     };
 
+    //! A run of a logical line whose text is drawn in a colour of its own, given by \ref Decorator::inks().
+    struct Ink {
+        //! Byte offset in the line where the run starts.
+        size_t from = 0;
+        //! Byte offset in the line just past the run.
+        size_t to = 0;
+        //! Colour of the run's text.
+        BLRgba32 tone{};
+    };
+
+    //! Byte range of the selection in the text, with `from` never after `to`.
+    struct Range {
+        //! Offset of the first selected byte.
+        size_t from = 0;
+        //! Offset just past the last selected byte, equal to `from` when nothing is selected.
+        size_t to = 0;
+    };
+
+    //! What an application attaches through \ref decorate() to colour, tint, mark or replace lines.
+    //!
+    //! Every question is about one logical line, counted from 0, and is asked while the editor paints, only for
+    //! lines that have a row being repainted. Colours are taken as they are answered, so a decorator that reads
+    //! them from \ref Theme::palette() each time follows theme changes. The default answers decorate nothing.
+    //! After its own state changes, the application calls \ref Widget::invalidate() on the editor.
+    class Decorator {
+    public:
+        Decorator() = default;
+        virtual ~Decorator() = default;
+
+        Decorator(const Decorator &) = default;
+        Decorator &operator=(const Decorator &) = default;
+        Decorator(Decorator &&) = default;
+        Decorator &operator=(Decorator &&) = default;
+
+        //! Called when the text from the start of `line` on has changed, so whatever was worked out for that line
+        //! and every line after it is stale.
+        //!
+        //! Called after every edit with the first line it touched, with the text already changed and before the
+        //! `edited` callback, and with 0 from \ref TextEdit::set_text() and \ref TextEdit::decorate().
+        virtual void changed(size_t /*line*/) {}
+
+        //! Appends to `out`, which arrives empty, the runs of `line` whose text is drawn in a colour of their own.
+        //!
+        //! `text` is the line without its line break. The runs are in order and do not overlap. Text no run covers
+        //! keeps the editor's text colour. Asked once per paint for each line with a row being repainted.
+        virtual void inks(size_t /*line*/, std::string_view /*text*/, std::vector<Ink> & /*out*/) {}
+
+        //! Returns the colour filled behind every row of `line`, or a fully transparent one for none.
+        //!
+        //! The fill spans the text area and lies under the selection and the text.
+        [[nodiscard]] virtual BLRgba32 wash(size_t /*line*/) { return BLRgba32{}; }
+
+        //! Returns the colour of a bar beside every row of `line`, or a fully transparent one for none.
+        //!
+        //! The bar is 3 pixels wide and as tall as the rows, so marks on neighbouring lines join into one bar. It
+        //! sits between the line numbers and the text in a numbered editor, and along the left edge otherwise.
+        [[nodiscard]] virtual BLRgba32 mark(size_t /*line*/) { return BLRgba32{}; }
+
+        //! Draws the row of `line` in `row` instead of its text, and returns true when it did.
+        //!
+        //! Asked for each row being repainted, with `row` the text area of that row: from the left edge of the
+        //! text, unscrolled, across the width the text has, and one row tall. The wash is drawn before it, and
+        //! the caret row's tint, the selection and the caret after it. Returning false draws the text as usual.
+        virtual bool draw(size_t /*line*/, const Painter & /*painter*/, const BLRect & /*row*/) { return false; }
+    };
+
     //! Creates an empty, editable editor that reports edits to `edited`, with a settings button when `cog` is
     //! \ref Cog::Shown.
     //!
@@ -76,6 +142,10 @@ public:
     //! A line breaks after the last space that fits in the row, or at the edge when the row has no space.
     TextEdit *wrapped(bool value = true);
 
+    //! Sets whether the editor is drawn without its own body, border and gutter shading, on the window's
+    //! background, for an editor that is the page itself rather than a field on it. Returns this.
+    TextEdit *bare(bool value = true);
+
     //! Tests whether the text can be edited, which is when \ref read_only() is not set.
     [[nodiscard]] bool editable() const { return !_readOnly; }
 
@@ -87,6 +157,66 @@ public:
 
     //! Selects the whole text, with the caret at the end.
     void select_all();
+
+    //! Returns the byte offset of the caret.
+    [[nodiscard]] size_t caret() const { return _caret; }
+
+    //! Returns the byte range of the selection, empty at the caret when nothing is selected.
+    [[nodiscard]] Range selected() const;
+
+    //! Selects from `anchor` to `caret`, byte offsets clamped to the text and moved back onto the start of a
+    //! character, and scrolls the caret into view. Equal offsets place the caret with nothing selected.
+    //!
+    //! A caret out of view is scrolled to the middle of it. Before the editor has a size, the scroll waits for
+    //! its first layout.
+    void select(size_t anchor, size_t caret);
+
+    //! Places the caret at the start of `line`, clamped to the last line, as \ref select() does.
+    void go_to(size_t line);
+
+    //! Replaces the selection with `text`, in UTF-8, or inserts it at the caret, as one step of undo.
+    //!
+    //! Behaves as typing does otherwise: carriage returns are removed, the caret ends after `text` and the
+    //! `edited` callback is called. Ignored when read-only.
+    void insert(std::string_view text);
+
+    //! Sets the function called whenever the caret or the selection changes, and returns this.
+    //!
+    //! Called once for each change, from the pointer, the keyboard, an edit or a call such as \ref select(),
+    //! after the caret has moved and before the `edited` callback of an edit. Read the new place through
+    //! \ref caret() and \ref selected(). A null `moved` stops the calls.
+    TextEdit *on_select(std::function<void()> moved);
+
+    //! Sets the function called whenever the view scrolls, by the wheel, the keyboard, a drag of a scroll bar or
+    //! the caret being kept in sight, and returns this. Called after the scroll has changed. A null `scrolled` stops
+    //! the calls.
+    TextEdit *on_scroll(std::function<void()> scrolled);
+
+    //! Returns the box the character at byte offset `offset` takes on screen, one character wide and one row tall,
+    //! in window coordinates. It lies outside \ref text_box() when the character is scrolled out of view, and is
+    //! empty before the editor has a size.
+    [[nodiscard]] BLRect spot(size_t offset) const;
+
+    //! Returns the part of the editor the text is shown in, right of the gutter, in window coordinates.
+    [[nodiscard]] BLRect text_box() const;
+
+    //! Attaches `decorator`, which colours, tints, marks or replaces lines, and returns this. Null detaches it.
+    //!
+    //! The editor does not own the decorator, which must outlive it or be detached first. Its
+    //! \ref Decorator::changed() is called with 0 and the editor repaints. Without one, painting asks nothing.
+    TextEdit *decorate(Decorator *decorator);
+
+    //! Returns the number of logical lines, which is one more than the number of line breaks.
+    [[nodiscard]] size_t line_count() const { return _starts.size(); }
+
+    //! Returns the logical line holding the byte offset `offset`, counted from 0. Past the end it is the last.
+    [[nodiscard]] size_t line_of(size_t offset) const;
+
+    //! Returns the byte offset where `line` starts, or the end of the text past the last line.
+    [[nodiscard]] size_t line_start(size_t line) const;
+
+    //! Returns the byte offset of the line break that ends `line`, or the end of the text for the last line.
+    [[nodiscard]] size_t line_end(size_t line) const;
 
     //! Returns \ref Widget::fixedWidth when it is set, otherwise 240 pixels.
     double natural_width(Typeface &type) override;
@@ -182,10 +312,6 @@ private:
 
     void refit();
 
-    [[nodiscard]] size_t line_count() const { return _starts.size(); }
-    [[nodiscard]] size_t line_of(size_t offset) const;
-    [[nodiscard]] size_t line_end(size_t line) const;
-
     [[nodiscard]] size_t row_count() const { return _rowStarts.size(); }
     [[nodiscard]] size_t row_of(size_t offset) const;
     [[nodiscard]] size_t row_end(size_t row) const;
@@ -222,12 +348,19 @@ private:
 
     void move_to(size_t offset, bool selecting, bool keepGoal = false);
     void keep_caret();
+    void centre_caret();
     void clamp_scroll();
+    void tell_scrolled();
+    void tell_moved();
+    void touched(size_t from);
+
+    void paint_marks(const Painter &painter, size_t first, size_t last) const;
+    void ink_row(size_t row, size_t base, size_t lineStart);
 
     void remember(size_t from, size_t to, const std::string &with, bool typing);
     void restore(std::vector<Edit> &from, std::vector<Edit> &to);
     void replace(size_t from, size_t to, const std::string &with, bool typing = false);
-    void insert(const std::string &what, bool typing = false);
+    void put(const std::string &what, bool typing = false);
 
     void show_settings();
 
@@ -253,6 +386,7 @@ private:
     bool _readOnly = false;
     bool _numbered = false;
     bool _wrapped = false;
+    bool _bare = false;
 
     double _scrollX = 0.0;
     double _scrollY = 0.0;
@@ -282,6 +416,22 @@ private:
 
     double _blinked = 0.0;
     bool _showCaret = true;
+
+    std::function<void()> _moved;
+    std::function<void()> _scrolled;
+    double _toldScrollX = 0.0;
+    double _toldScrollY = 0.0;
+    size_t _toldCaret = 0;
+    size_t _toldAnchor = 0;
+
+    // A select() made before the editor had a size scrolls at its first layout.
+    bool _centrePending = false;
+
+    Decorator *_decorator = nullptr;
+
+    // Kept between paints, so a decorated paint allocates nothing.
+    std::vector<Ink> _inks;
+    std::vector<Typeface::Band> _bands;
 };
 }
 

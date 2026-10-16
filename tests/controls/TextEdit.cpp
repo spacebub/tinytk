@@ -1838,4 +1838,512 @@ TEST_F(TextEditTest, LongLineTypingAtTheEnd) {
     EXPECT_EQ(edit->text().size(), 5000U);
     EXPECT_EQ(edit->text().back(), '!');
 }
+
+namespace decorated {
+using Ink = ttk::TextEdit::Ink;
+
+constexpr BLRgba32 RED{0xffff0000};
+constexpr BLRgba32 GREEN{0xff00ff00};
+constexpr BLRgba32 BLUE{0xff0000ff};
+
+class Decorator final : public ttk::TextEdit::Decorator {
+public:
+    std::vector<std::size_t> changes;
+    std::vector<std::size_t> asked;
+    std::vector<Ink> runs;
+    std::size_t inkedLine = 0;
+
+    std::size_t washed = SIZE_MAX;
+    std::size_t markFrom = SIZE_MAX;
+    std::size_t markTo = 0;
+    std::size_t replaced = SIZE_MAX;
+    BLRect drawnRow{};
+
+    void changed(const std::size_t line) override { changes.push_back(line); }
+
+    void inks(const std::size_t line, std::string_view /*text*/, std::vector<Ink> &out) override {
+        asked.push_back(line);
+
+        if (line == inkedLine) {
+            out.insert(out.end(), runs.begin(), runs.end());
+        }
+    }
+
+    BLRgba32 wash(const std::size_t line) override { return line == washed ? GREEN : BLRgba32{}; }
+
+    BLRgba32 mark(const std::size_t line) override { return line >= markFrom && line <= markTo ? RED : BLRgba32{}; }
+
+    bool draw(const std::size_t line, const ttk::Painter &painter, const BLRect &row) override {
+        if (line != replaced) {
+            return false;
+        }
+
+        drawnRow = row;
+        painter.fill(BLRect{row.x, row.y + 2.0, 20.0, row.h - 4.0}, BLUE);
+
+        return true;
+    }
+};
+
+// Clearly red, which neither the field nor the text colour of either palette is.
+bool reddish(const std::uint32_t pixel) {
+    const int red = controls::channel(pixel, 16);
+    const int green = controls::channel(pixel, 8);
+    const int blue = controls::channel(pixel, 0);
+
+    return red - green > 60 && red - blue > 60;
+}
+
+class DecoratedTest : public TextEditTest {
+protected:
+    Decorator decorator;
+
+    // The cells of `row` from column `from` up to column `to`, inset from the row's top and bottom.
+    [[nodiscard]] BLRectI cells(const ttk::TextEdit *edit, const int row, const double from, const double to) const {
+        const double x = edit->box().x + PAD_X;
+
+        return BLRectI{static_cast<int>(std::ceil(x + (from * cw))),
+                       static_cast<int>(edit->box().y + PAD_Y + (row * lh) + 2.0),
+                       static_cast<int>(std::floor((to - from) * cw)) - 1,
+                       static_cast<int>(lh - 4.0)};
+    }
+
+    [[nodiscard]] int red_in(const BLRectI &area) const {
+        int found = 0;
+
+        for (int y = area.y; y < area.y + area.h; ++y) {
+            for (int x = area.x; x < area.x + area.w; ++x) {
+                found += reddish(canvas.at(x, y)) ? 1 : 0;
+            }
+        }
+
+        return found;
+    }
+};
+
+TEST_F(DecoratedTest, InksColourTheirColumnsPastATab) {
+    ttk::TextEdit *edit = make("ab\tcd ef");
+
+    decorator.runs = {Ink{.from = 3, .to = 5, .tone = RED}};
+    edit->decorate(&decorator);
+    canvas.full();
+
+    EXPECT_EQ(red_in(cells(edit, 0, 0, 4)), 0) << "text before the tab stop was inked";
+    EXPECT_GT(red_in(cells(edit, 0, 4, 6)), 0) << "the run after the tab was not inked";
+    EXPECT_EQ(red_in(cells(edit, 0, 6.2, 9)), 0) << "the ink ran past its end";
+}
+
+TEST_F(DecoratedTest, InksFollowTheTextOntoWrappedRows) {
+    ttk::TextEdit *edit = make("aaaa bbbb cccc", fitting(10));
+
+    edit->wrapped();
+    decorator.runs = {Ink{.from = 5, .to = 14, .tone = RED}};
+    edit->decorate(&decorator);
+    canvas.full();
+
+    EXPECT_EQ(red_in(cells(edit, 0, 0, 4)), 0);
+    EXPECT_GT(red_in(cells(edit, 0, 5, 9)), 0) << "the part on the first row was not inked";
+    EXPECT_GT(red_in(cells(edit, 1, 0, 4)), 0) << "the part on the wrapped row was not inked";
+}
+
+TEST_F(DecoratedTest, InksInTheTextColourPaintAsNoInksDo) {
+    ttk::TextEdit *edit = make("select\tname, 'x' from t\n  where a > 1");
+    const BLRectI area{static_cast<int>(BOX.x), static_cast<int>(BOX.y), static_cast<int>(BOX.w), 60};
+
+    canvas.full();
+
+    const std::vector<std::uint32_t> plain = controls::pixels_in(canvas, area);
+    const BLRgba32 text = ttk::Theme::palette().text;
+
+    decorator.runs = {Ink{.from = 0, .to = 6, .tone = text},
+                      Ink{.from = 7, .to = 11, .tone = text},
+                      Ink{.from = 13, .to = 16, .tone = text}};
+    edit->decorate(&decorator);
+    canvas.full();
+
+    EXPECT_EQ(plain, controls::pixels_in(canvas, area));
+}
+
+TEST_F(DecoratedTest, InksAreAskedOnlyForLinesShownAndOncePerLine) {
+    ttk::TextEdit *edit = make(numbered_lines(200));
+
+    edit->decorate(&decorator);
+    canvas.full();
+
+    const auto shown = static_cast<std::size_t>(std::ceil(view_height() / lh)) + 1;
+
+    ASSERT_FALSE(decorator.asked.empty());
+    EXPECT_LE(decorator.asked.size(), shown);
+    EXPECT_LE(*std::ranges::max_element(decorator.asked), shown);
+}
+
+TEST_F(DecoratedTest, InksAreAskedOncePerWrappedLine) {
+    ttk::TextEdit *edit = make("aaaa bbbb cccc dddd eeee", fitting(10));
+
+    edit->wrapped();
+    edit->decorate(&decorator);
+    canvas.full();
+    decorator.asked.clear();
+    canvas.full();
+
+    EXPECT_EQ(decorator.asked, (std::vector<std::size_t>{0})) << "a wrapped line was asked for each of its rows";
+}
+
+TEST_F(DecoratedTest, WashFillsBehindEveryRowOfItsLine) {
+    ttk::TextEdit *edit = make("aaaa bbbb cccc\nnext", fitting(10));
+    const int x = static_cast<int>(edit->box().x + edit->box().w - 4.0);
+    const auto rowY = [&](const int row) { return static_cast<int>(edit->box().y + PAD_Y + (row * lh) + 2.0); };
+
+    edit->wrapped();
+    decorator.washed = 0;
+    edit->decorate(&decorator);
+    canvas.full();
+
+    EXPECT_EQ(canvas.at(x, rowY(0)), GREEN.value);
+    EXPECT_EQ(canvas.at(x, rowY(1)), GREEN.value) << "the wrapped row of the line was not washed";
+    EXPECT_EQ(canvas.at(x, rowY(2)), ttk::Theme::palette().field.value);
+}
+
+TEST_F(DecoratedTest, MarksJoinIntoOneBarBesideTheNumbers) {
+    ttk::TextEdit *edit = make("one\ntwo\nthree\nfour");
+
+    edit->numbered();
+    decorator.markFrom = 1;
+    decorator.markTo = 2;
+    edit->decorate(&decorator);
+    canvas.full();
+
+    const int x = static_cast<int>(edit->box().x + gutter(4) - 5.0);
+    const auto rowY = [&](const double row) { return static_cast<int>(edit->box().y + PAD_Y + (row * lh)); };
+
+    EXPECT_NE(canvas.at(x, rowY(0.5)), RED.value);
+    EXPECT_EQ(canvas.at(x, rowY(1.5)), RED.value);
+    EXPECT_EQ(canvas.at(x, rowY(2.0)), RED.value) << "the bar breaks between marked lines";
+    EXPECT_EQ(canvas.at(x, rowY(2.5)), RED.value);
+    EXPECT_NE(canvas.at(x, rowY(3.5)), RED.value);
+}
+
+TEST_F(DecoratedTest, MarksSitAtTheLeftEdgeWithoutNumbers) {
+    ttk::TextEdit *edit = make("one\ntwo");
+
+    decorator.markFrom = 1;
+    decorator.markTo = 1;
+    edit->decorate(&decorator);
+    canvas.full();
+
+    const int x = static_cast<int>(edit->box().x + 4.0);
+
+    EXPECT_EQ(canvas.at(x, static_cast<int>(edit->box().y + PAD_Y + (1.5 * lh))), RED.value);
+    EXPECT_NE(canvas.at(x, static_cast<int>(edit->box().y + PAD_Y + (0.5 * lh))), RED.value);
+}
+
+TEST_F(DecoratedTest, DrawReplacesTheTextOfItsLine) {
+    ttk::TextEdit *edit = make("abc\nGO\nxyz");
+    const BLRgba32 text = ttk::Theme::palette().text;
+    const auto inked = [&](const int row) { return controls::count_near(canvas, cells(edit, row, 0, 3), text, 60); };
+
+    canvas.full();
+
+    ASSERT_GT(inked(1), 0);
+
+    decorator.replaced = 1;
+    edit->decorate(&decorator);
+    canvas.full();
+
+    EXPECT_EQ(inked(1), 0) << "the replaced line's text was drawn too";
+    EXPECT_GT(inked(0), 0);
+    EXPECT_GT(inked(2), 0);
+    EXPECT_GT(controls::count_near(canvas, cells(edit, 1, 0, 2), BLUE, 0), 0) << "the decorator's drawing is missing";
+    EXPECT_DOUBLE_EQ(decorator.drawnRow.x, edit->box().x + PAD_X);
+    EXPECT_DOUBLE_EQ(decorator.drawnRow.y, edit->box().y + PAD_Y + lh);
+    EXPECT_DOUBLE_EQ(decorator.drawnRow.w, text_width());
+    EXPECT_DOUBLE_EQ(decorator.drawnRow.h, lh);
+}
+
+TEST_F(DecoratedTest, ChangedNamesTheFirstLineTouched) {
+    ttk::TextEdit *edit = focused("one\ntwo\nthree");
+
+    edit->decorate(&decorator);
+    edit->set_text("one\ntwo\nthree");
+    edit->go_to(2);
+    edit->wrote("x");
+    edit->key(key(Code::Left));
+    edit->key(key(Code::Backspace));
+    edit->key(key('z', true));
+
+    EXPECT_EQ(decorator.changes, (std::vector<std::size_t>{0, 0, 2, 1, 1}));
+}
+
+class Telling final : public ttk::TextEdit::Decorator {
+public:
+    const Calls *calls = nullptr;
+    std::vector<std::size_t> editedBefore;
+
+    void changed(std::size_t /*line*/) override { editedBefore.push_back(calls->texts.size()); }
+};
+
+TEST_F(DecoratedTest, ChangedComesBeforeEdited) {
+    ttk::TextEdit *edit = focused("one");
+    Telling telling;
+
+    telling.calls = &calls;
+    edit->decorate(&telling);
+    edit->insert("x");
+
+    EXPECT_EQ(telling.editedBefore, (std::vector<std::size_t>{0, 0}));
+    EXPECT_EQ(calls.texts.size(), 1U);
+}
+
+TEST_F(DecoratedTest, DetachingDrawsPlainTextAgain) {
+    ttk::TextEdit *edit = make("abcdef");
+
+    decorator.runs = {Ink{.from = 0, .to = 6, .tone = RED}};
+    edit->decorate(&decorator);
+    canvas.full();
+
+    ASSERT_GT(red_in(cells(edit, 0, 0, 6)), 0);
+
+    edit->decorate(nullptr);
+    canvas.frame();
+
+    EXPECT_EQ(red_in(cells(edit, 0, 0, 6)), 0);
+}
+}
+
+TEST_F(TextEditTest, SelectedIsTheOrderedRange) {
+    ttk::TextEdit *edit = make("hello world");
+
+    edit->select(8, 2);
+
+    EXPECT_EQ(edit->selected().from, 2U);
+    EXPECT_EQ(edit->selected().to, 8U);
+    EXPECT_EQ(edit->caret(), 2U);
+    EXPECT_EQ(edit->selection(), "llo wo");
+}
+
+TEST_F(TextEditTest, SelectedIsEmptyAtTheCaret) {
+    ttk::TextEdit *edit = focused("hello");
+
+    edit->key(key(Code::Right));
+    edit->key(key(Code::Right));
+
+    EXPECT_EQ(edit->selected().from, 2U);
+    EXPECT_EQ(edit->selected().to, 2U);
+    EXPECT_EQ(edit->caret(), 2U);
+}
+
+TEST_F(TextEditTest, SelectClampsAndKeepsToWholeCharacters) {
+    ttk::TextEdit *edit = make("a\xc3\xa9z");
+
+    edit->select(2, 99);
+
+    EXPECT_EQ(edit->selected().from, 1U) << "the anchor was left inside a character";
+    EXPECT_EQ(edit->selected().to, 4U);
+}
+
+TEST_F(TextEditTest, LinesAreLookedUpByOffset) {
+    const ttk::TextEdit *edit = make("one\ntwo\n\nfour");
+
+    EXPECT_EQ(edit->line_count(), 4U);
+    EXPECT_EQ(edit->line_of(0), 0U);
+    EXPECT_EQ(edit->line_of(3), 0U);
+    EXPECT_EQ(edit->line_of(4), 1U);
+    EXPECT_EQ(edit->line_of(8), 2U);
+    EXPECT_EQ(edit->line_of(9), 3U);
+    EXPECT_EQ(edit->line_of(500), 3U);
+    EXPECT_EQ(edit->line_start(1), 4U);
+    EXPECT_EQ(edit->line_end(1), 7U);
+    EXPECT_EQ(edit->line_end(3), 13U);
+    EXPECT_EQ(edit->line_start(9), 13U);
+}
+
+TEST_F(TextEditTest, OnSelectFiresOncePerChange) {
+    ttk::TextEdit *edit = focused("one two\nthree");
+    int told = 0;
+
+    edit->on_select([&] { ++told; });
+
+    edit->key(key(Code::Right));
+    EXPECT_EQ(told, 1);
+
+    edit->key(key(Code::Home));
+    edit->key(key(Code::Left));
+    EXPECT_EQ(told, 2) << "a key that left the caret where it was still told";
+
+    canvas.frame();
+    canvas.frame();
+    EXPECT_EQ(told, 2) << "a frame told";
+
+    edit->key(key(Code::Right, false, true));
+    EXPECT_EQ(told, 3);
+
+    edit->select_all();
+    EXPECT_EQ(told, 4);
+
+    edit->key(key(Code::Right));
+    EXPECT_EQ(told, 5);
+
+    edit->wrote("x");
+    EXPECT_EQ(told, 6);
+
+    edit->select(2, 4);
+    EXPECT_EQ(told, 7);
+
+    press_cell(edit, 1, 2);
+    EXPECT_EQ(told, 8);
+
+    edit->set_text("fresh");
+    EXPECT_EQ(told, 9);
+}
+
+TEST_F(TextEditTest, OnSelectSeesTheNewCaret) {
+    ttk::TextEdit *edit = focused("abc");
+    std::size_t seen = 0;
+
+    edit->on_select([&] { seen = edit->caret(); });
+    edit->key(key(Code::End));
+
+    EXPECT_EQ(seen, 3U);
+}
+
+TEST_F(TextEditTest, SpotIsTheCellACharacterTakesOnScreen) {
+    ttk::TextEdit *edit = focused("one\ntwo");
+    const BLRect at = edit->spot(5);
+
+    EXPECT_NEAR(at.x, BOX.x + PAD_X + cw, 0.01);
+    EXPECT_NEAR(at.y, BOX.y + PAD_Y + lh, 0.01);
+    EXPECT_NEAR(at.w, cw, 0.01);
+    EXPECT_NEAR(at.h, lh, 0.01);
+    EXPECT_NEAR(edit->text_box().x, BOX.x + 1.0, 0.01);
+}
+
+TEST_F(TextEditTest, SpotMovesWithTheScroll) {
+    ttk::TextEdit *edit = focused(numbered_lines(200));
+
+    edit->go_to(150);
+    canvas.frame();
+
+    const BLRect view = edit->text_box();
+    const BLRect far = edit->spot(edit->line_start(150));
+
+    EXPECT_GE(far.y, view.y);
+    EXPECT_LE(far.y + far.h, view.y + view.h);
+    EXPECT_LT(edit->spot(0).y, view.y) << "the first line was not scrolled out of view";
+}
+
+TEST_F(TextEditTest, OnScrollIsToldOfAScrollAndNothingElse) {
+    ttk::TextEdit *edit = focused(numbered_lines(200));
+    int told = 0;
+
+    edit->on_scroll([&] { ++told; });
+
+    edit->select(2, 4);
+    EXPECT_EQ(told, 0) << "a selection in view told";
+
+    edit->wheel(-2.0, ttk::Pointer{.x = BOX.x + 40.0, .y = BOX.y + 40.0});
+    EXPECT_EQ(told, 1);
+
+    edit->wheel(-2.0, ttk::Pointer{.x = BOX.x + 40.0, .y = BOX.y + 40.0});
+    edit->go_to(0);
+    EXPECT_EQ(told, 3);
+
+    edit->wheel(2.0, ttk::Pointer{.x = BOX.x + 40.0, .y = BOX.y + 40.0});
+    EXPECT_EQ(told, 3) << "a wheel against the top told";
+
+    edit->go_to(150);
+    edit->set_text("fresh");
+    EXPECT_EQ(told, 5) << "set_text going back to the top did not tell";
+}
+
+TEST_F(TextEditTest, GoToCentresAFarLine) {
+    ttk::TextEdit *edit = focused(numbered_lines(200));
+    const double rows = view_height() / lh;
+
+    edit->go_to(150);
+    canvas.frame();
+
+    EXPECT_EQ(edit->caret(), edit->line_start(150));
+
+    press_cell(edit, std::floor(rows / 2.0), 0);
+
+    EXPECT_NEAR(static_cast<double>(edit->line_of(edit->caret())), 150.0, 1.0);
+}
+
+TEST_F(TextEditTest, GoToANearLineDoesNotScroll) {
+    ttk::TextEdit *edit = focused(numbered_lines(200));
+
+    edit->go_to(3);
+    canvas.frame();
+    press_cell(edit, 0, 0);
+
+    EXPECT_EQ(edit->caret(), 0U);
+}
+
+TEST_F(TextEditTest, GoToBeforeTheFirstLayoutScrollsAtIt) {
+    auto made = std::make_unique<ttk::TextEdit>();
+
+    made->set_text(numbered_lines(200));
+    made->go_to(120);
+
+    ttk::TextEdit *edit = controls::mount(canvas, std::move(made), BOX);
+    const double rows = view_height() / lh;
+
+    press_cell(edit, std::floor(rows / 2.0), 0);
+
+    EXPECT_NEAR(static_cast<double>(edit->line_of(edit->caret())), 120.0, 1.0);
+}
+
+TEST_F(TextEditTest, SelectScrollsTheCaretIntoView) {
+    ttk::TextEdit *edit = focused(numbered_lines(200));
+
+    edit->select(edit->line_start(100), edit->line_end(100));
+    canvas.frame();
+
+    EXPECT_EQ(edit->selection(), "L100");
+
+    press_cell(edit, std::floor(view_height() / lh / 2.0), 0);
+
+    EXPECT_NEAR(static_cast<double>(edit->line_of(edit->caret())), 100.0, 1.0);
+}
+
+TEST_F(TextEditTest, InsertReplacesTheSelectionAndReportsIt) {
+    ttk::TextEdit *edit = focused("SELECT * FROM t");
+
+    edit->select(7, 8);
+    edit->insert("a,\r\nb");
+
+    EXPECT_EQ(edit->text(), "SELECT a,\nb FROM t");
+    EXPECT_EQ(edit->caret(), 11U);
+    EXPECT_EQ(calls.texts, (std::vector<std::string>{"SELECT a,\nb FROM t"}));
+}
+
+TEST_F(TextEditTest, InsertUndoesAsOneStepApartFromTyping) {
+    ttk::TextEdit *edit = focused();
+
+    edit->wrote("a");
+    edit->wrote("b");
+    edit->insert("{name}");
+    edit->wrote("c");
+
+    EXPECT_EQ(edit->text(), "ab{name}c");
+
+    edit->key(key('z', true));
+    EXPECT_EQ(edit->text(), "ab{name}");
+
+    edit->key(key('z', true));
+    EXPECT_EQ(edit->text(), "ab");
+
+    edit->key(key('z', true));
+    EXPECT_EQ(edit->text(), "");
+}
+
+TEST_F(TextEditTest, InsertIsIgnoredWhileReadOnly) {
+    ttk::TextEdit *edit = make("keep");
+
+    edit->read_only();
+    edit->insert("x");
+
+    EXPECT_EQ(edit->text(), "keep");
+    EXPECT_TRUE(calls.texts.empty());
+}
 }

@@ -6,13 +6,19 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include <benchmark/benchmark.h>
 
 #include "support/Canvas.h"
 #include "support/Fixtures.h"
+#include "ttk/draw/Theme.h"
 #include "ttk/toolkit/controls/TextEdit.h"
 
 namespace {
@@ -130,4 +136,78 @@ void TextEdit_paint_strip(benchmark::State &state) {
 }
 
 BENCHMARK(TextEdit_paint_strip);
+
+// Six runs a line in three colours, at offsets worked out before, as a highlighter that keeps what it found does.
+class Highlighter final : public ttk::TextEdit::Decorator {
+public:
+    std::size_t changes = 0;
+
+    void changed(std::size_t /*line*/) override { ++changes; }
+
+    void inks(std::size_t /*line*/, const std::string_view text, std::vector<ttk::TextEdit::Ink> &out) override {
+        const ttk::Theme::Palette &palette = ttk::Theme::palette();
+        const BLRgba32 tones[] = {palette.accent, palette.warning, palette.success};
+
+        for (std::size_t at = 0; at < 6 && at * 10 < text.size(); ++at) {
+            out.push_back(ttk::TextEdit::Ink{
+                    .from = at * 10, .to = std::min(text.size(), (at * 10) + 6), .tone = tones[at % 3]});
+        }
+    }
+};
+
+double page_height(bench::Canvas &canvas, const int rows) {
+    const BLFont &font = canvas.type().at(ttk::Typeface::mono, ttk::Theme::fontSmall);
+
+    return (rows * std::ceil(canvas.type().line_height(font) + 4.0)) + 16.0;
+}
+
+// A page of 60 rows painted whole, plain and then with six coloured runs on every line.
+void TextEdit_paint_page(benchmark::State &state) {
+    bench::Canvas canvas(1280, 1400);
+    ttk::TextEdit *edit = bench::mount(canvas, std::make_unique<ttk::TextEdit>(), 960.0, page_height(canvas, 60));
+    Highlighter highlighter;
+
+    edit->numbered();
+    edit->set_text(lines_of(2000));
+
+    if (state.range(0) != 0) {
+        edit->decorate(&highlighter);
+    }
+
+    bench::paint_once(canvas, *edit);
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(bench::paint_once(canvas, *edit));
+    }
+
+    edit->decorate(nullptr);
+}
+
+BENCHMARK(TextEdit_paint_page)->Arg(0)->Arg(1);
+
+// A character typed at the start of 50 000 lines, where every line after it moves, and the frame that shows it.
+// Plain and decorated.
+void TextEdit_type_long(benchmark::State &state) {
+    bench::Canvas canvas(1280, 800);
+    ttk::TextEdit *edit = bench::mount(canvas, std::make_unique<ttk::TextEdit>(), 960.0, 640.0);
+    Highlighter highlighter;
+
+    edit->numbered();
+    edit->set_text(lines_of(50000));
+
+    if (state.range(0) != 0) {
+        edit->decorate(&highlighter);
+    }
+
+    canvas.full();
+
+    for ([[maybe_unused]] auto step : state) {
+        edit->wrote("x");
+        benchmark::DoNotOptimize(canvas.frame());
+    }
+
+    edit->decorate(nullptr);
+}
+
+BENCHMARK(TextEdit_type_long)->Arg(0)->Arg(1);
 }

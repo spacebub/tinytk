@@ -829,6 +829,97 @@ void Typeface::draw_once(BLContext &context,
         return;
     }
 
+    const Row &made = composed(font, run, room);
+
+    if (!made.mask.is_empty()) {
+        context.fill_mask(BLPointI{static_cast<int>(std::lround(origin.x)) + made.at.x,
+                                   static_cast<int>(std::lround(origin.y)) + made.at.y},
+                          made.mask,
+                          BLRectI{0, 0, made.wide, made.tall},
+                          tone);
+    }
+}
+
+void Typeface::draw_once(BLContext &context,
+                         const BLFont &font,
+                         const BLPoint top,
+                         const std::string_view run,
+                         const BLRgba32 tone,
+                         const double room,
+                         const std::span<const Band> bands) {
+    if (bands.empty()) {
+        draw_once(context, font, top, run, tone, room);
+
+        return;
+    }
+
+    if (run.empty() || room <= 0.0) {
+        return;
+    }
+
+    const BLPoint origin{top.x, std::floor(top.y + font.metrics().ascent + 0.5)};
+
+    if (!maskable(context, origin)) {
+        const MaskRows rows = mask_rows(font);
+        const double high = origin.y - rows.above;
+        const auto tall = static_cast<double>(rows.above + rows.below);
+        double reached = 0.0;
+
+        const auto stretch = [&](const double from, const double to, const BLRgba32 ink) {
+            if (to <= from) {
+                return;
+            }
+
+            context.save();
+            context.clip_to_rect(BLRect{top.x + from, high, to - from, tall});
+            draw_once(context, font, top, run, ink, room);
+            context.restore();
+        };
+
+        for (const Band &band : bands) {
+            stretch(reached, band.from, tone);
+            stretch(std::max(reached, band.from), band.to, band.tone);
+            reached = std::max(reached, band.to);
+        }
+
+        stretch(reached, room + (2.0 * tall), tone);
+
+        return;
+    }
+
+    const Row &made = composed(font, run, room);
+
+    if (made.mask.is_empty()) {
+        return;
+    }
+
+    const int left = static_cast<int>(std::lround(origin.x)) + made.at.x;
+    const int high = static_cast<int>(std::lround(origin.y)) + made.at.y;
+    int column = 0;
+
+    const auto blit = [&](const double edge, const BLRgba32 ink) {
+        const int to = std::clamp(static_cast<int>(std::lround(top.x + edge)) - left, column, made.wide);
+
+        if (to > column) {
+            context.fill_mask(
+                    BLPointI{left + column, high}, made.mask, BLRectI{column, 0, to - column, made.tall}, ink);
+        }
+
+        column = to;
+    };
+
+    for (const Band &band : bands) {
+        blit(band.from, tone);
+        blit(band.to, band.tone);
+    }
+
+    if (column < made.wide) {
+        context.fill_mask(
+                BLPointI{left + column, high}, made.mask, BLRectI{column, 0, made.wide - column, made.tall}, tone);
+    }
+}
+
+Typeface::Row &Typeface::composed(const BLFont &font, const std::string_view run, const double room) {
     auto [made, fresh] = Cache::run_entry(_rows,
                                           Cache::RunView{
                                                   .font = reinterpret_cast<std::uintptr_t>(&font),
@@ -843,13 +934,7 @@ void Typeface::draw_once(BLContext &context,
         compose(font, shape_to(font, run, room), room, made);
     }
 
-    if (!made.mask.is_empty()) {
-        context.fill_mask(BLPointI{static_cast<int>(std::lround(origin.x)) + made.at.x,
-                                   static_cast<int>(std::lround(origin.y)) + made.at.y},
-                          made.mask,
-                          BLRectI{0, 0, made.wide, made.tall},
-                          tone);
-    }
+    return made;
 }
 
 void Typeface::compose(const BLFont &font, const Cut &cut, const double room, Row &into) {

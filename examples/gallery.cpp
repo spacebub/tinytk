@@ -34,6 +34,7 @@
 #include "ttk/toolkit/controls/MultistateSwitch.h"
 #include "ttk/toolkit/controls/Pill.h"
 #include "ttk/toolkit/controls/Select.h"
+#include "ttk/toolkit/controls/Spinner.h"
 #include "ttk/toolkit/controls/StatusIndicator.h"
 #include "ttk/toolkit/controls/Stepper.h"
 #include "ttk/toolkit/controls/TabStrip.h"
@@ -352,6 +353,8 @@ void controls(Gallery &gallery, ttk::Box *page) {
                 gallery.shell.ui().relayout();
             },
             "Click for the next state");
+
+    entry(page, "Spinner")->append(std::make_unique<ttk::Spinner>())->hint = "Something under way";
 
     gallery.field =
             entry(page, "Field")->append(std::make_unique<ttk::Field>("Address", [&gallery](const std::string &text) {

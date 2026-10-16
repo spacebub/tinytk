@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -153,6 +154,15 @@ public:
     //! does not evict what \ref label() and \ref text() keep. Draws nothing for an empty run or a box with no
     //! width.
     void row(const BLFont &font, const BLRect &box, std::string_view run, BLRgba32 tone) const;
+
+    //! Draws `run` as the \ref row() above does, with each of `bands` in its own colour and the rest in `tone`.
+    //!
+    //! `bands` are measured in pixels from `box.x`, in order and not overlapping. See \ref Typeface::Band.
+    void row(const BLFont &font,
+             const BLRect &box,
+             std::string_view run,
+             BLRgba32 tone,
+             std::span<const Typeface::Band> bands) const;
 
     //! Draws `run` letter-spaced, adding `spacing` pixels after each character, with `top` at the top-left of the
     //! line box. The run is neither wrapped nor elided.

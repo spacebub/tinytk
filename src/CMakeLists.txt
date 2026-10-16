@@ -228,6 +228,8 @@ add_library(ttk_ui STATIC
         ttk/toolkit/controls/Pill.h
         ttk/toolkit/controls/Select.cpp
         ttk/toolkit/controls/Select.h
+        ttk/toolkit/controls/Spinner.cpp
+        ttk/toolkit/controls/Spinner.h
         ttk/toolkit/controls/StatusIndicator.cpp
         ttk/toolkit/controls/StatusIndicator.h
         ttk/toolkit/controls/Stepper.cpp

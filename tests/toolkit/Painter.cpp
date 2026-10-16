@@ -806,6 +806,105 @@ TEST_F(Written, RowOfAnEmptyRunOrNoWidthDrawsNothing) {
     EXPECT_TRUE(blank());
 }
 
+TEST_F(Written, BandedRowInTheRowsOwnToneMatchesThePlainRow) {
+    const BLFontMetrics metrics = body().metrics();
+    const double top = 10 + ((30 - (metrics.ascent + metrics.descent)) / 2.0);
+    const std::vector<ttk::Typeface::Band> bands{{.from = 3.3, .to = 20.0, .tone = INK},
+                                                 {.from = 41.6, .to = 77.1, .tone = INK}};
+
+    painter.row(body(), {10, 10, 140, 30}, "Row of a list", INK, bands);
+    tests::fonts().draw_once(direct, body(), {10, top}, "Row of a list", INK, 140);
+
+    EXPECT_TRUE(same());
+}
+
+TEST_F(Written, BandedRowWithNoBandsIsThePlainRow) {
+    const BLFontMetrics metrics = body().metrics();
+    const double top = 10 + ((30 - (metrics.ascent + metrics.descent)) / 2.0);
+
+    painter.row(body(), {10, 10, 140, 30}, "Row of a list", INK, {});
+    tests::fonts().draw_once(direct, body(), {10, top}, "Row of a list", INK, 140);
+
+    EXPECT_TRUE(same());
+}
+
+// Columns of `image` holding any pixel leaning red, and any leaning to INK's blue.
+struct Hues {
+    std::vector<bool> red;
+    std::vector<bool> blue;
+};
+
+Hues hues(const BLImage &image) {
+    const std::vector<std::uint32_t> all = pixels(image);
+    Hues found{.red = std::vector<bool>(WIDTH), .blue = std::vector<bool>(WIDTH)};
+
+    for (int y = 0; y < HEIGHT; ++y) {
+        for (int x = 0; x < WIDTH; ++x) {
+            const std::uint32_t at = all[(static_cast<std::size_t>(y) * WIDTH) + static_cast<std::size_t>(x)];
+            const auto red = static_cast<int>((at >> 16U) & 0xffU);
+            const auto blue = static_cast<int>(at & 0xffU);
+
+            if ((at >> 24U) < 0x60U) {
+                continue;
+            }
+
+            if (red > blue + 40) {
+                found.red[static_cast<std::size_t>(x)] = true;
+            } else if (blue > red + 40) {
+                found.blue[static_cast<std::size_t>(x)] = true;
+            }
+        }
+    }
+
+    return found;
+}
+
+TEST_F(Written, BandsColourOnlyTheirStretch) {
+    const std::vector<ttk::Typeface::Band> bands{{.from = 40.0, .to = 80.0, .tone = BLRgba32(0xffff0000)}};
+
+    painter.row(body(), {10, 10, 140, 30}, "MMMMMMMMMMMMMMMM", INK, bands);
+    finish();
+
+    const Hues found = hues(mine);
+
+    for (std::size_t x = 0; x < WIDTH; ++x) {
+        if (x < 49 || x > 90) {
+            EXPECT_FALSE(found.red[x]) << "red outside the band at " << x;
+        }
+
+        if (x > 51 && x < 88) {
+            EXPECT_FALSE(found.blue[x]) << "the row's tone inside the band at " << x;
+        }
+    }
+
+    EXPECT_TRUE(std::ranges::any_of(found.red, [](const bool on) { return on; }));
+    EXPECT_TRUE(std::ranges::any_of(found.blue, [](const bool on) { return on; }));
+}
+
+TEST_F(Written, BandsUnderAFractionalTranslateColourOnlyTheirStretch) {
+    const std::vector<ttk::Typeface::Band> bands{{.from = 40.0, .to = 80.0, .tone = BLRgba32(0xffff0000)}};
+
+    ours.translate(0.37, 0.21);
+    painter.transformed(true);
+    painter.row(body(), {10, 10, 140, 30}, "MMMMMMMMMMMMMMMM", INK, bands);
+    finish();
+
+    const Hues found = hues(mine);
+
+    for (std::size_t x = 0; x < WIDTH; ++x) {
+        if (x < 49 || x > 91) {
+            EXPECT_FALSE(found.red[x]) << "red outside the band at " << x;
+        }
+
+        if (x > 52 && x < 88) {
+            EXPECT_FALSE(found.blue[x]) << "the row's tone inside the band at " << x;
+        }
+    }
+
+    EXPECT_TRUE(std::ranges::any_of(found.red, [](const bool on) { return on; }));
+    EXPECT_TRUE(std::ranges::any_of(found.blue, [](const bool on) { return on; }));
+}
+
 TEST_F(Written, TrackedMatchesTheTypeface) {
     painter.tracked(body(), {10, 20}, "TRACKED", INK, 3.0);
     tests::fonts().draw_tracked(direct, body(), {10, 20}, "TRACKED", INK, 3.0F);

@@ -304,6 +304,21 @@ void Painter::row(const BLFont &font, const BLRect &box, const std::string_view 
     _type.draw_once(*_context, font, BLPoint{box.x, top}, run, tone, box.w);
 }
 
+void Painter::row(const BLFont &font,
+                  const BLRect &box,
+                  const std::string_view run,
+                  const BLRgba32 tone,
+                  const std::span<const Typeface::Band> bands) const {
+    if (run.empty() || box.w <= 0.0) {
+        return;
+    }
+
+    const BLFontMetrics metrics = font.metrics();
+    const double top = box.y + ((box.h - (metrics.ascent + metrics.descent)) / 2.0);
+
+    _type.draw_once(*_context, font, BLPoint{box.x, top}, run, tone, box.w, bands);
+}
+
 void Painter::tracked(const BLFont &font,
                       const BLPoint top,
                       const std::string_view run,

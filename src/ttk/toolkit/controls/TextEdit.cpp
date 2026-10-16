@@ -71,9 +71,17 @@ void TextEdit::set_text(std::string text) {
     _undo.clear();
     _redo.clear();
     _typing = false;
+    _centrePending = false;
 
     reindex();
+    tell_scrolled();
+
+    if (_decorator != nullptr) {
+        _decorator->changed(0);
+    }
+
     invalidate();
+    tell_moved();
 }
 
 TextEdit *TextEdit::read_only(const bool value) {
@@ -86,6 +94,13 @@ TextEdit *TextEdit::read_only(const bool value) {
 TextEdit *TextEdit::numbered(const bool value) {
     _numbered = value;
     refit();
+
+    return this;
+}
+
+TextEdit *TextEdit::bare(const bool value) {
+    _bare = value;
+    invalidate();
 
     return this;
 }
@@ -124,6 +139,95 @@ void TextEdit::select_all() {
     _caret = _text.size();
 
     invalidate();
+    tell_moved();
+}
+
+TextEdit::Range TextEdit::selected() const {
+    Range range;
+
+    span(range.from, range.to);
+
+    return range;
+}
+
+void TextEdit::select(const size_t anchor, const size_t caret) {
+    const auto snap = [this](size_t at) {
+        at = std::min(at, _text.size());
+
+        while (at > 0 && at < _text.size() && is_continuation(_text[at])) {
+            --at;
+        }
+
+        return at;
+    };
+
+    _anchor = snap(anchor);
+    _caret = snap(caret);
+
+    if (_lineHeight > 0.0 && view_height() > 0.0) {
+        centre_caret();
+    } else {
+        _centrePending = true;
+    }
+
+    move_to(_caret, true);
+}
+
+void TextEdit::go_to(const size_t line) {
+    const size_t at = line_start(std::min(line, line_count() - 1));
+
+    select(at, at);
+}
+
+void TextEdit::insert(const std::string_view text) {
+    if (!_readOnly) {
+        put(std::string(text));
+    }
+}
+
+TextEdit *TextEdit::on_scroll(std::function<void()> scrolled) {
+    _scrolled = std::move(scrolled);
+    _toldScrollX = _scrollX;
+    _toldScrollY = _scrollY;
+
+    return this;
+}
+
+BLRect TextEdit::spot(const size_t offset) const {
+    if (_box.w <= 0.0 || _lineHeight <= 0.0) {
+        return {};
+    }
+
+    const size_t at = std::min(offset, _text.size());
+    const size_t row = row_of(at);
+    const double x = text_left() - _scrollX + (static_cast<double>(column_of(at) - base_of(row)) * _charWidth);
+    const double y = view_top() + (static_cast<double>(row) * _lineHeight) - _scrollY;
+
+    return BLRect{x, y, _charWidth, _lineHeight};
+}
+
+BLRect TextEdit::text_box() const {
+    return text_clip(gutter_width());
+}
+
+TextEdit *TextEdit::on_select(std::function<void()> moved) {
+    _moved = std::move(moved);
+    _toldCaret = _caret;
+    _toldAnchor = _anchor;
+
+    return this;
+}
+
+TextEdit *TextEdit::decorate(Decorator *decorator) {
+    _decorator = decorator;
+
+    if (_decorator != nullptr) {
+        _decorator->changed(0);
+    }
+
+    invalidate();
+
+    return this;
 }
 
 void TextEdit::measure(Typeface &type) {
@@ -314,12 +418,23 @@ void TextEdit::refit() {
         }
     }
 
+    if (_centrePending && _lineHeight > 0.0 && view_height() > 0.0) {
+        _centrePending = false;
+
+        centre_caret();
+        keep_caret();
+    }
+
     clamp_scroll();
     invalidate();
 }
 
 size_t TextEdit::line_of(const size_t offset) const {
     return static_cast<size_t>(std::ranges::upper_bound(_starts, offset) - _starts.begin()) - 1;
+}
+
+size_t TextEdit::line_start(const size_t line) const {
+    return line < line_count() ? _starts[line] : _text.size();
 }
 
 size_t TextEdit::line_end(const size_t line) const {
@@ -559,6 +674,36 @@ void TextEdit::move_to(const size_t offset, const bool selecting, const bool kee
 
     keep_caret();
     invalidate();
+    tell_moved();
+}
+
+void TextEdit::tell_moved() {
+    if (_caret == _toldCaret && _anchor == _toldAnchor) {
+        return;
+    }
+
+    _toldCaret = _caret;
+    _toldAnchor = _anchor;
+
+    if (_moved) {
+        _moved();
+    }
+}
+
+void TextEdit::touched(const size_t from) {
+    if (_decorator != nullptr) {
+        _decorator->changed(line_of(from));
+    }
+}
+
+void TextEdit::centre_caret() {
+    const double top = static_cast<double>(row_of(_caret)) * _lineHeight;
+
+    if (top < _scrollY || top + _lineHeight > _scrollY + view_height()) {
+        _scrollY = top - ((view_height() - _lineHeight) / 2.0);
+    }
+
+    clamp_scroll();
 }
 
 void TextEdit::keep_caret() {
@@ -592,6 +737,20 @@ void TextEdit::keep_caret() {
 void TextEdit::clamp_scroll() {
     _scrollX = std::clamp(_scrollX, 0.0, farthest_x());
     _scrollY = std::clamp(_scrollY, 0.0, farthest_y());
+    tell_scrolled();
+}
+
+void TextEdit::tell_scrolled() {
+    if (_scrollX == _toldScrollX && _scrollY == _toldScrollY) {
+        return;
+    }
+
+    _toldScrollX = _scrollX;
+    _toldScrollY = _scrollY;
+
+    if (_scrolled) {
+        _scrolled();
+    }
 }
 
 void TextEdit::remember(const size_t from, const size_t to, const std::string &with, const bool typing) {
@@ -629,6 +788,7 @@ void TextEdit::restore(std::vector<Edit> &from, std::vector<Edit> &to) {
     // What came goes and what went comes back, and the same again the other way.
     _text.replace(back.at, back.came.size(), back.gone);
     reindex(back.at, back.came.size(), back.gone.size());
+    touched(back.at);
 
     const size_t caret = back.caret;
     const size_t anchor = back.anchor;
@@ -655,6 +815,7 @@ void TextEdit::replace(const size_t from, const size_t to, const std::string &wi
 
     _text.replace(from, to - from, with);
     reindex(from, to - from, with.size());
+    touched(from);
 
     const bool keepTyping = _typing;
 
@@ -666,7 +827,7 @@ void TextEdit::replace(const size_t from, const size_t to, const std::string &wi
     }
 }
 
-void TextEdit::insert(const std::string &what, const bool typing) {
+void TextEdit::put(const std::string &what, const bool typing) {
     size_t from = 0;
     size_t to = 0;
 
@@ -750,10 +911,15 @@ void TextEdit::paint(const Painter &painter) {
     const BLFont &font = painter.font(Typeface::mono, Theme::fontSmall);
     const double gutter = gutter_width();
 
-    painter.round(_box, Theme::radiusSmall, palette.field);
+    if (_bare) {
+        painter.fill(_box, palette.background);
+    } else {
+        painter.round(_box, Theme::radiusSmall, palette.field);
+    }
+
     painter.push(BLRect{_box.x + 1.0, _box.y + 1.0, _box.w - 2.0, _box.h - 2.0});
 
-    if (_numbered) {
+    if (_numbered && !_bare) {
         painter.fill(BLRect{_box.x, _box.y, gutter, _box.h}, palette.sunken);
         painter.fill(BLRect{_box.x + gutter, _box.y, 1.0, _box.h}, palette.border);
     }
@@ -802,6 +968,12 @@ void TextEdit::paint(const Painter &painter) {
 
     painter.push(text_clip(gutter));
 
+    size_t washed = std::string::npos;
+    size_t inked = std::string::npos;
+    BLRgba32 tint{};
+    const double textLeft = text_left();
+    const double textWide = text_width();
+
     for (size_t row = first; row <= last; ++row) {
         const double y = view_top() + (static_cast<double>(row) * _lineHeight) - _scrollY;
 
@@ -812,6 +984,20 @@ void TextEdit::paint(const Painter &painter) {
         const size_t start = _rowStarts[row];
         const size_t end = row_end(row);
         const size_t base = base_of(row);
+        size_t line = 0;
+        bool drawn = false;
+
+        if (_decorator != nullptr) {
+            line = line_of(start);
+
+            if (line != washed) {
+                washed = line;
+                tint = _decorator->wash(line);
+            }
+
+            painter.fill(BLRect{_box.x + gutter + 1.0, y, _box.w - gutter - 2.0, _lineHeight}, tint);
+            drawn = _decorator->draw(line, painter, BLRect{textLeft, y, textWide, _lineHeight});
+        }
 
         if (row == caretRow && focused() && from == to) {
             painter.fill(BLRect{_box.x + gutter + 1.0, y, _box.w - gutter - 2.0, _lineHeight},
@@ -831,13 +1017,26 @@ void TextEdit::paint(const Painter &painter) {
             painter.fill(BLRect{x1, y, x2 - x1, _lineHeight}, Theme::alpha(palette.accent, focused() ? 0.32 : 0.18));
         }
 
-        if (start != end) {
+        if (start != end && !drawn) {
             // Given the whole row's width, so nothing is cut: what is off the edge
             // is scrolled to, not elided.
             const std::string &shown = expand(row);
             const double wide = static_cast<double>(column_of(end) - base + 1) * _charWidth;
+            const BLRect box{left, y, wide, _lineHeight};
 
-            painter.row(font, BLRect{left, y, wide, _lineHeight}, shown, palette.text);
+            if (_decorator == nullptr) {
+                painter.row(font, box, shown, palette.text);
+            } else {
+                if (line != inked) {
+                    inked = line;
+                    _inks.clear();
+                    _decorator->inks(
+                            line, std::string_view(_text).substr(_starts[line], line_end(line) - _starts[line]), _inks);
+                }
+
+                ink_row(row, base, _starts[line]);
+                painter.row(font, box, shown, palette.text, _bands);
+            }
         }
     }
 
@@ -850,6 +1049,10 @@ void TextEdit::paint(const Painter &painter) {
     }
 
     painter.pop();
+
+    if (_decorator != nullptr) {
+        paint_marks(painter, first, last);
+    }
 
     if (const double reach = farthest_y(); reach > 0.0) {
         const double whole = static_cast<double>(row_count()) * _lineHeight;
@@ -875,7 +1078,70 @@ void TextEdit::paint(const Painter &painter) {
 
     Widget::paint(painter);
 
-    painter.outline(_box, Theme::radiusSmall, 1.0, focused() ? palette.accent : palette.border);
+    if (!_bare) {
+        painter.outline(_box, Theme::radiusSmall, 1.0, focused() ? palette.accent : palette.border);
+    }
+}
+
+void TextEdit::ink_row(const size_t row, const size_t base, const size_t lineStart) {
+    const size_t start = _rowStarts[row];
+    const size_t end = row_end(row);
+    const size_t room = end - lineStart;
+    size_t at = start;
+    size_t column = base;
+
+    // Inks come in order, so one walk along the row finds the column of every edge.
+    const auto reach = [&](const size_t to) {
+        for (; at < to; ++at) {
+            if (_text[at] == '\t') {
+                column = ((column / TAB) + 1) * TAB;
+            } else if (!is_continuation(_text[at])) {
+                ++column;
+            }
+        }
+
+        return static_cast<double>(column - base) * _charWidth;
+    };
+
+    _bands.clear();
+
+    for (const Ink &ink : _inks) {
+        const size_t from = std::max(lineStart + std::min(ink.from, room), at);
+        const size_t to = lineStart + std::min(ink.to, room);
+
+        if (from >= end) {
+            break;
+        }
+
+        if (to <= from) {
+            continue;
+        }
+
+        const double x0 = reach(from);
+
+        _bands.push_back(Typeface::Band{.from = x0, .to = reach(to), .tone = ink.tone});
+    }
+}
+
+void TextEdit::paint_marks(const Painter &painter, const size_t first, const size_t last) const {
+    const double x = _numbered ? _box.x + gutter_width() - 6.0 : _box.x + 3.0;
+    size_t marked = std::string::npos;
+    BLRgba32 tone{};
+
+    for (size_t row = first; row <= last; ++row) {
+        const BLRect bar{x, view_top() + (static_cast<double>(row) * _lineHeight) - _scrollY, 3.0, _lineHeight};
+
+        if (!painter.needed(bar)) {
+            continue;
+        }
+
+        if (const size_t line = line_of(_rowStarts[row]); line != marked) {
+            marked = line;
+            tone = _decorator->mark(line);
+        }
+
+        painter.fill(bar, tone);
+    }
 }
 
 Cursor TextEdit::cursor_at(const double x, const double y) const {
@@ -1033,7 +1299,7 @@ bool TextEdit::key(const Key &pressed) {
                 return true;
 
             case 'v':
-                insert(Clipboard::read());
+                put(Clipboard::read());
                 return true;
 
             case 'z':
@@ -1139,7 +1405,7 @@ bool TextEdit::key(const Key &pressed) {
                 ++indent;
             }
 
-            insert("\n" + _text.substr(_starts[line], indent - _starts[line]));
+            put("\n" + _text.substr(_starts[line], indent - _starts[line]));
             return true;
         }
 
@@ -1148,7 +1414,7 @@ bool TextEdit::key(const Key &pressed) {
                 return false;
             }
 
-            insert(std::string(TAB - (column_of(from) % TAB), ' '));
+            put(std::string(TAB - (column_of(from) % TAB), ' '));
             return true;
 
         default:
@@ -1158,7 +1424,7 @@ bool TextEdit::key(const Key &pressed) {
 
 void TextEdit::wrote(const std::string &text) {
     if (!_readOnly) {
-        insert(text, true);
+        put(text, true);
     }
 }
 
