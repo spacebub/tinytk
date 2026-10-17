@@ -37,9 +37,9 @@ struct Pointer {
     //! Button pressed or released. Left for motion and wheel events, which carry no button.
     Click button = Click::Left;
 
-    //! Whether Ctrl was held. Set for presses only.
+    //! Whether Ctrl was held. Set for presses and wheel events only.
     bool ctrl = false;
-    //! Whether Shift was held. Set for presses only.
+    //! Whether Shift was held. Set for presses and wheel events only.
     bool shift = false;
 };
 

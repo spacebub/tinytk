@@ -260,6 +260,10 @@ bool Widget::wheel(double /*unused*/, const Pointer & /*unused*/) {
     return false;
 }
 
+bool Widget::wheel_sideways(double /*unused*/, const Pointer & /*unused*/) {
+    return false;
+}
+
 bool Widget::key(const Key & /*unused*/) {
     return false;
 }

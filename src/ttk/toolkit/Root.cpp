@@ -407,11 +407,24 @@ void Root::grab(Widget *who) {
 }
 
 void Root::wheel(const double steps, const double x, const double y) {
-    const Pointer at{.x = x, .y = y};
+    wheel(steps, 0.0, Pointer{.x = x, .y = y});
+}
 
-    for (Widget *up = pick(x, y); up != nullptr; up = up->parent()) {
-        if (up->wheel(steps, at)) {
-            return;
+void Root::wheel(const double steps, const double across, const Pointer &at) {
+    // A touchpad sends both parts at once, and each goes to whatever scrolls that way.
+    if (steps != 0.0) {
+        for (Widget *up = pick(at.x, at.y); up != nullptr; up = up->parent()) {
+            if (up->wheel(steps, at)) {
+                break;
+            }
+        }
+    }
+
+    if (across != 0.0) {
+        for (Widget *up = pick(at.x, at.y); up != nullptr; up = up->parent()) {
+            if (up->wheel_sideways(across, at)) {
+                break;
+            }
         }
     }
 }

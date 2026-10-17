@@ -1252,21 +1252,28 @@ void TextEdit::release(const Pointer & /*at*/) {
 }
 
 bool TextEdit::wheel(const double steps, const Pointer &at) {
-    // Shift turns the wheel sideways, where there is anything that way.
+    // Shift turns the wheel sideways, a notch down going right.
     if (at.shift) {
-        if (farthest_x() <= 0.0) {
-            return false;
-        }
-
-        _scrollX -= steps * 3.0 * _charWidth;
-    } else {
-        if (farthest_y() <= 0.0) {
-            return false;
-        }
-
-        _scrollY -= steps * 3.0 * _lineHeight;
+        return wheel_sideways(-steps, at);
     }
 
+    if (farthest_y() <= 0.0) {
+        return false;
+    }
+
+    _scrollY -= steps * 3.0 * _lineHeight;
+    clamp_scroll();
+    invalidate();
+
+    return true;
+}
+
+bool TextEdit::wheel_sideways(const double steps, const Pointer & /*at*/) {
+    if (farthest_x() <= 0.0) {
+        return false;
+    }
+
+    _scrollX += steps * 3.0 * _charWidth;
     clamp_scroll();
     invalidate();
 

@@ -237,6 +237,11 @@ public:
     //! scrolls are offered to the parent.
     virtual bool wheel(double steps, const Pointer &at);
 
+    //! Handles a sideways wheel scroll of `steps` notches at `at`, positive to the right, as a touchpad or a
+    //! tilting wheel sends, and returns true when it was consumed. Unconsumed scrolls are offered to the parent.
+    //! The default implementation returns false.
+    virtual bool wheel_sideways(double steps, const Pointer &at);
+
     //! Handles a key press while the widget has focus and returns true when it was consumed.
     virtual bool key(const Key &pressed);
 

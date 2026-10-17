@@ -165,6 +165,10 @@ public:
     //! Handles a wheel scroll of `steps` notches at `[x, y]`, offered to the widget there and then its ancestors
     //! until one consumes it.
     void wheel(double steps, double x, double y);
+    //! Handles a wheel scroll of `steps` notches up and `across` notches to the right at `at`, which carries the
+    //! modifiers held. Each part that is not zero is offered to the widget there and then its ancestors until one
+    //! consumes it, `steps` through \ref Widget::wheel() and `across` through \ref Widget::wheel_sideways().
+    void wheel(double steps, double across, const Pointer &at);
     //! Handles the pointer leaving the window by clearing the hover. Ignored while a widget holds the press.
     void leave();
 

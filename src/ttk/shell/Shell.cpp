@@ -658,10 +658,20 @@ void Shell::handle(const SDL_Event &event) {
             break;
         }
 
-        case SDL_EVENT_MOUSE_WHEEL:
-            _root->wheel(event.wheel.y, event.wheel.mouse_x, event.wheel.mouse_y);
+        case SDL_EVENT_MOUSE_WHEEL: {
+            const SDL_Keymod mods = SDL_GetModState();
+
+            _root->wheel(event.wheel.y,
+                         event.wheel.x,
+                         ttk::Pointer{
+                                 .x = event.wheel.mouse_x,
+                                 .y = event.wheel.mouse_y,
+                                 .ctrl = (mods & SDL_KMOD_CTRL) != 0,
+                                 .shift = (mods & SDL_KMOD_SHIFT) != 0,
+                         });
 
             break;
+        }
 
         case SDL_EVENT_WINDOW_MOUSE_LEAVE:
             _root->leave();

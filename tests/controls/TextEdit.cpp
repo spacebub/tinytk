@@ -1340,6 +1340,37 @@ TEST_F(TextEditTest, WrappedEditorDoesNotScrollSideways) {
     canvas.frame();
 
     EXPECT_FALSE(edit->wheel(-1.0, ttk::Pointer{.x = 100.0, .y = 100.0, .shift = true}));
+    EXPECT_FALSE(edit->wheel_sideways(1.0, ttk::Pointer{.x = 100.0, .y = 100.0}));
+}
+
+TEST_F(TextEditTest, ASidewaysWheelScrollsThreeColumnsPerNotch) {
+    ttk::TextEdit *edit = make(std::string(200, 'a'));
+
+    canvas.root().wheel(0.0, 1.0, ttk::Pointer{.x = 100.0, .y = 100.0});
+    press_cell(edit, 0, 0);
+
+    EXPECT_EQ(probe(edit).find('|'), 3U);
+}
+
+TEST_F(TextEditTest, ATouchpadScrollsDownAndSidewaysAtOnce) {
+    std::string text;
+
+    for (int line = 0; line < 40; ++line) {
+        text += std::string(200, 'a') + '\n';
+    }
+
+    ttk::TextEdit *edit = make(text);
+
+    canvas.root().wheel(-1.0, 1.0, ttk::Pointer{.x = 100.0, .y = 100.0});
+    press_cell(edit, 0, 0);
+
+    EXPECT_EQ(probe(edit).find('|'), (3U * 201U) + 3U);
+}
+
+TEST_F(TextEditTest, ASidewaysWheelGoesToTheParentWhenEverythingFits) {
+    ttk::TextEdit *edit = make("short");
+
+    EXPECT_FALSE(edit->wheel_sideways(1.0, ttk::Pointer{.x = 100.0, .y = 100.0}));
 }
 
 TEST_F(TextEditTest, MovingTheCaretDownScrollsItIntoView) {

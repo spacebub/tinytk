@@ -255,6 +255,11 @@ public:
     //! Returns false, leaving the scroll to the parent, when there is nothing to scroll in that direction.
     bool wheel(double steps, const Pointer &at) override;
 
+    //! Scrolls sideways by 3 columns per notch of `steps`, positive to the right.
+    //!
+    //! Returns false, leaving the scroll to the parent, when there is nothing to the side, as in a wrapped editor.
+    bool wheel_sideways(double steps, const Pointer &at) override;
+
     //! Handles editing and caret keys and returns true when the key was consumed.
     //!
     //! Arrows move by a character or a row, Ctrl+Left and Ctrl+Right by a word, PageUp and PageDown by a view
