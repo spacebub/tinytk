@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.7.0 - 2026-10-17
+
+### Changed
+
+- A dialog shown over another no longer hides it from view. The covered dialog is drawn under the
+  one on top, and still takes no pointer, keys or focus
+- A dialog closed with `Dialog::set_open(false)` before another covered it stays closed when the
+  one on top is taken down
+
+### Added
+
+- Benchmarks of the dialog layer: a full paint, a relayout and a small frame with one to three
+  dialogs stacked, and showing one dialog over another
+
 ## 1.6.0 - 2026-10-16
 
 ### Added
