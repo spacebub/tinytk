@@ -226,7 +226,24 @@ TEST_F(Stack, DialogsAreLaidOutBelowTheTitleBar) {
     EXPECT_DOUBLE_EQ(box.h, canvas.height() - ttk::Theme::barHeight);
 }
 
-TEST_F(Stack, CoveredDialogsAreNotLaidOut) {
+TEST_F(Stack, CoveredDialogsAreDrawnUnderTheTop) {
+    show(200.0);
+    canvas.frame_at(1.0);
+    show(60.0);
+    canvas.frame_at(2.0);
+
+    const std::vector<std::uint32_t> stacked = canvas.pixels();
+
+    layer->dismiss();
+    layer->dismiss();
+    canvas.frame_at(3.0);
+    show(60.0);
+    canvas.frame_at(4.0);
+
+    EXPECT_NE(canvas.pixels(), stacked) << "the covered dialog was not drawn";
+}
+
+TEST_F(Stack, CoveredDialogsFollowTheWindow) {
     Probe *under = show();
 
     show();
@@ -236,7 +253,7 @@ TEST_F(Stack, CoveredDialogsAreNotLaidOut) {
     canvas.root().relayout();
     canvas.frame();
 
-    EXPECT_EQ(under->arranged, before) << "a hidden dialog was measured again";
+    EXPECT_GT(under->arranged, before) << "a covered dialog is drawn, so it is placed with the rest";
 }
 
 TEST_F(Stack, TitleBarStaysUncovered) {

@@ -12,19 +12,21 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "ttk/toolkit/overlays/Dialog.h"
 
 namespace ttk {
-//! Stack of dialogs of which only the top one is shown.
+//! Stack of dialogs of which only the top one takes input.
 //!
-//! Meant for the \ref Root::DIALOGS layer. A dialog shown over another hides it until the one on top is taken
-//! down, so a dialog can open a second one over itself and get back to the first.
+//! Meant for the \ref Root::DIALOGS layer. A dialog shown over another covers it until the one on top is taken
+//! down, so a dialog can open a second one over itself and get back to the first. A covered dialog is hidden, so
+//! it takes no pointer, keys or focus, but it is still drawn under the one over it.
 class DialogLayer : public Widget {
 public:
     //! Takes ownership of `dialog`, shows it on top of the stack and returns it.
     //!
-    //! The dialog that was on top is hidden. \ref Dialog::dismissed of `dialog` is set to call \ref close(), a
+    //! The dialog that was on top is covered. \ref Dialog::dismissed of `dialog` is set to call \ref close(), a
     //! relayout is requested, and \ref Dialog::opened() is called on `dialog` before returning.
     Dialog *show(std::unique_ptr<Dialog> dialog);
 
@@ -51,9 +53,17 @@ public:
     //! dialog.
     [[nodiscard]] bool covered() const { return !children().empty(); }
 
-    //! Places every visible dialog over the layer's box below the title bar, which stays uncovered. Hidden dialogs
-    //! are not laid out.
+    //! Places every dialog, covered or not, over the layer's box below the title bar, which stays uncovered.
     void arrange(Typeface &type) override;
+
+    //! Draws the dialogs from the bottom of the stack up, the covered ones included.
+    void paint(const Painter &painter) override;
+
+private:
+    [[nodiscard]] bool drawn_here(const Widget *child) const;
+
+    // Hidden by the layer rather than closed, so still drawn.
+    std::vector<const Widget *> _covered;
 };
 }
 

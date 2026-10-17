@@ -10,12 +10,17 @@
 
 #include "ttk/dialogs/DialogLayer.h"
 #include "ttk/draw/Theme.h"
+#include "ttk/toolkit/Painter.h"
 #include "ttk/toolkit/Root.h"
 
 namespace ttk {
 
 Dialog *DialogLayer::show(std::unique_ptr<Dialog> dialog) {
     if (Dialog *under = top(); under != nullptr) {
+        if (under->visible()) {
+            _covered.push_back(under);
+        }
+
         under->set_visible(false);
     }
 
@@ -67,11 +72,12 @@ void DialogLayer::dismiss() {
         closed(up);
     }
 
+    std::erase(_covered, up);
     erase(up);
 
     Dialog *under = top();
 
-    if (under != nullptr) {
+    if (under != nullptr && std::erase(_covered, under) > 0) {
         under->set_visible(true);
     }
 
@@ -88,11 +94,33 @@ void DialogLayer::arrange(Typeface &type) {
     // Never over the title bar: the window stays draggable by it.
     const BLRect under{_box.x, _box.y + Theme::barHeight, _box.w, std::max(0.0, _box.h - Theme::barHeight)};
 
-    // A covered dialog is not measured: its card would shape all its text again.
     for (const Ptr &child : children()) {
-        if (child->visible()) {
+        if (drawn_here(child.get())) {
             child->place(under, type);
         }
     }
+}
+
+void DialogLayer::paint(const Painter &painter) {
+    // Hidden only to take no input, a covered dialog is drawn as if it were visible.
+    for (const Ptr &child : children()) {
+        if (!drawn_here(child.get()) || !painter.needed(child->drawn())) {
+            continue;
+        }
+
+        BLRect region{};
+
+        if (child->clips(region)) {
+            painter.push(region);
+            child->paint(painter);
+            painter.pop();
+        } else {
+            child->paint(painter);
+        }
+    }
+}
+
+bool DialogLayer::drawn_here(const Widget *child) const {
+    return child->visible() || std::ranges::find(_covered, child) != _covered.end();
 }
 }

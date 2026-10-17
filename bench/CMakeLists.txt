@@ -35,6 +35,7 @@ add_executable(ttk_bench
         ui/Anim_bench.cpp
         ui/Controls_bench.cpp
         ui/Damage_bench.cpp
+        ui/Dialogs_bench.cpp
         ui/Glyphs_bench.cpp
         ui/Layout_bench.cpp
         ui/Painter_bench.cpp
