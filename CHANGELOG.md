@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.7.1 - 2026-10-17
+
+### Added
+
+- `Widget::wheel_sideways` takes the sideways part of a wheel event, positive to the right, as a
+  touchpad or a tilting wheel sends it. `Root::wheel(steps, across, at)` offers each part that is
+  not zero to the widget under the pointer and then its ancestors, so a touchpad scrolls both ways
+  at once
+- `TextEdit` scrolls sideways by 3 columns per notch of a sideways wheel, and leaves it to its
+  parent when there is nothing to the side
+
+### Fixed
+
+- `Shell` passes the wheel's sideways part on instead of dropping it, and fills in the Ctrl and
+  Shift held, so Shift and the wheel scroll a `TextEdit` sideways in a window as well as in tests
+
 ## 1.7.0 - 2026-10-17
 
 ### Changed
