@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.3 - 2026-10-21
+
+### Added
+
+- A benchmark of a wrapped label's natural width at one, two and eight sentences
+
+### Fixed
+
+- A wrapped label measured every word of its text again each time it was asked for its natural
+  width. It now keeps the width until its text or face changes
+
 ## 1.7.2 - 2026-10-20
 
 ### Fixed
