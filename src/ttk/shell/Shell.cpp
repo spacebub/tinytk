@@ -119,6 +119,8 @@ double Shell::now() {
 
 bool Shell::start(const std::string &title, const int width, const int height) {
     SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+    // SDL holds the display on for as long as video is up unless told otherwise, which keeps the machine from sleeping.
+    SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         return false;
