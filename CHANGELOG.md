@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.2 - 2026-10-20
+
+### Fixed
+
+- `Shell` lets the screensaver run and the machine sleep, which SDL blocks for as long as video is
+  up unless told otherwise
+
 ## 1.7.1 - 2026-10-17
 
 ### Added
