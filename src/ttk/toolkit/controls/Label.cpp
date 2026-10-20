@@ -63,6 +63,7 @@ void Label::set_text(const std::string_view text) {
 
     _text = text;
     _fittedRoom = -1;
+    _folded = -1.0;
 
     if (_tracked) {
         _upper = Text::upper(_text);
@@ -91,6 +92,7 @@ void Label::set_text(const std::string_view text) {
 Label *Label::font(const int weight, const float size) {
     _weight = weight;
     _size = size;
+    _folded = -1.0;
 
     return this;
 }
@@ -129,12 +131,14 @@ Label *Label::section() {
     _tracked = true;
     _upper = Text::upper(_text);
     _tone = Theme::Tone(&Theme::Palette::faint);
+    _folded = -1.0;
 
     return this;
 }
 
 Label *Label::mono(const bool value) {
     _mono = value;
+    _folded = -1.0;
 
     return this;
 }
@@ -149,6 +153,7 @@ Label *Label::on_click(std::function<void()> clicked) {
 
 Label *Label::path(const bool value) {
     _path = value;
+    _folded = -1.0;
 
     return this;
 }
@@ -225,13 +230,17 @@ double Label::natural_width(Typeface &type) {
         return fixedWidth;
     }
 
-    const BLFont &face = type.at(face_weight(), _size);
+    if (_tracked || !_wrap) {
+        const BLFont &face = type.at(face_weight(), _size);
 
-    if (_tracked) {
-        return type.width_tracked(face, _upper, 0.9F);
+        return _tracked ? type.width_tracked(face, _upper, 0.9F) : type.width(face, _text);
     }
 
-    return _wrap ? folded_width(type, face, _text) : type.width(face, _text);
+    if (_folded < 0.0) {
+        _folded = folded_width(type, type.at(face_weight(), _size), _text);
+    }
+
+    return _folded;
 }
 
 double Label::natural_height(Typeface &type, const double width) {

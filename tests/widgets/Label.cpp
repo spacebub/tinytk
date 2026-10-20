@@ -240,6 +240,61 @@ TEST_F(Painted, LabelElidedToOneRowFitsOnOneRowAtItsNaturalWidth) {
     }
 }
 
+// A fresh label folds the same text from nothing, so a width kept from before a change would differ from it.
+TEST_F(Painted, LabelWrappedWidthFollowsATextChange) {
+    ttk::Label label("A few words");
+    ttk::Label fresh(paragraph());
+    const BLFont &face = type().at(400, ttk::Theme::fontBody);
+
+    label.wrap();
+    fresh.wrap();
+
+    const double was = label.natural_width(type());
+
+    label.set_text(paragraph());
+
+    EXPECT_GT(label.natural_width(type()), was) << "the width kept the old text";
+    EXPECT_DOUBLE_EQ(label.natural_width(type()), fresh.natural_width(type()));
+    EXPECT_EQ(ttk::fold_spans(type(), face, paragraph(), label.natural_width(type())).size(), 1U);
+}
+
+TEST_F(Painted, LabelWrappedWidthFollowsAFontChange) {
+    ttk::Label label(paragraph());
+    ttk::Label fresh(paragraph());
+    const BLFont &face = type().at(BIG_WEIGHT, BIG);
+
+    label.wrap();
+    fresh.wrap()->font(BIG_WEIGHT, BIG);
+
+    const double was = label.natural_width(type());
+
+    label.font(BIG_WEIGHT, BIG);
+
+    EXPECT_GT(label.natural_width(type()), was) << "the width kept the old face";
+    EXPECT_DOUBLE_EQ(label.natural_width(type()), fresh.natural_width(type()));
+    EXPECT_EQ(ttk::fold_spans(type(), face, paragraph(), label.natural_width(type())).size(), 1U);
+}
+
+TEST_F(Painted, LabelWrappedWidthFollowsTheFixedFace) {
+    ttk::Label label("iiii iiii iiii");
+    ttk::Label fresh("iiii iiii iiii");
+
+    label.wrap();
+    fresh.wrap()->mono();
+
+    const double was = label.natural_width(type());
+
+    label.mono();
+
+    EXPECT_GT(label.natural_width(type()), was) << "the width kept the proportional face";
+    EXPECT_DOUBLE_EQ(label.natural_width(type()), fresh.natural_width(type()));
+
+    label.mono(false)->path();
+
+    EXPECT_DOUBLE_EQ(label.natural_width(type()), fresh.natural_width(type()))
+            << "a path is measured in the fixed face";
+}
+
 TEST_F(Painted, LabelElidedHeightStopsAtTheRows) {
     ttk::Label label(paragraph(4));
     const double one = line(400, ttk::Theme::fontBody);

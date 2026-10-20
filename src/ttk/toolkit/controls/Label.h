@@ -157,6 +157,9 @@ private:
     // The wrapped height last measured, so a text that folds to a different one
     // asks for the layout it needs.
     double _tall = -1.0;
+
+    // The width a wrapped text folds to, remeasured only when the text or the face changes.
+    double _folded = -1.0;
 };
 }
 

@@ -172,6 +172,20 @@ void Label_wrap_height(benchmark::State &state) {
 
 BENCHMARK(Label_wrap_height);
 
+void Label_wrap_width(benchmark::State &state) {
+    auto held = std::make_unique<ttk::Label>(bench::Fixtures::paragraph(static_cast<int>(state.range(0))));
+
+    held->wrap();
+
+    ttk::Label *made = bench::mount(sheet(), std::move(held), 420.0);
+
+    for ([[maybe_unused]] auto step : state) {
+        benchmark::DoNotOptimize(made->natural_width(sheet().type()));
+    }
+}
+
+BENCHMARK(Label_wrap_width)->Arg(1)->Arg(2)->Arg(8);
+
 void MultistateSwitch_natural_width(benchmark::State &state) {
     ttk::MultistateSwitch *made = bench::mount(sheet(), multistate_switch());
 
