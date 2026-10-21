@@ -270,6 +270,10 @@ void Painter::text(const BLFont &font, const BLPoint top, const std::string_view
     _type.draw(*_context, font, top, run, tone);
 }
 
+double Painter::baseline(const BLFont &font, const BLRect &box) const {
+    return _type.baseline(font, box.y + (box.h / 2.0));
+}
+
 void Painter::label(const BLFont &font,
                     const BLRect &box,
                     const Align align,
@@ -294,14 +298,7 @@ void Painter::label(const BLFont &font,
 }
 
 void Painter::row(const BLFont &font, const BLRect &box, const std::string_view run, const BLRgba32 tone) const {
-    if (run.empty() || box.w <= 0.0) {
-        return;
-    }
-
-    const BLFontMetrics metrics = font.metrics();
-    const double top = box.y + ((box.h - (metrics.ascent + metrics.descent)) / 2.0);
-
-    _type.draw_once(*_context, font, BLPoint{box.x, top}, run, tone, box.w);
+    row_on(font, BLPoint{box.x, baseline(font, box)}, box.w, run, tone);
 }
 
 void Painter::row(const BLFont &font,
@@ -309,14 +306,32 @@ void Painter::row(const BLFont &font,
                   const std::string_view run,
                   const BLRgba32 tone,
                   const std::span<const Typeface::Band> bands) const {
-    if (run.empty() || box.w <= 0.0) {
+    row_on(font, BLPoint{box.x, baseline(font, box)}, box.w, run, tone, bands);
+}
+
+void Painter::row_on(const BLFont &font,
+                     const BLPoint start,
+                     const double room,
+                     const std::string_view run,
+                     const BLRgba32 tone) const {
+    if (run.empty() || room <= 0.0) {
         return;
     }
 
-    const BLFontMetrics metrics = font.metrics();
-    const double top = box.y + ((box.h - (metrics.ascent + metrics.descent)) / 2.0);
+    _type.draw_once(*_context, font, BLPoint{start.x, start.y - font.metrics().ascent}, run, tone, room);
+}
 
-    _type.draw_once(*_context, font, BLPoint{box.x, top}, run, tone, box.w, bands);
+void Painter::row_on(const BLFont &font,
+                     const BLPoint start,
+                     const double room,
+                     const std::string_view run,
+                     const BLRgba32 tone,
+                     const std::span<const Typeface::Band> bands) const {
+    if (run.empty() || room <= 0.0) {
+        return;
+    }
+
+    _type.draw_once(*_context, font, BLPoint{start.x, start.y - font.metrics().ascent}, run, tone, room, bands);
 }
 
 void Painter::tracked(const BLFont &font,

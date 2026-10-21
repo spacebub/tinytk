@@ -936,7 +936,7 @@ void TextEdit::paint(const Painter &painter) {
             std::min(row_count() - 1, static_cast<size_t>(std::floor((_scrollY + view_height()) / _lineHeight)));
     const double left = text_left() - _scrollX;
     const double inset = (_lineHeight - _fontHeight) / 2.0;
-    // A row's text is a line box centred `inset` inside the row, and its ink reaches past that box.
+    // A row's line box sits about `inset` inside the row, and its ink reaches past that box.
     const double bleed = std::max(0.0, Typeface::bleed(font) - inset);
     const auto needed = [&](const double y) {
         return painter.needed(BLRect{_box.x, y - bleed, _box.w, _lineHeight + (bleed * 2.0)});
@@ -1041,7 +1041,7 @@ void TextEdit::paint(const Painter &painter) {
     }
 
     if (_text.empty() && !_placeholder.empty()) {
-        painter.text(font, BLPoint{left, view_top() + inset}, _placeholder, palette.faint);
+        painter.row(font, BLRect{left, view_top(), _box.x + _box.w - left, _lineHeight}, _placeholder, palette.faint);
     }
 
     if (focused() && _showCaret && !_readOnly) {

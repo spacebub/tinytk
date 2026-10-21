@@ -148,6 +148,32 @@ protected:
     }
 };
 
+TEST_F(Typed, CapsTakesTheCapHeightOfAFaceThatGivesOne) {
+    if (body().metrics().cap_height <= 0.0F) {
+        GTEST_SKIP() << "the regular face gives no cap height";
+    }
+
+    EXPECT_FLOAT_EQ(type().caps(body()), body().metrics().cap_height);
+}
+
+TEST_F(Typed, CapsScalesWithTheSize) {
+    for (const int weight : {ttk::Typeface::regular, ttk::Typeface::mono}) {
+        const float small = type().caps(type().at(weight, 14));
+
+        EXPECT_GT(small, 0.0F);
+        EXPECT_NEAR(type().caps(type().at(weight, 28)), 2.0F * small, 0.01F) << "weight " << weight;
+    }
+}
+
+TEST_F(Typed, BaselineCentresTheCapitalsOnAWholePixel) {
+    for (const double middle : {30.0, 30.25, 30.5, 30.75}) {
+        const double baseline = type().baseline(mono(), middle);
+
+        EXPECT_EQ(baseline, std::floor(baseline));
+        EXPECT_LE(std::abs(baseline - (type().caps(mono()) / 2.0) - middle), 0.5) << "middle " << middle;
+    }
+}
+
 TEST_F(Typed, LoadGivesEveryWeightAFace) {
     ttk::Typeface fresh;
 
@@ -648,22 +674,37 @@ TEST_F(Drawn, DrawUsesTheTone) {
     EXPECT_TRUE(solid) << "a thick stem had no fully covered pixel";
 }
 
-TEST_F(Drawn, DrawCentredCentresTheLineBox) {
-    const BLFont &font = type().at(ttk::Typeface::regular, 20);
+TEST_F(Drawn, DrawCentredCentresTheCapitals) {
     const BLPoint top{10.0, 5.0};
     constexpr float box = 60.0F;
 
-    type().draw_centred(context, font, top, box, "Hxj", BLRgba32(0xffffffff));
+    for (const int weight : {ttk::Typeface::regular, ttk::Typeface::mono}) {
+        context.fill_all(BLRgba32(GROUND));
+        type().draw_centred(context, type().at(weight, 20), top, box, "H", BLRgba32(0xffffffff));
 
-    const tests::Ink found = settle();
-    const double line = type().line_height(font);
-    const double pad = ttk::Typeface::bleed(font);
-    const double centred = top.y + ((box - line) * 0.5);
+        const tests::Ink found = settle();
 
-    ASSERT_TRUE(found.any());
-    EXPECT_GE(found.y0, centred - pad);
-    EXPECT_LE(found.y1, centred + line + pad);
-    EXPECT_GT(found.y0, top.y + 5.0) << "the run sat at the top of its box";
+        ASSERT_TRUE(found.any());
+        EXPECT_NEAR((found.y0 + found.y1) / 2.0, top.y + (box / 2.0), 1.0) << "weight " << weight;
+    }
+}
+
+TEST_F(Drawn, CapsIsHowFarAnHRisesAboveTheBaseline) {
+    const BLPoint top{10.0, 10.0};
+
+    for (const int weight : {ttk::Typeface::regular, ttk::Typeface::semibold, ttk::Typeface::mono}) {
+        const BLFont &font = type().at(weight, 20);
+
+        context.fill_all(BLRgba32(GROUND));
+        type().draw(context, font, top, "H", BLRgba32(0xffffffff));
+
+        const tests::Ink found = settle();
+        const double baseline = std::floor(top.y + font.metrics().ascent + 0.5);
+
+        ASSERT_TRUE(found.any());
+        EXPECT_NEAR(baseline - found.y0, type().caps(font), 1.0) << "weight " << weight;
+        EXPECT_EQ(found.y1, static_cast<int>(baseline)) << "weight " << weight;
+    }
 }
 
 TEST_F(Drawn, DrawTrackedSpreadsTheRun) {

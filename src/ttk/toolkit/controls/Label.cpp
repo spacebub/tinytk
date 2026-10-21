@@ -7,6 +7,7 @@
  *	spacebub <spacebubs@proton.me>
  */
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -290,7 +291,6 @@ void Label::paint(const Painter &painter) {
 
     if (_tracked) {
         const double taken = painter.type().width_tracked(face, _upper, 0.9F);
-        const double height = painter.line_height(face);
 
         double x = _box.x;
 
@@ -300,7 +300,7 @@ void Label::paint(const Painter &painter) {
             x = _box.x + _box.w - taken;
         }
 
-        painter.tracked(face, BLPoint{x, _box.y + ((_box.h - height) / 2.0)}, _upper, ink, 0.9);
+        painter.tracked(face, BLPoint{x, painter.baseline(face, _box) - face.metrics().ascent}, _upper, ink, 0.9);
 
         return;
     }
@@ -331,6 +331,7 @@ void Label::paint_capped(const Painter &painter, const BLFont &face, const BLRgb
 
     std::ranges::replace(rest, '\n', ' ');
 
-    painter.row(face, BLRect{_box.x, y, _box.w, step}, rest, ink);
+    // On the baseline text() gives the lines above, so the step between lines holds.
+    painter.row_on(face, BLPoint{_box.x, std::floor(y + face.metrics().ascent + 0.5)}, _box.w, rest, ink);
 }
 }

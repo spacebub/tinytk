@@ -117,8 +117,7 @@ public:
     //! Draws `run` in `tone` centred vertically in a box `height` tall whose top-left is `top`. Does nothing when
     //! `run` is empty.
     //!
-    //! The line box of the font, its ascent plus its descent, is centred in the box and the baseline rounded to a
-    //! whole pixel.
+    //! The run sits on the \ref baseline() of the box's middle, which centres the font's capitals in the box.
     void draw_centred(
             BLContext &context, const BLFont &font, BLPoint top, float height, std::string_view run, BLRgba32 tone);
 
@@ -151,6 +150,16 @@ public:
 
     //! Returns the ascent plus the descent of `font`.
     [[nodiscard]] float line_height(const BLFont &font) const;
+
+    //! Returns how far the capitals of `font` reach above the baseline: the face's cap height, or for a face
+    //! that gives none, the top of its H. Kept per face.
+    float caps(const BLFont &font);
+
+    //! Returns the baseline that centres the capitals of `font` on `middle`, rounded to a whole pixel.
+    //!
+    //! Faces differ in how their capitals sit in their line box, so a line mixing faces sets every part on the
+    //! baseline of its main face.
+    double baseline(const BLFont &font, double middle);
 
     //! Returns how far the ink of `font` can reach outside a line box of \ref line_height(), in pixels.
     //!
@@ -253,6 +262,8 @@ private:
     Cache::RunMap<Elided> _elided;
     Cache::RunMap<Measured> _words;
     std::unordered_map<std::uintptr_t, Glyphs> _glyphs;
+    // The top of the H in design units, for faces that give no cap height.
+    std::unordered_map<std::uint64_t, float> _capitals;
 
     // Bumped on every lookup. Every cache reads it to tell which entries are cold.
     size_t _asked = 0;

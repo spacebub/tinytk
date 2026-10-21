@@ -143,12 +143,18 @@ public:
     //! The run is neither wrapped nor elided. Draws nothing for an empty run.
     void text(const BLFont &font, BLPoint top, std::string_view run, BLRgba32 tone) const;
 
+    //! Returns the baseline that centres the capitals of `font` in `box`, as \ref label() and \ref row() set text.
+    //! See \ref Typeface::baseline().
+    double baseline(const BLFont &font, const BLRect &box) const;
+
     //! Draws `run` on one line vertically centred in `box` and placed across it by `align`.
     //!
-    //! The run is elided to `box.w` first. Draws nothing for an empty run or a box with no width.
+    //! The run is elided to `box.w` first and set on the \ref baseline() of `box`. Draws nothing for an empty run
+    //! or a box with no width.
     void label(const BLFont &font, const BLRect &box, Align align, std::string_view run, BLRgba32 tone) const;
 
-    //! Draws `run` against the left edge of `box`, vertically centred and cut with an ellipsis at its right edge.
+    //! Draws `run` against the left edge of `box`, on its \ref baseline() and cut with an ellipsis at its right
+    //! edge.
     //!
     //! Meant for the rows of a long list. Rows are kept in a cache of their own, so scrolling through many of them
     //! does not evict what \ref label() and \ref text() keep. Draws nothing for an empty run or a box with no
@@ -163,6 +169,18 @@ public:
              std::string_view run,
              BLRgba32 tone,
              std::span<const Typeface::Band> bands) const;
+
+    //! Draws `run` as \ref row() does, from `start.x` on the baseline `start.y` and cut with an ellipsis past
+    //! `room` pixels. For the parts of a line that mixes faces, all set on the \ref baseline() of the main one.
+    void row_on(const BLFont &font, BLPoint start, double room, std::string_view run, BLRgba32 tone) const;
+
+    //! Draws `run` as the \ref row_on() above does, with each of `bands` in its own colour and the rest in `tone`.
+    void row_on(const BLFont &font,
+                BLPoint start,
+                double room,
+                std::string_view run,
+                BLRgba32 tone,
+                std::span<const Typeface::Band> bands) const;
 
     //! Draws `run` letter-spaced, adding `spacing` pixels after each character, with `top` at the top-left of the
     //! line box. The run is neither wrapped nor elided.

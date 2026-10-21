@@ -631,6 +631,44 @@ float Typeface::line_height(const BLFont &font) const {
     return metrics.ascent + metrics.descent;
 }
 
+float Typeface::caps(const BLFont &font) {
+    const BLFontMetrics &metrics = font.metrics();
+
+    if (metrics.cap_height > 0.0F) {
+        return metrics.cap_height;
+    }
+
+    const BLFontFace &face = font.face();
+    const auto found = _capitals.find(face.unique_id());
+    float top = 0.0F;
+
+    if (found != _capitals.end()) {
+        top = found->second;
+    } else {
+        BLGlyphBuffer letter;
+        BLBoxI bounds{};
+
+        letter.set_utf8_text("H", 1);
+
+        // A face without an H maps it to glyph 0, whose box says nothing about capitals.
+        if (font.map_text_to_glyphs(letter) == BL_SUCCESS && letter.size() == 1 && letter.content()[0] != 0
+            && font.get_glyph_bounds(letter.content(), sizeof(std::uint32_t), &bounds, 1) == BL_SUCCESS) {
+            top = static_cast<float>(std::max(std::abs(bounds.y0), std::abs(bounds.y1)));
+        }
+
+        _capitals.emplace(face.unique_id(), top);
+    }
+
+    const auto units = static_cast<float>(face.units_per_em());
+
+    // A face with no H, or none loaded, falls back on the share of the ascent capitals usually take.
+    return top > 0.0F && units > 0.0F ? top * font.size() / units : metrics.ascent * 0.72F;
+}
+
+double Typeface::baseline(const BLFont &font, const double middle) {
+    return std::floor(middle + (static_cast<double>(caps(font)) / 2.0) + 0.5);
+}
+
 double Typeface::bleed(const BLFont &font) {
     const BLFontMetrics metrics = font.metrics();
     const MaskRows rows = mask_rows(font);
@@ -677,10 +715,9 @@ void Typeface::draw_centred(BLContext &context,
         return;
     }
 
-    const BLFontMetrics metrics = font.metrics();
-    const double baseline = top.y + ((static_cast<double>(height) + metrics.ascent - metrics.descent) * 0.5);
+    const double on = baseline(font, top.y + (static_cast<double>(height) / 2.0));
 
-    lay(context, font, shaped(font, run), BLPoint{top.x, std::floor(baseline + 0.5)}, tone);
+    lay(context, font, shaped(font, run), BLPoint{top.x, on}, tone);
 }
 
 Typeface::Glyphs &Typeface::glyphs(const BLFont &font) {

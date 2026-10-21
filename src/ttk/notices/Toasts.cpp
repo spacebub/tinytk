@@ -15,6 +15,14 @@
 #include "ttk/toolkit/controls/GlyphButton.h"
 
 namespace ttk {
+namespace {
+
+// The middle of the capitals on the first line of a paragraph whose top is `top`.
+double capitals(const Painter &painter, const BLFont &face, const double top) {
+    return std::floor(top + face.metrics().ascent + 0.5) - (painter.type().caps(face) / 2.0);
+}
+
+}
 
 Toasts::Toasts(std::function<void(int)> dismissed) : _dismissed(std::move(dismissed)) {
 }
@@ -173,7 +181,7 @@ void Toast::paint(const Painter &painter) {
     if (!_message.title.empty()) {
         const BLFont &face = painter.font(Typeface::bold, Theme::fontSmall);
 
-        painter.circle(BLPoint{_box.x + 20.0, y + (painter.line_height(face) / 2.0)}, 4.0, ink);
+        painter.circle(BLPoint{_box.x + 20.0, capitals(painter, face, y)}, 4.0, ink);
 
         y += painter.paragraph(face, BLRect{_box.x + 31.0, y, room - 15.0, 0.0}, _message.title, ink) + 3.0;
 
@@ -182,7 +190,7 @@ void Toast::paint(const Painter &painter) {
     } else {
         const BLFont &face = painter.font(400, Theme::fontSmall);
 
-        painter.circle(BLPoint{_box.x + 20.0, y + (painter.line_height(face) / 2.0)}, 4.0, ink);
+        painter.circle(BLPoint{_box.x + 20.0, capitals(painter, face, y)}, 4.0, ink);
         painter.paragraph(face, BLRect{_box.x + 31.0, y, room - 15.0, 0.0}, _message.body, text);
     }
 

@@ -782,13 +782,68 @@ TEST_F(Written, LabelTooNarrowForAnEllipsisDrawsNothing) {
 }
 
 TEST_F(Written, RowMatchesTheTypefacesOnceDrawing) {
-    const BLFontMetrics metrics = body().metrics();
-    const double top = 10 + ((30 - (metrics.ascent + metrics.descent)) / 2.0);
+    const double top = painter.baseline(body(), {10, 10, 140, 30}) - body().metrics().ascent;
 
     painter.row(body(), {10, 10, 140, 30}, "Row of a list", INK);
     tests::fonts().draw_once(direct, body(), {10, top}, "Row of a list", INK, 140);
 
     EXPECT_TRUE(same());
+}
+
+TEST_F(Written, RowOnMatchesTheTypefacesOnceDrawingOnTheBaseline) {
+    painter.row_on(body(), {10, 40}, 140, "Row of a list", INK);
+    tests::fonts().draw_once(direct, body(), {10, 40 - body().metrics().ascent}, "Row of a list", INK, 140);
+
+    EXPECT_TRUE(same());
+}
+
+TEST_F(Written, RowOnOfAnEmptyRunOrNoRoomDrawsNothing) {
+    painter.row_on(body(), {10, 40}, 140, "", INK);
+    painter.row_on(body(), {10, 40}, 0, "Row", INK);
+
+    EXPECT_TRUE(blank());
+}
+
+TEST_F(Written, FacesOnOneBaselineEndTheirCapitalsOnOneRow) {
+    BLImage sans(WIDTH, HEIGHT, BL_FORMAT_PRGB32);
+    BLImage mono(WIDTH, HEIGHT, BL_FORMAT_PRGB32);
+
+    for (auto [image, weight] : {std::pair{&sans, ttk::Typeface::regular}, std::pair{&mono, ttk::Typeface::mono}}) {
+        BLContext context(*image);
+
+        context.clear_all();
+        ttk::Painter(context, tests::fonts(), EVERYWHERE).row_on(painter.font(weight, 13.0F), {10, 50}, 140, "H", INK);
+        context.end();
+    }
+
+    EXPECT_EQ(ink(sans).bottom, 50);
+    EXPECT_EQ(ink(mono).bottom, 50);
+}
+
+TEST_F(Written, LabelSetsTheRunOnTheBaselineOfItsBox) {
+    const BLFont &mono = painter.font(ttk::Typeface::mono, 13.0F);
+    const BLRect box{10, 10.5, 140, 31};
+
+    painter.label(mono, box, ttk::Align::Start, "Label", INK);
+    tests::fonts().draw(direct, mono, {10, painter.baseline(mono, box) - mono.metrics().ascent}, "Label", INK);
+
+    EXPECT_TRUE(same());
+}
+
+TEST_F(Written, LabelsOfEitherFaceCentreTheirCapitalsInTheBox) {
+    const BLRect box{10, 10, 140, 40};
+
+    for (const int weight : {ttk::Typeface::regular, ttk::Typeface::mono}) {
+        BLImage image(WIDTH, HEIGHT, BL_FORMAT_PRGB32);
+        BLContext context(image);
+
+        context.clear_all();
+        ttk::Painter(context, tests::fonts(), EVERYWHERE)
+                .label(painter.font(weight, 13.0F), box, ttk::Align::Start, "H", INK);
+        context.end();
+
+        EXPECT_NEAR(ink(image).middle_y(), box.y + (box.h / 2.0), 1.0) << "weight " << weight;
+    }
 }
 
 TEST_F(Written, RowIsCutAtTheRightEdge) {
@@ -807,8 +862,7 @@ TEST_F(Written, RowOfAnEmptyRunOrNoWidthDrawsNothing) {
 }
 
 TEST_F(Written, BandedRowInTheRowsOwnToneMatchesThePlainRow) {
-    const BLFontMetrics metrics = body().metrics();
-    const double top = 10 + ((30 - (metrics.ascent + metrics.descent)) / 2.0);
+    const double top = painter.baseline(body(), {10, 10, 140, 30}) - body().metrics().ascent;
     const std::vector<ttk::Typeface::Band> bands{{.from = 3.3, .to = 20.0, .tone = INK},
                                                  {.from = 41.6, .to = 77.1, .tone = INK}};
 
@@ -819,8 +873,7 @@ TEST_F(Written, BandedRowInTheRowsOwnToneMatchesThePlainRow) {
 }
 
 TEST_F(Written, BandedRowWithNoBandsIsThePlainRow) {
-    const BLFontMetrics metrics = body().metrics();
-    const double top = 10 + ((30 - (metrics.ascent + metrics.descent)) / 2.0);
+    const double top = painter.baseline(body(), {10, 10, 140, 30}) - body().metrics().ascent;
 
     painter.row(body(), {10, 10, 140, 30}, "Row of a list", INK, {});
     tests::fonts().draw_once(direct, body(), {10, top}, "Row of a list", INK, 140);
