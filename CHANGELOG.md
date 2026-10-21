@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.8.0 - 2026-10-21
+
+### Added
+
+- `Typeface::caps` gives how far the capitals of a font reach above the baseline, taken from the
+  H for a face that gives no cap height, such as the monospace faces
+- `Typeface::baseline` and `Painter::baseline` give the baseline, on a whole pixel, that centres
+  the capitals on a middle or in a box
+- `Painter::row_on` draws a row on a given baseline, with or without bands, so the parts of a
+  line set in different faces sit on one baseline
+
+### Changed
+
+- `Painter::row`, `Painter::label`, `Typeface::draw_centred` and letter-spaced labels centre the
+  capitals in the box instead of the line box. Sans text sat about 0.4 pixels low and monospace
+  about 0.25 pixels high, so the two side by side were often a pixel apart and digits sat high in
+  a round badge. Text centred in a box can move by a pixel
+- A toast's dot sits level with the middle of its first line's capitals, and a TextEdit's
+  placeholder on the baseline of the first line's text
+
 ## 1.7.3 - 2026-10-21
 
 ### Added
