@@ -298,6 +298,95 @@ TEST_F(Drawn, OutlineOutsideTheClipDrawsNothing) {
     EXPECT_TRUE(blank());
 }
 
+// The border filled whole, as the ring between the outer and the inner rounded rectangle.
+void ring(BLContext &context, const BLRect &box, const double radius, const double width, const BLRgba32 tone) {
+    const double corner = std::max(0.0, std::min(radius - (width / 2.0), std::min(box.w - width, box.h - width) / 2.0));
+    const double outer = corner > 0.0 ? corner + (width / 2.0) : 0.0;
+    const double inner = corner > 0.0 ? std::max(0.0, corner - (width / 2.0)) : 0.0;
+
+    BLPath path;
+
+    path.add_round_rect(BLRoundRect(box.x, box.y, box.w, box.h, outer, outer));
+    path.add_round_rect(
+            BLRoundRect(box.x + width, box.y + width, box.w - (width * 2.0), box.h - (width * 2.0), inner, inner),
+            BL_GEOMETRY_DIRECTION_CCW);
+    context.fill_path(path, tone);
+}
+
+struct Border {
+    BLRect box;
+    double radius = 0.0;
+    double width = 0.0;
+};
+
+std::vector<Border> borders() {
+    std::vector<Border> all;
+
+    for (const double shift : {0.0, 0.5, 0.25, 0.7}) {
+        for (const BLSize size : {BLSize{60, 40}, BLSize{64, 23}, BLSize{24, 24}, BLSize{23, 64}, BLSize{9, 9}}) {
+            for (const double radius : {0.0, 1.0, 3.0, 8.0, 11.5, 12.0, 40.0}) {
+                for (const double width : {1.0, 1.5, 2.0, 3.0}) {
+                    all.push_back(Border{
+                            .box = BLRect{10.0 + shift, 12.0 + (shift / 2.0), size.w, size.h},
+                            .radius = radius,
+                            .width = width,
+                    });
+                }
+            }
+        }
+    }
+
+    return all;
+}
+
+// Every channel of a translucent border over a ground, within a level of the ring filled whole.
+TEST(Outline, PiecesMatchTheWholeRing) {
+    const BLRgba32 ground(0xff303840);
+    const BLRgba32 tone(0x9ad0e0f0);
+
+    for (const Border &border : borders()) {
+        BLImage mine(WIDTH, HEIGHT, BL_FORMAT_PRGB32);
+        BLImage theirs(WIDTH, HEIGHT, BL_FORMAT_PRGB32);
+        BLContext ours(mine);
+        BLContext direct(theirs);
+
+        ours.fill_all(ground);
+        direct.fill_all(ground);
+        ttk::Painter(ours, tests::fonts(), EVERYWHERE).outline(border.box, border.radius, border.width, tone);
+        ring(direct, border.box, border.radius, border.width, tone);
+        ours.end();
+        direct.end();
+
+        EXPECT_LE(worst(pixels(mine), pixels(theirs)), 1)
+                << "box " << border.box.x << ',' << border.box.y << ' ' << border.box.w << 'x' << border.box.h
+                << " radius " << border.radius << " width " << border.width;
+    }
+}
+
+// Under a scale the pieces would not meet on whole pixels, so the ring is filled whole.
+TEST(Outline, UnderAScaleIsTheWholeRing) {
+    BLImage mine(WIDTH, HEIGHT, BL_FORMAT_PRGB32);
+    BLImage theirs(WIDTH, HEIGHT, BL_FORMAT_PRGB32);
+    BLContext ours(mine);
+    BLContext direct(theirs);
+    const BLRgba32 tone(0x9ad0e0f0);
+
+    ours.clear_all();
+    direct.clear_all();
+    ours.scale(1.3);
+    direct.scale(1.3);
+
+    const ttk::Painter painter(ours, tests::fonts(), EVERYWHERE);
+
+    painter.transformed(true);
+    painter.outline({10.5, 10.5, 60, 40}, 8, 1, tone);
+    ring(direct, {10.5, 10.5, 60, 40}, 8, 1, tone);
+    ours.end();
+    direct.end();
+
+    EXPECT_EQ(pixels(mine), pixels(theirs));
+}
+
 TEST_F(Drawn, CircleMatchesBlend2D) {
     painter.circle({50.5, 40.25}, 17.5, INK);
     direct.fill_circle(50.5, 40.25, 17.5, INK);

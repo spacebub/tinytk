@@ -93,6 +93,42 @@ void Painter_outline(benchmark::State &state) {
 
 BENCHMARK(Painter_outline);
 
+void Painter_outline_card(benchmark::State &state) {
+    Sheet sheet;
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().outline(BLRect{10, 10, 240, 180}, 8.0, 1.0, ttk::Theme::palette().border);
+    }
+
+    sheet.flush();
+}
+
+BENCHMARK(Painter_outline_card);
+
+void Painter_outline_card_half(benchmark::State &state) {
+    Sheet sheet;
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().outline(BLRect{10.5, 10.5, 240, 180}, 8.0, 1.0, ttk::Theme::palette().border);
+    }
+
+    sheet.flush();
+}
+
+BENCHMARK(Painter_outline_card_half);
+
+void Painter_outline_pill(benchmark::State &state) {
+    Sheet sheet;
+
+    for ([[maybe_unused]] auto step : state) {
+        sheet.painter().outline(BLRect{10, 10.5, 64, 23}, 11.5, 1.0, ttk::Theme::palette().border);
+    }
+
+    sheet.flush();
+}
+
+BENCHMARK(Painter_outline_pill);
+
 void Painter_circle(benchmark::State &state) {
     Sheet sheet;
 

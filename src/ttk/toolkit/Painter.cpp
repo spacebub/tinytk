@@ -203,6 +203,77 @@ void Painter::round(const BLRect &box, const double radius, const BLRgba32 tone)
     _context->fill_round_rect(box, corner, corner, tone);
 }
 
+namespace {
+
+// Blend2D's own cubic for a quarter circle, so a corner lands on the pixels its round rect would.
+constexpr double KAPPA = 0.55228474983;
+
+// The fewest rows of side worth filling as rectangles: a box off whole pixels pays more per rectangle.
+constexpr double SIDE_ROWS = 12.0;
+constexpr double SIDE_ROWS_OFF_PIXELS = 32.0;
+
+struct Ring {
+    double outer;
+    double inner;
+    double width;
+};
+
+// Adds the part of `ring` around `box` that lies within `depth` of the edge at `edge`, the top edge for a positive
+// `sign` and the bottom one for a negative.
+void add_band(
+        BLPath &path, const BLRect &box, const double edge, const double sign, const double depth, const Ring &ring) {
+    const double left = box.x;
+    const double right = box.x + box.w;
+    const double cut = edge + (sign * depth);
+    const double bend = ring.outer * (1.0 - KAPPA);
+    const double turn = ring.width + (ring.inner * (1.0 - KAPPA));
+    const double inside = ring.width + ring.inner;
+    const auto down = [&](const double by) { return edge + (sign * by); };
+
+    path.move_to(left, cut);
+    path.line_to(left, down(ring.outer));
+
+    if (ring.outer > 0.0) {
+        path.cubic_to(left, down(bend), left + bend, edge, left + ring.outer, edge);
+    }
+
+    path.line_to(right - ring.outer, edge);
+
+    if (ring.outer > 0.0) {
+        path.cubic_to(right - bend, edge, right, down(bend), right, down(ring.outer));
+    }
+
+    path.line_to(right, cut);
+    path.line_to(right - ring.width, cut);
+    path.line_to(right - ring.width, down(inside));
+
+    if (ring.inner > 0.0) {
+        path.cubic_to(right - ring.width, down(turn), right - turn, down(ring.width), right - inside, down(ring.width));
+    }
+
+    path.line_to(left + inside, down(ring.width));
+
+    if (ring.inner > 0.0) {
+        path.cubic_to(left + turn, down(ring.width), left + ring.width, down(turn), left + ring.width, down(inside));
+    }
+
+    path.line_to(left + ring.width, cut);
+    path.close();
+}
+
+bool whole(const double at) {
+    return at == std::floor(at);
+}
+
+// Whether a coordinate on a whole pixel stays on one in the image.
+bool on_whole_pixels(const BLContext &context) {
+    const BLMatrix2D &to = context.final_transform();
+
+    return to.m00 == 1.0 && to.m11 == 1.0 && to.m01 == 0.0 && to.m10 == 0.0 && whole(to.m20) && whole(to.m21);
+}
+
+}
+
 void Painter::outline(const BLRect &box, const double radius, const double width, const BLRgba32 tone) const {
     if (box.w <= width * 2.0 || box.h <= width * 2.0 || width <= 0.0 || tone.a() == 0 || !needed(box)) {
         return;
@@ -211,19 +282,42 @@ void Painter::outline(const BLRect &box, const double radius, const double width
     const BLRect inset{box.x + (width / 2.0), box.y + (width / 2.0), box.w - width, box.h - width};
     const double corner = std::max(0.0, std::min(radius - (width / 2.0), std::min(inset.w, inset.h) / 2.0));
 
-    // Filled as the ring between the outer and the inner rounded rectangle, the
-    // inner wound the other way, which lands on the pixels a stroke would and
-    // measures a third cheaper.
-    const double outer = corner > 0.0 ? corner + (width / 2.0) : 0.0;
-    const double inner = corner > 0.0 ? std::max(0.0, corner - (width / 2.0)) : 0.0;
+    // The ring between the outer and the inner rounded rectangle lands on the pixels a stroke would.
+    const Ring ring{
+            .outer = corner > 0.0 ? corner + (width / 2.0) : 0.0,
+            .inner = corner > 0.0 ? std::max(0.0, corner - (width / 2.0)) : 0.0,
+            .width = width,
+    };
+
+    // The sides are filled as rectangles, as rasterising a path costs by the row. They meet the bands on whole
+    // pixels, since a pixel two fills share is blended twice.
+    const double reach = std::max(ring.outer, width);
+    const double top = std::ceil(box.y + reach);
+    const double bottom = std::floor(box.y + box.h - reach);
+
+    const bool aligned = whole(box.x) && whole(box.y) && whole(box.w) && whole(box.h) && whole(width);
 
     _ring.clear();
-    _ring.add_round_rect(BLRoundRect(box.x, box.y, box.w, box.h, outer, outer));
-    _ring.add_round_rect(
-            BLRoundRect(box.x + width, box.y + width, box.w - (width * 2.0), box.h - (width * 2.0), inner, inner),
-            BL_GEOMETRY_DIRECTION_CCW);
 
+    if (bottom - top < (aligned ? SIDE_ROWS : SIDE_ROWS_OFF_PIXELS) || !on_whole_pixels(*_context)) {
+        _ring.add_round_rect(BLRoundRect(box.x, box.y, box.w, box.h, ring.outer, ring.outer));
+        _ring.add_round_rect(BLRoundRect(box.x + width,
+                                         box.y + width,
+                                         box.w - (width * 2.0),
+                                         box.h - (width * 2.0),
+                                         ring.inner,
+                                         ring.inner),
+                             BL_GEOMETRY_DIRECTION_CCW);
+        _context->fill_path(_ring, tone);
+
+        return;
+    }
+
+    add_band(_ring, box, box.y, 1.0, top - box.y, ring);
+    add_band(_ring, box, box.y + box.h, -1.0, box.y + box.h - bottom, ring);
     _context->fill_path(_ring, tone);
+    _context->fill_rect(BLRect{box.x, top, width, bottom - top}, tone);
+    _context->fill_rect(BLRect{box.x + box.w - width, top, width, bottom - top}, tone);
 }
 
 void Painter::circle(const BLPoint centre, const double radius, const BLRgba32 tone) const {
