@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.1 - 2026-10-23
+
+### Added
+
+- Benchmarks of a card-sized outline on whole and half pixels, and of a pill's
+
+### Changed
+
+- Improve `Painter::outline` performance
+
 ## 1.8.0 - 2026-10-21
 
 ### Added
