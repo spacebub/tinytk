@@ -4,7 +4,7 @@ include(GoogleTest)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
 
-set(TTK_GOOGLETEST_VERSION v1.17.0)
+set(TTK_GOOGLETEST_VERSION v1.18.0)
 
 ttk_cache_source(googletest https://github.com/google/googletest.git ${TTK_GOOGLETEST_VERSION})
 
