@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <limits>
 #include <ranges>
+#include <utility>
 
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -54,6 +55,84 @@ bool is_identifier_char(const char value) {
 
 bool is_continuation(const char value) {
     return (static_cast<unsigned char>(value) & 0xc0U) == 0x80U;
+}
+
+bool is_blank(const char value) {
+    return value == ' ' || value == '\t' || value == '\n' || value == '\r';
+}
+
+std::vector<std::string> parse_windows(const std::string_view line) {
+    std::vector<std::string> arguments;
+    std::string current;
+    bool started = false;
+    bool quoted = false;
+    size_t index = 0;
+
+    while (index < line.size()) {
+        const char letter = line[index];
+
+        if (!quoted && is_blank(letter)) {
+            if (started) {
+                arguments.push_back(std::move(current));
+                current.clear();
+                started = false;
+            }
+
+            ++index;
+
+            continue;
+        }
+
+        started = true;
+
+        if (letter == '\\') {
+            size_t slashes = 0;
+
+            while (index < line.size() && line[index] == '\\') {
+                ++slashes;
+                ++index;
+            }
+
+            if (index == line.size() || line[index] != '"') {
+                current.append(slashes, '\\');
+
+                continue;
+            }
+
+            current.append(slashes / 2, '\\');
+
+            if (slashes % 2 == 1) {
+                current.push_back('"');
+                ++index;
+            }
+
+            continue;
+        }
+
+        // Inside quotes, a doubled quote is a literal one and the quotes go on.
+        if (letter == '"' && quoted && index + 1 < line.size() && line[index + 1] == '"') {
+            current.push_back('"');
+            index += 2;
+
+            continue;
+        }
+
+        if (letter == '"') {
+            quoted = !quoted;
+            ++index;
+
+            continue;
+        }
+
+        current.push_back(letter);
+        ++index;
+    }
+
+    if (started) {
+        arguments.push_back(std::move(current));
+    }
+
+    return arguments;
 }
 
 #ifdef TTK_TEXT_SIMD
@@ -308,7 +387,11 @@ size_t last_of(const std::string_view value, const char letter) {
     return std::string_view::npos;
 }
 
-std::vector<std::string> parse_arguments(const std::string_view line) {
+std::vector<std::string> parse_arguments(const std::string_view line, const Quoting quoting) {
+    if (quoting == Quoting::Windows) {
+        return parse_windows(line);
+    }
+
     std::vector<std::string> arguments;
     std::string current;
     bool started = false;
@@ -327,7 +410,7 @@ std::vector<std::string> parse_arguments(const std::string_view line) {
     while (index < line.size()) {
         const char letter = line[index];
 
-        if (letter == ' ' || letter == '\t' || letter == '\n' || letter == '\r') {
+        if (is_blank(letter)) {
             if (started) {
                 arguments.push_back(current);
                 current.clear();
@@ -453,7 +536,7 @@ std::vector<std::string> parse_arguments(const std::string_view line) {
 }
 
 std::string quote_argument(const std::string_view argument) {
-    if (!argument.empty() && argument.find_first_of(" \t\n\"'\\$") == std::string_view::npos) {
+    if (!argument.empty() && argument.find_first_of(" \t\r\n\"'\\$") == std::string_view::npos) {
         return std::string(argument);
     }
 

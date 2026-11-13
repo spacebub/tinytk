@@ -10,6 +10,7 @@
 #define TTK_SYSTEM_TEXT_H
 
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -68,13 +69,35 @@ namespace ttk::Text {
 //! Returns the index of the last `letter` in `value`, or `std::string_view::npos` when there is none.
 [[nodiscard]] size_t last_of(std::string_view value, char letter);
 
-//! Splits a command line into arguments following shell rules.
+//! Rules \ref parse_arguments() splits a command line by.
+enum class Quoting : std::uint8_t {
+    //! A POSIX shell: `\` escapes, single quotes, and `$NAME` expansion.
+    Shell,
+    //! Windows argv: `\` is a plain character unless it precedes a double quote.
+    Windows,
+};
+
+//! The rules of the system the program runs on.
+#ifdef _WIN32
+constexpr Quoting nativeQuoting = Quoting::Windows;
+#else
+constexpr Quoting nativeQuoting = Quoting::Shell;
+#endif
+
+//! Splits a command line into arguments.
 //!
-//! Arguments are separated by spaces, tabs and line breaks. Single quotes keep their content literally.
-//! Double quotes allow `\` escapes and expand `$NAME` and `${NAME}` from the environment, as does unquoted
-//! text, where `\` escapes the next byte. An unset variable expands to nothing and a lone `$` stays as is.
-//! An unterminated quote runs to the end of `line`.
-[[nodiscard]] std::vector<std::string> parse_arguments(std::string_view line);
+//! Arguments are separated by spaces, tabs and line breaks, and an unterminated quote runs to the end of
+//! `line`. The rest depends on `quoting`.
+//!
+//! Under \ref Quoting::Shell, single quotes keep their content literally. Double quotes allow `\` escapes and
+//! expand `$NAME` and `${NAME}` from the environment, as does unquoted text, where `\` escapes the next byte.
+//! An unset variable expands to nothing and a lone `$` stays as is.
+//!
+//! Under \ref Quoting::Windows, only double quotes group, and `'` and `$` are plain characters. A run of
+//! backslashes is kept as it is unless a double quote follows. Then each pair gives one backslash, and an odd
+//! one left over makes the quote literal. Inside quotes, `""` is a literal quote. This undoes
+//! \ref quote_argument().
+[[nodiscard]] std::vector<std::string> parse_arguments(std::string_view line, Quoting quoting = nativeQuoting);
 
 //! Returns `argument` quoted for a Windows command line.
 //!

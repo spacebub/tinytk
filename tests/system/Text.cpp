@@ -21,6 +21,14 @@
 namespace {
 using Strings = std::vector<std::string>;
 
+Strings shell(const std::string_view line) {
+    return ttk::Text::parse_arguments(line, ttk::Text::Quoting::Shell);
+}
+
+Strings windows(const std::string_view line) {
+    return ttk::Text::parse_arguments(line, ttk::Text::Quoting::Windows);
+}
+
 constexpr std::string_view UMLAUT = "\xC3\xA4";
 constexpr std::string_view UMLAUT_UPPER = "\xC3\x84";
 constexpr std::string_view JAPANESE = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
@@ -662,100 +670,128 @@ TEST(TextLastOf, MissingInEveryLengthGivesNpos) {
 }
 
 TEST_F(TextParseArguments, EmptyLineGivesNone) {
-    EXPECT_TRUE(ttk::Text::parse_arguments("").empty());
+    EXPECT_TRUE(shell("").empty());
 }
 
 TEST_F(TextParseArguments, BlankLineGivesNone) {
-    EXPECT_TRUE(ttk::Text::parse_arguments(" \t\r\n ").empty());
+    EXPECT_TRUE(shell(" \t\r\n ").empty());
 }
 
 TEST_F(TextParseArguments, SplitsOnEveryKindOfBlank) {
-    EXPECT_EQ(ttk::Text::parse_arguments("a b\tc\nd\re"), (Strings{"a", "b", "c", "d", "e"}));
+    EXPECT_EQ(shell("a b\tc\nd\re"), (Strings{"a", "b", "c", "d", "e"}));
 }
 
 TEST_F(TextParseArguments, CollapsesRunsOfBlanks) {
-    EXPECT_EQ(ttk::Text::parse_arguments("  a   b  "), (Strings{"a", "b"}));
+    EXPECT_EQ(shell("  a   b  "), (Strings{"a", "b"}));
 }
 
 TEST_F(TextParseArguments, SingleQuotesKeepContentLiterally) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"('a b' '$TTK_TEST_WORD' 'x\y' 'q"q')"),
-              (Strings{"a b", "$TTK_TEST_WORD", R"(x\y)", R"(q"q)"}));
+    EXPECT_EQ(shell(R"('a b' '$TTK_TEST_WORD' 'x\y' 'q"q')"), (Strings{"a b", "$TTK_TEST_WORD", R"(x\y)", R"(q"q)"}));
 }
 
 TEST_F(TextParseArguments, DoubleQuotesKeepBlanks) {
-    EXPECT_EQ(ttk::Text::parse_arguments("\"a b\"   \"c\td\""), (Strings{"a b", "c\td"}));
+    EXPECT_EQ(shell("\"a b\"   \"c\td\""), (Strings{"a b", "c\td"}));
 }
 
 TEST_F(TextParseArguments, DoubleQuotesAllowEscapes) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"("say \"hi\"" "back\\slash" "\$TTK_TEST_WORD")"),
+    EXPECT_EQ(shell(R"("say \"hi\"" "back\\slash" "\$TTK_TEST_WORD")"),
               (Strings{R"(say "hi")", R"(back\slash)", "$TTK_TEST_WORD"}));
 }
 
 TEST_F(TextParseArguments, DoubleQuotesKeepSingleQuotes) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"("it's")"), (Strings{"it's"}));
+    EXPECT_EQ(shell(R"("it's")"), (Strings{"it's"}));
 }
 
 TEST_F(TextParseArguments, EmptyQuotesGiveAnEmptyArgument) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"(a '' "" b)"), (Strings{"a", "", "", "b"}));
+    EXPECT_EQ(shell(R"(a '' "" b)"), (Strings{"a", "", "", "b"}));
 }
 
 TEST_F(TextParseArguments, AdjacentPiecesJoinIntoOneArgument) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"(a'b c'"d e"f)"), (Strings{"ab cd ef"}));
+    EXPECT_EQ(shell(R"(a'b c'"d e"f)"), (Strings{"ab cd ef"}));
 }
 
 TEST_F(TextParseArguments, BackslashEscapesTheNextByteUnquoted) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"(a\ b \'c \"d \\e)"), (Strings{"a b", "'c", "\"d", "\\e"}));
+    EXPECT_EQ(shell(R"(a\ b \'c \"d \\e)"), (Strings{"a b", "'c", "\"d", "\\e"}));
 }
 
 TEST_F(TextParseArguments, TrailingBackslashIsKept) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"(abc\)"), (Strings{R"(abc\)"}));
+    EXPECT_EQ(shell(R"(abc\)"), (Strings{R"(abc\)"}));
 }
 
 TEST_F(TextParseArguments, ExpandsNameUnquoted) {
-    EXPECT_EQ(ttk::Text::parse_arguments("$TTK_TEST_WORD"), (Strings{"word"}));
+    EXPECT_EQ(shell("$TTK_TEST_WORD"), (Strings{"word"}));
 }
 
 TEST_F(TextParseArguments, ExpandsBracedNameUnquoted) {
-    EXPECT_EQ(ttk::Text::parse_arguments("${TTK_TEST_WORD}s"), (Strings{"words"}));
+    EXPECT_EQ(shell("${TTK_TEST_WORD}s"), (Strings{"words"}));
 }
 
 TEST_F(TextParseArguments, ExpandsNameInsideDoubleQuotes) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"("[$TTK_TEST_WORD]" "[${TTK_TEST_WORD}]")"), (Strings{"[word]", "[word]"}));
+    EXPECT_EQ(shell(R"("[$TTK_TEST_WORD]" "[${TTK_TEST_WORD}]")"), (Strings{"[word]", "[word]"}));
 }
 
 TEST_F(TextParseArguments, NameEndsAtTheFirstNonIdentifierByte) {
-    EXPECT_EQ(ttk::Text::parse_arguments("$TTK_TEST_WORD/bin $TTK_TEST_WORD.txt"), (Strings{"word/bin", "word.txt"}));
+    EXPECT_EQ(shell("$TTK_TEST_WORD/bin $TTK_TEST_WORD.txt"), (Strings{"word/bin", "word.txt"}));
 }
 
 TEST_F(TextParseArguments, ExpandedValueStaysOneArgument) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"("$TTK_TEST_SPACED")"), (Strings{"two words"}));
+    EXPECT_EQ(shell(R"("$TTK_TEST_SPACED")"), (Strings{"two words"}));
 }
 
 TEST_F(TextParseArguments, UnsetVariableExpandsToNothing) {
-    EXPECT_EQ(ttk::Text::parse_arguments("a$TTK_TEST_UNSET b${TTK_TEST_UNSET}c"), (Strings{"a", "bc"}));
-    EXPECT_EQ(ttk::Text::parse_arguments(R"("<$TTK_TEST_UNSET>")"), (Strings{"<>"}));
+    EXPECT_EQ(shell("a$TTK_TEST_UNSET b${TTK_TEST_UNSET}c"), (Strings{"a", "bc"}));
+    EXPECT_EQ(shell(R"("<$TTK_TEST_UNSET>")"), (Strings{"<>"}));
 }
 
 TEST_F(TextParseArguments, LoneDollarStays) {
-    EXPECT_EQ(ttk::Text::parse_arguments("$ a$ \"$\" cost$/x"), (Strings{"$", "a$", "$", "cost$/x"}));
+    EXPECT_EQ(shell("$ a$ \"$\" cost$/x"), (Strings{"$", "a$", "$", "cost$/x"}));
 }
 
 TEST_F(TextParseArguments, UnterminatedSingleQuoteRunsToTheEnd) {
-    EXPECT_EQ(ttk::Text::parse_arguments("a 'b c"), (Strings{"a", "b c"}));
+    EXPECT_EQ(shell("a 'b c"), (Strings{"a", "b c"}));
 }
 
 TEST_F(TextParseArguments, UnterminatedDoubleQuoteRunsToTheEnd) {
-    EXPECT_EQ(ttk::Text::parse_arguments("a \"b c"), (Strings{"a", "b c"}));
+    EXPECT_EQ(shell("a \"b c"), (Strings{"a", "b c"}));
 }
 
 TEST_F(TextParseArguments, KeepsMultiByteArguments) {
-    EXPECT_EQ(ttk::Text::parse_arguments(std::string(JAPANESE) + " '" + std::string(GRIN) + " x'"),
+    EXPECT_EQ(shell(std::string(JAPANESE) + " '" + std::string(GRIN) + " x'"),
               (Strings{std::string(JAPANESE), std::string(GRIN) + " x"}));
 }
 
 TEST_F(TextParseArguments, ParsesATypicalCommand) {
-    EXPECT_EQ(ttk::Text::parse_arguments(R"(gzdoom -iwad "doom 2.wad" -file 'mods/a b.pk3' +map MAP01)"),
+    EXPECT_EQ(shell(R"(gzdoom -iwad "doom 2.wad" -file 'mods/a b.pk3' +map MAP01)"),
               (Strings{"gzdoom", "-iwad", "doom 2.wad", "-file", "mods/a b.pk3", "+map", "MAP01"}));
+}
+
+TEST_F(TextParseArguments, WindowsKeepsBackslashesInPaths) {
+    EXPECT_EQ(windows(R"(-file C:\Doom\x.wad "C:\Program Files\gzdoom.ini" \\server\y.pk3)"),
+              (Strings{"-file", R"(C:\Doom\x.wad)", R"(C:\Program Files\gzdoom.ini)", R"(\\server\y.pk3)"}));
+}
+
+TEST_F(TextParseArguments, WindowsHalvesBackslashesBeforeAQuote) {
+    EXPECT_EQ(windows(R"("a\"b" c\\"d e" f\\\"g "C:\dir\\")"),
+              (Strings{R"(a"b)", R"(c\d e)", R"(f\"g)", R"(C:\dir\)"}));
+}
+
+TEST_F(TextParseArguments, WindowsTakesADoubledQuoteInsideQuotesAsOne) {
+    EXPECT_EQ(windows(R"("a""b" "say ""hi""")"), (Strings{R"(a"b)", R"(say "hi")"}));
+}
+
+TEST_F(TextParseArguments, WindowsTakesQuotesAndDollarsAsPlain) {
+    EXPECT_EQ(windows(R"(Bob's 'a b' $TTK_TEST_WORD)"), (Strings{"Bob's", "'a", "b'", "$TTK_TEST_WORD"}));
+}
+
+TEST_F(TextParseArguments, WindowsQuotesGroupAndJoin) {
+    EXPECT_EQ(windows(R"(a"b c"d "" "e)"), (Strings{"ab cd", "", "e"}));
+}
+
+TEST_F(TextParseArguments, WindowsUndoesQuoteArgument) {
+    for (const std::string_view argument :
+         {R"(C:\Program Files\x\)", R"(say "hi")", R"(\\server\a b)", "", "plain", "a\rb", R"(x\"")"}) {
+        EXPECT_EQ(windows(ttk::Text::quote_argument(argument)), (Strings{std::string(argument)})) << argument;
+    }
 }
 
 TEST(TextQuoteArgument, PlainArgumentIsUnchanged) {
