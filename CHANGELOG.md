@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0 - 2026-11-14
+
+### Changed
+
+- `Field` no longer reserves room for a hidden badge. Its caption row is as tall as the label, as on
+  `Select`, `Stepper` and `Fact`, and grows only while a badge shows. A row that mixes them now lines
+  up both its captions and its boxes, and every `Field` with a caption is 5 pixels shorter
+- `Pill::set_text` asks for a layout when a visible pill without a fixed width wants a different width,
+  so a pill sized by its row shows a longer text whole. A pill placed by hand or stretched by its row
+  should set `fixedWidth`
+- A section caption ends on a whole pixel, so the frame of the control under it is drawn sharp
+
 ## 1.8.3 - 2026-11-13
 
 ### Fixed
