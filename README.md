@@ -1,6 +1,8 @@
 # tinytk
 
 Tiny ui toolkit on Blend2D and SDL3. Provides several premade controls and system utilities.
+It's a very thin abstraction layer over blend2d, that exposes all b2d internals but shapes
+them for work in a GUI application.
 
 ## Layout
 
