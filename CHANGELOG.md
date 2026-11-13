@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.3 - 2026-11-13
+
+### Fixed
+
+- `Text::parse_arguments` follows the Windows argv rules on Windows, so a path such as
+  `C:\dir\file` keeps its backslashes. A new `Text::Quoting` argument picks shell or Windows rules
+  and defaults to those of the system the program runs on
+- `Text::quote_argument` left a carriage return unquoted, so the argument split in two when read
+  back
+
 ## 1.8.2 - 2026-11-13
 
 ### Added
