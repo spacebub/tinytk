@@ -6,6 +6,7 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -101,7 +102,7 @@ TEST_F(Painted, FactCaptionIsASectionCaption) {
 
     EXPECT_DOUBLE_EQ(caption(fact)->natural_width(type()), tracked("CONFIG é"));
     EXPECT_DOUBLE_EQ(caption(fact)->natural_height(type(), 100),
-                     type().line_height(type().at(600, ttk::Theme::fontTiny)));
+                     std::ceil(type().line_height(type().at(600, ttk::Theme::fontTiny))));
 }
 
 TEST_F(Painted, FactValueIsSemiboldBodyType) {
@@ -124,7 +125,7 @@ TEST_F(Painted, FactNaturalHeightStacksBothLinesWithAGap) {
     ttk::Fact fact("Config", "Value");
 
     EXPECT_DOUBLE_EQ(fact.natural_height(type(), 300),
-                     type().line_height(type().at(600, ttk::Theme::fontTiny)) + 3.0
+                     std::ceil(type().line_height(type().at(600, ttk::Theme::fontTiny))) + 3.0
                              + type().line_height(type().at(600, ttk::Theme::fontBody)));
 }
 

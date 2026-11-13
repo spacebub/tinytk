@@ -21,7 +21,16 @@ void Pill::set_text(const std::string_view text) {
         return;
     }
 
+    // Showing the pill lays it out anyway.
+    Root *at = fixedWidth < 0.0 && visible() ? root() : nullptr;
+    const double was = at != nullptr ? wanted_width(at->type()) : 0.0;
+
     _text = text;
+
+    // The row sizes the pill, so a wider text needs a new layout to show whole.
+    if (at != nullptr && wanted_width(at->type()) != was) {
+        at->relayout();
+    }
 
     invalidate();
 }

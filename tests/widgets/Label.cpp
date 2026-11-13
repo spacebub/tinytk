@@ -6,6 +6,7 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -333,7 +334,8 @@ TEST_F(Painted, LabelSectionIsSmallTrackedUpperCase) {
     EXPECT_DOUBLE_EQ(label.natural_width(type()),
                      type().width_tracked(type().at(600, ttk::Theme::fontTiny), "SECTION é TAIL", 0.9F))
             << "only ASCII letters are upper cased";
-    EXPECT_DOUBLE_EQ(label.natural_height(type(), 100), line(600, ttk::Theme::fontTiny));
+    EXPECT_DOUBLE_EQ(label.natural_height(type(), 100), std::ceil(line(600, ttk::Theme::fontTiny)))
+            << "a caption ends on a whole pixel";
 }
 
 TEST_F(Painted, LabelSectionSetTextUpperCasesTheNewText) {

@@ -81,8 +81,9 @@ public:
     //! for a section caption and unshortened for a path.
     double natural_width(Typeface &type) override;
 
-    //! Returns \ref fixedHeight when it is set, otherwise one line height, or for a wrapped label the height
-    //! of the text wrapped at `width`, over no more lines than \ref elide() allows.
+    //! Returns \ref fixedHeight when it is set, otherwise one line height, rounded up to a whole pixel for a
+    //! section caption, or for a wrapped label the height of the text wrapped at `width`, over no more lines
+    //! than \ref elide() allows.
     double natural_height(Typeface &type, double width) override;
 
     //! Paints the text. Paints nothing when the text is empty.

@@ -60,7 +60,7 @@ public:
     Field *note(std::string_view text);
 
     //! Shows `text` as a badge of style `kind` at the right of the caption row and returns this field. Empty
-    //! hides the badge.
+    //! hides the badge. The badge is taller than the caption, so the field grows while one shows.
     Field *badge(std::string_view text, Pill::Kind kind);
 
     //! Adds a 30 pixel glyph button inside the right end of the frame and returns this field.

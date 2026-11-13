@@ -42,7 +42,9 @@ public:
     //! Creates an accent coloured pill showing `text` with a dot.
     explicit Pill(std::string text = {});
 
-    //! Sets the text to `text` and repaints. The layout is not redone, so the width stays as it was.
+    //! Sets the text to `text` and repaints. A visible pill without a \ref fixedWidth asks the root for a layout
+    //! when the new text changes the width it wants, so the row it sits in makes room. A pill placed by hand or
+    //! stretched by its row gains nothing from that layout, so it should set a \ref fixedWidth.
     void set_text(std::string_view text);
 
     //! Returns the strong tone of `kind` in the current palette, before the darkening a pill applies to it in

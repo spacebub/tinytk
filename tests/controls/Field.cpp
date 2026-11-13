@@ -22,7 +22,9 @@
 #include "ttk/draw/Typeface.h"
 #include "ttk/toolkit/Event.h"
 #include "ttk/toolkit/controls/Field.h"
+#include "ttk/toolkit/controls/Label.h"
 #include "ttk/toolkit/controls/Pill.h"
+#include "ttk/toolkit/controls/Select.h"
 
 namespace {
 using controls::Calls;
@@ -30,7 +32,8 @@ using controls::key;
 namespace Code = ttk::Code;
 
 constexpr BLRect BOX{20, 20, 360, 200};
-constexpr double CAPTION = 22.0;
+// The caption row while a badge shows. Without one it is as tall as the label.
+constexpr double BADGE = 22.0;
 constexpr double SPACING = 6.0;
 
 class FieldTest : public controls::Painted {
@@ -215,8 +218,12 @@ TEST_F(FieldTest, MonoChangesTheFace) {
 
 TEST_F(FieldTest, TheInputSitsBelowTheCaption) {
     const ttk::Field *field = make();
+    ttk::Label caption("Name");
 
-    EXPECT_DOUBLE_EQ(field->input()->box().y, BOX.y + CAPTION + SPACING + 6.0);
+    caption.section();
+
+    EXPECT_DOUBLE_EQ(field->input()->box().y,
+                     BOX.y + caption.natural_height(tests::fonts(), BOX.w) + SPACING + 6.0);
     EXPECT_DOUBLE_EQ(field->input()->box().x, BOX.x + 12.0);
     EXPECT_DOUBLE_EQ(field->input()->box().w, BOX.w - 24.0);
     EXPECT_DOUBLE_EQ(field->input()->box().h, ttk::Theme::control - 12.0);
@@ -235,7 +242,7 @@ TEST_F(FieldTest, ABadgeShowsTheCaptionRowEvenWithoutALabel) {
 
     relayout();
 
-    EXPECT_DOUBLE_EQ(field->input()->box().y, BOX.y + CAPTION + SPACING + 6.0);
+    EXPECT_DOUBLE_EQ(field->input()->box().y, BOX.y + BADGE + SPACING + 6.0);
 
     field->badge("", ttk::Pill::Kind::Success);
     relayout();
@@ -477,5 +484,28 @@ TEST_F(FieldTest, PartialRepaintsMatchAFullOne) {
     canvas.frame();
 
     EXPECT_TRUE(canvas.matches_full());
+}
+
+TEST_F(FieldTest, ItsCaptionIsAsTallAsASelectOne) {
+    const auto field = build("Name");
+    ttk::Select select("Name", [](int) {});
+
+    EXPECT_DOUBLE_EQ(field->natural_height(tests::fonts(), BOX.w), select.natural_height(tests::fonts(), BOX.w));
+}
+
+TEST_F(FieldTest, ABadgeMakesACaptionedFieldTallerWhileItShows) {
+    ttk::Field *field = make();
+    const double bare = field->input()->box().y;
+
+    field->badge("New", ttk::Pill::Kind::Success);
+    relayout();
+
+    EXPECT_DOUBLE_EQ(field->input()->box().y, BOX.y + BADGE + SPACING + 6.0);
+    EXPECT_GT(field->input()->box().y, bare);
+
+    field->badge("", ttk::Pill::Kind::Success);
+    relayout();
+
+    EXPECT_DOUBLE_EQ(field->input()->box().y, bare) << "the caption row kept the room of a cleared badge";
 }
 }

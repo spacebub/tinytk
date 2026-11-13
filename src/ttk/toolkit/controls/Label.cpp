@@ -252,7 +252,8 @@ double Label::natural_height(Typeface &type, const double width) {
     const BLFont &face = type.at(face_weight(), _size);
 
     if (!_wrap) {
-        return type.line_height(face);
+        // A caption sits over a control, so it ends on a whole pixel and the frame under it stays sharp.
+        return _tracked ? std::ceil(type.line_height(face)) : type.line_height(face);
     }
 
     const size_t lines = fold_spans(type, face, _text, width).size();

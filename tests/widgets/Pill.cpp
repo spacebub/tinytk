@@ -16,10 +16,13 @@
 #include <gtest/gtest.h>
 
 #include "Screen.h"
+#include "controls/Mount.h"
 #include "support/Canvas.h"
 #include "ttk/draw/Glyphs.h"
 #include "ttk/draw/Theme.h"
 #include "ttk/toolkit/controls/Pill.h"
+#include "ttk/toolkit/layout/Box.h"
+#include "ttk/toolkit/layout/Spacer.h"
 
 namespace {
 using widgets::Painted;
@@ -310,7 +313,12 @@ TEST_F(Painted, PillConstructionSettersDoNotDamage) {
 }
 
 TEST_F(Painted, PillSetTextRepaintsOnlyThePill) {
-    Mounted mounted("Ready");
+    auto made = Mounted::make("Ready", Kind::None);
+
+    // Fixed, so the new width asks for no layout and the frame paints the pill alone.
+    made->fixedWidth = BOX.w;
+
+    Mounted mounted(std::move(made));
     const std::vector<std::uint32_t> before = mounted.canvas.pixels();
 
     mounted.pill->set_text("Busy");
@@ -323,13 +331,36 @@ TEST_F(Painted, PillSetTextRepaintsOnlyThePill) {
     EXPECT_TRUE(mounted.canvas.matches_full());
 }
 
-TEST_F(Painted, PillSetTextKeepsTheWidth) {
-    Mounted mounted("Ready");
+TEST_F(Painted, PillOfFixedWidthKeepsItOnSetText) {
+    auto made = Mounted::make("Ready", Kind::None);
+
+    made->fixedWidth = BOX.w;
+
+    Mounted mounted(std::move(made));
 
     mounted.pill->set_text("Busy");
 
     EXPECT_FALSE(mounted.canvas.root().settle()) << "set_text asked for a layout";
     EXPECT_DOUBLE_EQ(mounted.pill->box().w, BOX.w);
+}
+
+TEST_F(Painted, PillSizedByItsRowWidensForALongerText) {
+    tests::Canvas canvas;
+    auto row = ttk::Box::row();
+    ttk::Pill *pill = row->append(std::make_unique<ttk::Pill>("Co-op"));
+
+    row->append(std::make_unique<ttk::Spacer>());
+    controls::mount(canvas, std::move(row), BLRect{40, 40, 300, 26});
+
+    pill->set_text("Team deathmatch");
+    canvas.frame();
+
+    EXPECT_DOUBLE_EQ(pill->box().w, pill->natural_width(type()));
+
+    pill->set_text("DM");
+    canvas.frame();
+
+    EXPECT_DOUBLE_EQ(pill->box().w, pill->natural_width(type())) << "a shorter text left the pill wide";
 }
 
 TEST_F(Painted, PillTextTooLongForTheBoxIsElidedInside) {
@@ -361,4 +392,33 @@ TEST_F(Painted, PillInATinyBoxPaintsOnlyThere) {
     EXPECT_EQ(widgets::outside(mounted.canvas, widgets::pixels_of(tiny)), 0U);
     EXPECT_TRUE(mounted.canvas.matches_full());
 }
+}
+
+TEST_F(Painted, PillGlyphKeepsItsWidthOnSetText) {
+    tests::Canvas canvas;
+    auto row = ttk::Box::row();
+    ttk::Pill *pill = row->append(std::make_unique<ttk::Pill>("Ready"));
+
+    pill->glyph(ttk::Glyphs::Glyph::Folder);
+    row->append(std::make_unique<ttk::Spacer>());
+    controls::mount(canvas, std::move(row), BLRect{40, 40, 300, 26});
+
+    pill->set_text("A much longer text than before");
+
+    EXPECT_FALSE(canvas.root().settle()) << "a text the glyph hides asked for a layout";
+}
+
+TEST_F(Painted, PillHiddenAsksForNoLayoutOnSetText) {
+    tests::Canvas canvas;
+    auto row = ttk::Box::row();
+    ttk::Pill *pill = row->append(std::make_unique<ttk::Pill>("Co-op"));
+
+    row->append(std::make_unique<ttk::Spacer>());
+    controls::mount(canvas, std::move(row), BLRect{40, 40, 300, 26});
+
+    pill->set_visible(false);
+    canvas.frame();
+    pill->set_text("Team deathmatch");
+
+    EXPECT_FALSE(canvas.root().settle()) << "a hidden pill asked for a layout";
 }

@@ -30,7 +30,6 @@ Field::Field(std::string label, std::function<void(const std::string &)> edited)
 
     Box *caption = _caption_row;
 
-    caption->fixedHeight = 22.0;
     caption->cross(Place::Centre);
 
     _caption = caption->append(std::make_unique<Label>(std::move(label)));
