@@ -103,7 +103,7 @@ endforeach ()
 # A Wayland window has no framebuffer without wl_shm, so SDL is left on X11 instead.
 set(SDL_WAYLAND ${TTK_WLSHM} CACHE BOOL "" FORCE)
 
-set(TTK_SDL_VERSION release-3.4.18)
+set(TTK_SDL_VERSION release-3.4.20)
 
 ttk_cache_source(SDL3 https://github.com/libsdl-org/SDL.git ${TTK_SDL_VERSION})
 

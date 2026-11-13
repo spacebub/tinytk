@@ -12,6 +12,8 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <system_error>
+#include <unordered_set>
 
 #if defined(__SSE2__) || defined(_M_X64)
 #include <emmintrin.h>
@@ -19,17 +21,19 @@
 #endif
 
 #include "ttk/draw/Typeface.h"
+#include "ttk/system/Env.h"
+#include "ttk/system/Paths.h"
 #include "ttk/util/Cache.h"
 
 namespace ttk {
 namespace {
 
 // Candidate faces per weight, in order of preference. The first that loads wins.
-// Blend2D reads a file and offers no enumeration, so these are guesses at where the
-// Debian, Ubuntu, Arch and Fedora layouts keep them.
+// Blend2D reads a file and offers no enumeration. A bare name is looked for under the font
+// directories: distributions agree on what the files are called and not on where they sit.
 struct Face {
     int weight;
-    const char *path;
+    const char *file;
 };
 
 const Face FACES[] = {
@@ -46,50 +50,41 @@ const Face FACES[] = {
         {Typeface::mono, "/System/Library/Fonts/Menlo.ttc"},
         {Typeface::mono, "/System/Library/Fonts/Monaco.ttf"},
 #else
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/noto/NotoSans-Regular.ttf"},
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"},
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/cantarell/Cantarell-Regular.otf"},
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"},
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/TTF/DejaVuSans.ttf"},
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/dejavu/DejaVuSans.ttf"},
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"},
-        {.weight = Typeface::regular, .path = "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf"},
+        // Blend2D draws a variable font at its default weight, so the Adwaita Sans and [wght]
+        // files stand in for a bold only where no bold file exists.
+        {.weight = Typeface::regular, .file = "NotoSans-Regular.ttf"},
+        {.weight = Typeface::regular, .file = "Cantarell-Regular.otf"},
+        {.weight = Typeface::regular, .file = "DejaVuSans.ttf"},
+        {.weight = Typeface::regular, .file = "LiberationSans-Regular.ttf"},
+        {.weight = Typeface::regular, .file = "AdwaitaSans-Regular.ttf"},
+        {.weight = Typeface::regular, .file = "NotoSans[wght].ttf"},
 
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/noto/NotoSans-SemiBold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/truetype/noto/NotoSans-SemiBold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/noto/NotoSans-Bold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/cantarell/Cantarell-Bold.otf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"},
-        {.weight = Typeface::semibold, .path = "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf"},
+        {.weight = Typeface::semibold, .file = "NotoSans-SemiBold.ttf"},
+        {.weight = Typeface::semibold, .file = "NotoSans-Bold.ttf"},
+        {.weight = Typeface::semibold, .file = "Cantarell-Bold.otf"},
+        {.weight = Typeface::semibold, .file = "DejaVuSans-Bold.ttf"},
+        {.weight = Typeface::semibold, .file = "LiberationSans-Bold.ttf"},
+        {.weight = Typeface::semibold, .file = "AdwaitaSans-Regular.ttf"},
+        {.weight = Typeface::semibold, .file = "NotoSans[wght].ttf"},
 
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/noto/NotoSans-Bold.ttf"},
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"},
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/cantarell/Cantarell-Bold.otf"},
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"},
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"},
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"},
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"},
-        {.weight = Typeface::bold, .path = "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf"},
+        {.weight = Typeface::bold, .file = "NotoSans-Bold.ttf"},
+        {.weight = Typeface::bold, .file = "Cantarell-Bold.otf"},
+        {.weight = Typeface::bold, .file = "DejaVuSans-Bold.ttf"},
+        {.weight = Typeface::bold, .file = "LiberationSans-Bold.ttf"},
+        {.weight = Typeface::bold, .file = "AdwaitaSans-Regular.ttf"},
+        {.weight = Typeface::bold, .file = "NotoSans[wght].ttf"},
 
-        {.weight = Typeface::mono, .path = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"},
-        {.weight = Typeface::mono, .path = "/usr/share/fonts/TTF/DejaVuSansMono.ttf"},
-        {.weight = Typeface::mono, .path = "/usr/share/fonts/dejavu/DejaVuSansMono.ttf"},
-        {.weight = Typeface::mono, .path = "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf"},
-        {.weight = Typeface::mono, .path = "/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf"},
-        {.weight = Typeface::mono, .path = "/usr/share/fonts/noto/NotoSansMono-Regular.ttf"},
-        {.weight = Typeface::mono, .path = "/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf"},
+        {.weight = Typeface::mono, .file = "DejaVuSansMono.ttf"},
+        {.weight = Typeface::mono, .file = "LiberationMono-Regular.ttf"},
+        {.weight = Typeface::mono, .file = "NotoSansMono-Regular.ttf"},
+        {.weight = Typeface::mono, .file = "AdwaitaMono-Regular.ttf"},
+        {.weight = Typeface::mono, .file = "NotoSansMono[wght].ttf"},
 
-        {.weight = Typeface::monoBold, .path = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"},
-        {.weight = Typeface::monoBold, .path = "/usr/share/fonts/TTF/DejaVuSansMono-Bold.ttf"},
-        {.weight = Typeface::monoBold, .path = "/usr/share/fonts/dejavu/DejaVuSansMono-Bold.ttf"},
-        {.weight = Typeface::monoBold, .path = "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"},
-        {.weight = Typeface::monoBold, .path = "/usr/share/fonts/liberation-mono/LiberationMono-Bold.ttf"},
-        {.weight = Typeface::monoBold, .path = "/usr/share/fonts/noto/NotoSansMono-Bold.ttf"},
-        {.weight = Typeface::monoBold, .path = "/usr/share/fonts/truetype/noto/NotoSansMono-Bold.ttf"},
+        {.weight = Typeface::monoBold, .file = "DejaVuSansMono-Bold.ttf"},
+        {.weight = Typeface::monoBold, .file = "LiberationMono-Bold.ttf"},
+        {.weight = Typeface::monoBold, .file = "NotoSansMono-Bold.ttf"},
+        {.weight = Typeface::monoBold, .file = "AdwaitaMono-Bold.ttf"},
+        {.weight = Typeface::monoBold, .file = "NotoSansMono[wght].ttf"},
 #endif
 };
 
@@ -320,18 +315,133 @@ long long key(const int weight, const float size) {
     return (static_cast<long long>(weight) * 100000) + static_cast<long long>(std::lround(size * 4.0F));
 }
 
+// The directories fontconfig searches by default, those of the user first.
+std::vector<std::filesystem::path> font_directories() {
+    std::vector<std::filesystem::path> directories;
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+    const std::filesystem::path home = Paths::home_directory();
+    const std::filesystem::path data = Env::get("XDG_DATA_HOME");
+
+    if (data.is_absolute()) {
+        directories.push_back(data / "fonts");
+    } else if (!home.empty()) {
+        directories.push_back(home / ".local" / "share" / "fonts");
+    }
+
+    if (!home.empty()) {
+        directories.push_back(home / ".fonts");
+    }
+
+    directories.emplace_back("/usr/local/share/fonts");
+    directories.emplace_back("/usr/share/fonts");
+#endif
+
+    return directories;
+}
+
+// Where Debian, Arch and RHEL keep the candidates under a font directory. A machine laid out
+// like one of them finds every weight here and is spared the walk.
+std::vector<std::filesystem::path> known_directories(const std::span<const std::filesystem::path> directories) {
+    std::vector<std::filesystem::path> known;
+
+    for (const std::filesystem::path &directory : directories) {
+        for (const char *layout : {
+                     "noto",
+                     "truetype/noto",
+                     "cantarell",
+                     "truetype/dejavu",
+                     "TTF",
+                     "dejavu",
+                     "truetype/liberation",
+                     "liberation-sans",
+                     "liberation-mono",
+             }) {
+            std::error_code code;
+
+            if (std::filesystem::path here = directory / layout; std::filesystem::is_directory(here, code)) {
+                known.push_back(std::move(here));
+            }
+        }
+    }
+
+    return known;
+}
+
+// The file to read for each candidate of a weight `held` lacks. A full path stands as it is. A
+// bare name is taken from the first directory that holds it at any depth.
+std::unordered_map<std::string_view, std::string> locate(const std::span<const std::filesystem::path> directories,
+                                                         const std::map<int, BLFontFace> &held) {
+    std::unordered_map<std::string_view, std::string> found;
+    std::unordered_set<std::string_view> wanted;
+
+    for (const Face &face : FACES) {
+        if (held.contains(face.weight)) {
+            continue;
+        }
+
+        if (std::filesystem::path(face.file).is_absolute()) {
+            found.emplace(face.file, face.file);
+        } else {
+            wanted.insert(face.file);
+        }
+    }
+
+    if (wanted.empty()) {
+        return found;
+    }
+
+    for (const std::filesystem::path &directory : directories) {
+        std::error_code code;
+        std::filesystem::recursive_directory_iterator walk(
+                directory, std::filesystem::directory_options::skip_permission_denied, code);
+
+        for (; !code && walk != std::filesystem::recursive_directory_iterator(); walk.increment(code)) {
+            const std::string name = walk->path().filename().string();
+
+            if (const auto want = wanted.find(name); want != wanted.end()) {
+                found.try_emplace(*want, walk->path().string());
+            }
+        }
+    }
+
+    return found;
+}
 }
 
 bool Typeface::load() {
+    return load(font_directories());
+}
+
+bool Typeface::load(const std::span<const std::filesystem::path> directories) {
+    const std::vector<std::filesystem::path> known = known_directories(directories);
+
+    for (const Face &face : FACES) {
+        for (const std::filesystem::path &directory : known) {
+            if (_faces.contains(face.weight)) {
+                break;
+            }
+
+            BLFontFace loaded;
+
+            if (loaded.create_from_file((directory / face.file).string().c_str()) == BL_SUCCESS) {
+                _faces[face.weight] = loaded;
+            }
+        }
+    }
+
+    const std::unordered_map<std::string_view, std::string> found = locate(directories, _faces);
+
     for (const Face &face : FACES) {
         // The first candidate for a weight that loads is the one kept.
         if (_faces.contains(face.weight)) {
             continue;
         }
 
+        const auto file = found.find(face.file);
         BLFontFace loaded;
 
-        if (loaded.create_from_file(face.path) != BL_SUCCESS) {
+        if (file == found.end() || loaded.create_from_file(file->second.c_str()) != BL_SUCCESS) {
             continue;
         }
 

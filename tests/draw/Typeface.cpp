@@ -6,12 +6,16 @@
  * Authors:
  *	spacebub <spacebubs@proton.me>
  */
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <initializer_list>
 #include <set>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -22,6 +26,7 @@
 
 #include "draw/Pixels.h"
 #include "support/Canvas.h"
+#include "support/Sandbox.h"
 #include "ttk/draw/Typeface.h"
 
 namespace {
@@ -197,6 +202,157 @@ TEST_F(Typed, LoadTwiceStillLoads) {
     EXPECT_TRUE(fresh.load());
     EXPECT_TRUE(fresh.at(ttk::Typeface::regular, 12).is_valid());
 }
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+// An installed font file called one of `names`, or an empty path.
+std::filesystem::path installed(const std::initializer_list<std::string_view> names) {
+    std::error_code code;
+    std::filesystem::recursive_directory_iterator walk("/usr/share/fonts", code);
+
+    for (; !code && walk != std::filesystem::recursive_directory_iterator(); walk.increment(code)) {
+        if (std::ranges::find(names, walk->path().filename().string()) != names.end()) {
+            return walk->path();
+        }
+    }
+
+    return {};
+}
+
+std::string family_of(const BLFontFace &face) {
+    return {face.family_name().data(), face.family_name().size()};
+}
+
+TEST(Typeface, LoadFindsAFontAtAnyDepth) {
+    const std::filesystem::path font = installed({"DejaVuSans.ttf", "NotoSans-Regular.ttf"});
+
+    if (font.empty()) {
+        GTEST_SKIP() << "no font installed";
+    }
+
+    const std::filesystem::path root = tests::Sandbox::scratch("fonts-deep");
+
+    std::filesystem::create_directories(root / "some" / "vendor");
+    std::filesystem::copy_file(font, root / "some" / "vendor" / "DejaVuSans.ttf");
+
+    const std::vector<std::filesystem::path> directories{root};
+    ttk::Typeface fresh;
+
+    ASSERT_TRUE(fresh.load(directories));
+
+    for (const int weight : {
+                 ttk::Typeface::regular,
+                 ttk::Typeface::semibold,
+                 ttk::Typeface::bold,
+                 ttk::Typeface::mono,
+                 ttk::Typeface::monoBold,
+         }) {
+        EXPECT_TRUE(fresh.at(weight, 12).is_valid()) << "weight " << weight;
+    }
+}
+
+TEST(Typeface, LoadTakesAKnownDirectoryBeforeItSearches) {
+    const std::filesystem::path sans = installed({"DejaVuSans.ttf", "NotoSans-Regular.ttf"});
+    const std::filesystem::path mono = installed({"DejaVuSansMono.ttf", "NotoSansMono-Regular.ttf"});
+
+    if (sans.empty() || mono.empty()) {
+        GTEST_SKIP() << "no two fonts installed";
+    }
+
+    const std::filesystem::path root = tests::Sandbox::scratch("fonts-known");
+
+    // Noto leads the candidates, yet the lesser name sits where a distribution would put it.
+    std::filesystem::create_directories(root / "some" / "vendor");
+    std::filesystem::create_directories(root / "truetype" / "dejavu");
+    std::filesystem::copy_file(sans, root / "some" / "vendor" / "NotoSans-Regular.ttf");
+    std::filesystem::copy_file(mono, root / "truetype" / "dejavu" / "DejaVuSans.ttf");
+
+    BLFontFace wanted;
+
+    ASSERT_EQ(wanted.create_from_file(mono.c_str()), BL_SUCCESS);
+
+    const std::vector<std::filesystem::path> directories{root};
+    ttk::Typeface fresh;
+
+    ASSERT_TRUE(fresh.load(directories));
+    EXPECT_EQ(family_of(fresh.at(ttk::Typeface::regular, 12).face()), family_of(wanted));
+}
+
+TEST(Typeface, LoadSearchesForTheWeightsAKnownDirectoryLacks) {
+    const std::filesystem::path sans = installed({"DejaVuSans.ttf", "NotoSans-Regular.ttf"});
+    const std::filesystem::path mono = installed({"DejaVuSansMono.ttf", "NotoSansMono-Regular.ttf"});
+
+    if (sans.empty() || mono.empty()) {
+        GTEST_SKIP() << "no two fonts installed";
+    }
+
+    const std::filesystem::path root = tests::Sandbox::scratch("fonts-mixed");
+
+    std::filesystem::create_directories(root / "some" / "vendor");
+    std::filesystem::create_directories(root / "truetype" / "dejavu");
+    std::filesystem::copy_file(sans, root / "truetype" / "dejavu" / "DejaVuSans.ttf");
+    std::filesystem::copy_file(mono, root / "some" / "vendor" / "DejaVuSansMono.ttf");
+
+    BLFontFace wanted;
+
+    ASSERT_EQ(wanted.create_from_file(mono.c_str()), BL_SUCCESS);
+
+    const std::vector<std::filesystem::path> directories{root};
+    ttk::Typeface fresh;
+
+    ASSERT_TRUE(fresh.load(directories));
+    EXPECT_EQ(family_of(fresh.at(ttk::Typeface::mono, 12).face()), family_of(wanted));
+    EXPECT_NE(family_of(fresh.at(ttk::Typeface::regular, 12).face()), family_of(wanted));
+}
+
+TEST(Typeface, LoadFindsNothingWhereNoFontIs) {
+    const std::filesystem::path font = installed({"DejaVuSans.ttf", "NotoSans-Regular.ttf"});
+    const std::filesystem::path root = tests::Sandbox::scratch("fonts-none");
+
+    std::filesystem::create_directories(root / "empty");
+
+    if (!font.empty()) {
+        std::filesystem::copy_file(font, root / "empty" / "Unknown.ttf");
+    }
+
+    const std::vector<std::filesystem::path> directories{root, root / "absent"};
+    ttk::Typeface fresh;
+
+    EXPECT_FALSE(fresh.load(directories));
+    EXPECT_FALSE(fresh.load({}));
+    EXPECT_FALSE(fresh.at(ttk::Typeface::regular, 12).is_valid());
+}
+
+TEST(Typeface, LoadTakesANameFromTheFirstDirectoryThatHoldsIt) {
+    const std::filesystem::path sans = installed({"DejaVuSans.ttf", "NotoSans-Regular.ttf"});
+    const std::filesystem::path mono = installed({"DejaVuSansMono.ttf", "NotoSansMono-Regular.ttf"});
+
+    if (sans.empty() || mono.empty()) {
+        GTEST_SKIP() << "no two fonts installed";
+    }
+
+    const std::filesystem::path root = tests::Sandbox::scratch("fonts-order");
+
+    std::filesystem::create_directories(root / "first");
+    std::filesystem::create_directories(root / "second");
+    std::filesystem::copy_file(sans, root / "first" / "DejaVuSans.ttf");
+    std::filesystem::copy_file(mono, root / "second" / "DejaVuSans.ttf");
+
+    BLFontFace wanted;
+
+    ASSERT_EQ(wanted.create_from_file(sans.c_str()), BL_SUCCESS);
+
+    const std::vector<std::filesystem::path> forward{root / "first", root / "second"};
+    const std::vector<std::filesystem::path> backward{root / "second", root / "first"};
+    ttk::Typeface one;
+    ttk::Typeface other;
+
+    ASSERT_TRUE(one.load(forward));
+    ASSERT_TRUE(other.load(backward));
+
+    EXPECT_EQ(family_of(one.at(ttk::Typeface::regular, 12).face()), family_of(wanted));
+    EXPECT_NE(family_of(other.at(ttk::Typeface::regular, 12).face()), family_of(wanted));
+}
+#endif
 
 TEST_F(Typed, UnknownWeightGivesAFontWithNoFace) {
     ttk::Typeface fresh;

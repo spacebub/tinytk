@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <span>
 #include <string>
@@ -61,10 +62,22 @@ public:
 
     //! Loads a face for each of \ref regular, \ref semibold, \ref bold, \ref mono and \ref monoBold.
     //!
-    //! Each weight takes the first file that loads from a list of well-known system font paths. A weight with
-    //! none takes the loaded face of the lowest weight value, which is a monospace face when one loaded. Returns
-    //! false when no face loads at all.
+    //! Each weight takes the first file that loads from a list of well-known system fonts. On Windows and macOS
+    //! the list holds full paths. Elsewhere it holds file names, looked for under `$XDG_DATA_HOME/fonts`,
+    //! `~/.fonts`, `/usr/local/share/fonts` and `/usr/share/fonts`, in that order, with `~/.local/share`
+    //! standing in for an unset `XDG_DATA_HOME`. A weight with none takes the loaded face of the lowest weight
+    //! value, which is a monospace face when one loaded. Returns false when no face loads at all.
     bool load();
+
+    //! Loads as \ref load() does, with the file names looked for under `directories` instead.
+    //!
+    //! The subdirectories that common distributions use, such as `truetype/dejavu` and `noto`, are tried
+    //! first. A font found there wins over a preferred one that sits elsewhere. Only a weight still without
+    //! a face has the directories searched at any depth, where the first directory that holds a name gives
+    //! the file. Links to directories are not followed.
+    //!
+    //! `directories` plays no part on Windows and macOS, where the fonts are known by full path.
+    bool load(std::span<const std::filesystem::path> directories);
 
     //! Returns the font of `weight` at `size` pixels, created on first use.
     //!
