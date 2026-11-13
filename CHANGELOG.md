@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.8.2 - 2026-11-13
+
+### Added
+
+- `Typeface::load(directories)` looks for the fonts under the given directories instead of the
+  system font directories
+- `cmake -P cmake/Update.cmake` lists newer releases of the pinned dependencies and applies them
+  once confirmed
+
+### Changed
+
+- SDL 3.4.18 to 3.4.20, Google Benchmark 1.9.5 to 1.10.0 and GoogleTest 1.17.0 to 1.18.0
+
+### Fixed
+
+- `Typeface::load` found no font on Fedora and openSUSE, and on Arch without Noto or DejaVu, since
+  it knew each font by a fixed path. It now knows them by file name. It tries the subdirectories
+  that common distributions use, then searches `$XDG_DATA_HOME/fonts`, `~/.fonts`,
+  `/usr/local/share/fonts` and `/usr/share/fonts` at any depth
+- Adwaita Sans, Adwaita Mono and the variable Noto Sans files load on a machine that carries no
+  other known font. A variable font is drawn at its regular weight
+
 ## 1.8.1 - 2026-10-23
 
 ### Added
