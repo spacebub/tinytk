@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.14.0 - 2026-11-14
+
+### Added
+
+- `Glyphs::add()` takes a `Glyphs::Custom` shape, an SVG path to stroke, one to fill, or both, and
+  returns a `Glyph` for it. Menus, buttons, fields and anything else that takes a glyph draw it as
+  they draw the built-in ones, from the same cached masks. A shape whose paths do not parse is
+  refused, and `Glyphs::sheet()` still holds only the built-in set
+
 ## 1.13.0 - 2026-11-14
 
 ### Added
