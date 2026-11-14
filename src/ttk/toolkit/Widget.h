@@ -248,6 +248,22 @@ public:
     //! Handles text input, in UTF-8, while the widget has focus.
     virtual void wrote(const std::string &text);
 
+    //! Called at each position while files from another program are dragged over the widget at `at`. Returns
+    //! true when the widget would take them there. A widget that returns false leaves the question to its
+    //! parent. Nothing says what kind the files are until they are let go. The default implementation returns
+    //! false.
+    virtual bool drag_files(const Pointer &at);
+
+    //! Called on the widget that last returned true from \ref drag_files() when the files move to another
+    //! widget, leave the window or are let go. It comes before \ref drop_files(). The default implementation
+    //! does nothing.
+    virtual void drag_files_ended();
+
+    //! Handles `paths` let go over the widget at `at` and returns true when the widget took them. Files it
+    //! leaves are offered to its parent. A drop may come with no \ref drag_files() before it. The default
+    //! implementation returns false.
+    virtual bool drop_files(const std::vector<std::string> &paths, const Pointer &at);
+
     //! Tests whether the widget can receive keyboard focus.
     //!
     //! The default implementation returns true while the widget answers the pointer and is enabled, so every

@@ -463,6 +463,118 @@ TEST_F(Routed, WheelOverNothingDoesNothing) {
     EXPECT_TRUE(journal.empty());
 }
 
+TEST_F(Routed, DraggedFilesAreOfferedUpTheChainUntilOneWouldTakeThem) {
+    tests::Probe *list = popup({0, 0, 100, 100}, "list");
+    on(list, {0, 0, 100, 20}, "row");
+
+    list->takesFiles = true;
+    root.drag_files(10, 10);
+
+    EXPECT_EQ(journal, (Journal{"row:drag_files", "list:drag_files"}));
+    EXPECT_EQ(root.drag_target(), list);
+    ASSERT_EQ(list->filesAt.size(), 1U);
+    EXPECT_EQ(list->filesAt.front().y, 10.0);
+}
+
+TEST_F(Routed, DraggedFilesMovingOffTheTakerEndItsDrag) {
+    tests::Probe *list = popup({0, 0, 100, 50}, "list");
+    tests::Probe *other = popup({0, 50, 100, 50}, "other");
+
+    list->takesFiles = true;
+    root.drag_files(10, 10);
+    root.drag_files(10, 20);
+    root.drag_files(10, 70);
+
+    EXPECT_EQ(list->dragsEnded, 1);
+    EXPECT_EQ(other->dragsEnded, 0);
+    EXPECT_EQ(root.drag_target(), nullptr);
+}
+
+TEST_F(Routed, ADragMovingStraightToAnotherTakerEndsAtTheFirst) {
+    tests::Probe *games = popup({0, 0, 100, 50}, "games");
+    tests::Probe *addons = popup({0, 50, 100, 50}, "addons");
+
+    games->takesFiles = true;
+    addons->takesFiles = true;
+    root.drag_files(10, 10);
+    root.drag_files(10, 70);
+
+    EXPECT_EQ(games->dragsEnded, 1);
+    EXPECT_EQ(addons->dragsEnded, 0);
+    EXPECT_EQ(root.drag_target(), addons);
+}
+
+TEST_F(Routed, PointerMotionEndsADragWhoseEndNeverCame) {
+    tests::Probe *list = popup({0, 0, 100, 100}, "list");
+
+    list->takesFiles = true;
+    root.drag_files(10, 10);
+    root.motion(20, 20);
+
+    EXPECT_EQ(list->dragsEnded, 1);
+    EXPECT_EQ(root.drag_target(), nullptr);
+}
+
+TEST_F(Routed, ADropClosesAnOpenPopupFirst) {
+    tests::Probe *list = popup({0, 0, 100, 100}, "list");
+    int closed = 0;
+
+    list->takesFiles = true;
+    root.set_dismiss([&closed] { ++closed; });
+
+    EXPECT_TRUE(root.drop_files({"/a.wad"}, 10, 10));
+    EXPECT_EQ(closed, 1);
+    EXPECT_FALSE(root.has_dismiss());
+}
+
+TEST_F(Routed, ADragThatLeavesTheWindowEndsAtTheTaker) {
+    tests::Probe *list = popup({0, 0, 100, 100}, "list");
+
+    list->takesFiles = true;
+    root.drag_files(10, 10);
+    root.drag_files_ended();
+
+    EXPECT_EQ(list->dragsEnded, 1);
+    EXPECT_EQ(root.drag_target(), nullptr);
+
+    root.drag_files_ended();
+
+    EXPECT_EQ(list->dragsEnded, 1);
+}
+
+TEST_F(Routed, DroppedFilesGoToTheFirstWidgetUpTheChainThatTakesThem) {
+    tests::Probe *list = popup({0, 0, 100, 100}, "list");
+    tests::Probe *row = on(list, {0, 0, 100, 20}, "row");
+
+    list->takesFiles = true;
+    root.drag_files(10, 10);
+
+    EXPECT_TRUE(root.drop_files({"/a.wad", "/b.pk3"}, 10, 10));
+    EXPECT_EQ(list->droppedFiles, (std::vector<std::string>{"/a.wad", "/b.pk3"}));
+    EXPECT_TRUE(row->droppedFiles.empty());
+    EXPECT_EQ(list->dragsEnded, 1);
+    EXPECT_EQ(root.drag_target(), nullptr);
+}
+
+TEST_F(Routed, FilesDroppedOverNothingThatTakesThemAreRefused) {
+    popup({0, 0, 100, 100}, "list");
+
+    EXPECT_FALSE(root.drop_files({"/a.wad"}, 10, 10));
+    EXPECT_FALSE(root.drop_files({"/a.wad"}, 500, 500));
+}
+
+TEST_F(Routed, AnErasedTakerIsForgotten) {
+    tests::Probe *list = popup({0, 0, 100, 100}, "list");
+
+    list->takesFiles = true;
+    root.drag_files(10, 10);
+    root.layer(ttk::Root::POPUPS)->erase(list);
+
+    EXPECT_EQ(root.drag_target(), nullptr);
+
+    root.drag_files_ended();
+}
+
 TEST_F(Routed, LeaveClearsTheHover) {
     const tests::Probe *button = popup({10, 10, 40, 20}, "button");
 

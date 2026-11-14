@@ -225,6 +225,9 @@ private:
     std::vector<std::function<void()>> _errands;
     unsigned _wakeEvent = 0;
 
+    // The files of the drop in progress, which arrive one event each.
+    std::vector<std::string> _dropping;
+
     double _width = 0.0;
     double _height = 0.0;
 

@@ -35,6 +35,7 @@ public:
     bool takesPress = true;
     bool takesKey = false;
     bool takesWheel = false;
+    bool takesFiles = false;
     bool focusPainted = false;
     bool activatesOnKeys = true;
 
@@ -59,6 +60,9 @@ public:
     std::vector<BLRect> revealed;
     std::string written;
     double wheeled = 0.0;
+    std::vector<std::string> droppedFiles;
+    std::vector<ttk::Pointer> filesAt;
+    int dragsEnded = 0;
     int enters = 0;
     int leaves = 0;
     int gained = 0;
@@ -106,6 +110,32 @@ public:
     void within(const bool in) override {
         note(in ? "within" : "without");
         inside.push_back(in);
+    }
+
+    bool drag_files(const ttk::Pointer &at) override {
+        note("drag_files");
+
+        if (takesFiles) {
+            filesAt.push_back(at);
+        }
+
+        return takesFiles;
+    }
+
+    void drag_files_ended() override {
+        note("drag_files_ended");
+        ++dragsEnded;
+    }
+
+    bool drop_files(const std::vector<std::string> &paths, const ttk::Pointer &at) override {
+        note("drop_files");
+
+        if (takesFiles) {
+            droppedFiles.insert(droppedFiles.end(), paths.begin(), paths.end());
+            filesAt.push_back(at);
+        }
+
+        return takesFiles;
     }
 
     bool wheel(const double steps, const ttk::Pointer & /*at*/) override {

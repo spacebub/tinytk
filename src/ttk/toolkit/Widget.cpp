@@ -271,6 +271,17 @@ bool Widget::key(const Key & /*unused*/) {
 void Widget::wrote(const std::string & /*unused*/) {
 }
 
+bool Widget::drag_files(const Pointer & /*unused*/) {
+    return false;
+}
+
+void Widget::drag_files_ended() {
+}
+
+bool Widget::drop_files(const std::vector<std::string> & /*unused*/, const Pointer & /*unused*/) {
+    return false;
+}
+
 void Widget::gained_focus() {
     invalidate();
 }

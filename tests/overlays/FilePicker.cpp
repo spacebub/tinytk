@@ -82,6 +82,18 @@ protected:
     [[nodiscard]] const ttk::FilePicker::State &state() const { return picker.state(); }
 };
 
+TEST(PickerPasses, FiltersMatchAsTheyDoInThePicker) {
+    const std::vector<std::string> wads{"*.wad", "*.PK3"};
+
+    EXPECT_TRUE(ttk::FilePicker::passes(wads, "DOOM2.WAD"));
+    EXPECT_TRUE(ttk::FilePicker::passes(wads, "mod.pk3"));
+    EXPECT_FALSE(ttk::FilePicker::passes(wads, "notes.txt"));
+    EXPECT_FALSE(ttk::FilePicker::passes(wads, "doom2.wad.bak"));
+    EXPECT_TRUE(ttk::FilePicker::passes({"*"}, "anything"));
+    EXPECT_TRUE(ttk::FilePicker::passes({}, "anything"));
+    EXPECT_TRUE(ttk::FilePicker::passes({"save??.zds"}, "SAVE07.ZDS"));
+}
+
 TEST(PickerStart, FallsBackToTheSandboxedHome) {
     ttk::Notifier notifier;
     const ttk::FilePicker picker(&notifier);

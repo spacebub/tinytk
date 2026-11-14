@@ -330,6 +330,9 @@ void Root::motion(const double x, const double y) {
 
     _pointer = at;
 
+    // A drag whose end never came, which some desktops leave undelivered.
+    drag_files_ended();
+
     if (_grabbed != nullptr) {
         _grabbed->drag(at);
 
@@ -435,6 +438,50 @@ void Root::leave() {
     }
 
     hover_to(nullptr, Pointer{.x = -1.0, .y = -1.0});
+}
+
+void Root::drag_files(const double x, const double y) {
+    const Pointer at{.x = x, .y = y};
+    Widget *taker = nullptr;
+
+    for (Widget *up = pick(x, y); up != nullptr; up = up->parent()) {
+        if (up->drag_files(at)) {
+            taker = up;
+
+            break;
+        }
+    }
+
+    if (_dragTarget != taker) {
+        drag_files_ended();
+    }
+
+    _dragTarget = taker;
+}
+
+void Root::drag_files_ended() {
+    // Cleared before the call, so a handler that asks the root sees the drag over.
+    Widget *was = std::exchange(_dragTarget, nullptr);
+
+    if (was != nullptr) {
+        was->drag_files_ended();
+    }
+}
+
+bool Root::drop_files(const std::vector<std::string> &paths, const double x, const double y) {
+    const Pointer at{.x = x, .y = y};
+
+    // As a press would, so a menu is not left open over what the drop opens.
+    dismiss();
+    drag_files_ended();
+
+    for (Widget *up = pick(x, y); up != nullptr; up = up->parent()) {
+        if (up->drop_files(paths, at)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool Root::key(const Key &pressed) {
@@ -616,6 +663,10 @@ void Root::forget(const Widget *who) {
 
     if (_grabbed == who) {
         _grabbed = nullptr;
+    }
+
+    if (_dragTarget == who) {
+        _dragTarget = nullptr;
     }
 
     if (_focused == who) {

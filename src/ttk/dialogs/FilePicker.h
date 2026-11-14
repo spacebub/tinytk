@@ -170,6 +170,10 @@ public:
               const std::string &option = {},
               const std::string &optionHint = {});
 
+    //! Tests whether a file named `name` passes `filters` as \ref open() reads them, so files that arrive another
+    //! way, such as a drop, can be held to the same kinds.
+    [[nodiscard]] static bool passes(const std::vector<std::string> &filters, std::string_view name);
+
     //! Opens the picker to save a file, offering `name` and starting in \ref start_directory() for `remember`.
     //!
     //! `chosen` receives the single \ref State::target path. `filters` decide which files are listed and which
@@ -250,6 +254,11 @@ private:
     void push();
 
     [[nodiscard]] static bool matches(std::string_view pattern, std::string_view name);
+
+    // The rule a listing and passes() share. `patterns` and `name` are in lower case.
+    [[nodiscard]] static bool any_matches(const std::vector<std::string> &patterns, std::string_view name);
+    [[nodiscard]] static bool anything(std::string_view filter) { return filter == "*" || filter == "*.*"; }
+
     [[nodiscard]] bool wanted(const std::string &name) const;
 
     [[nodiscard]] bool hidden() const { return _memory.hidden ? _memory.hidden() : _hidden; }

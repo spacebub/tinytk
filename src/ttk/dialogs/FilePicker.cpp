@@ -230,7 +230,7 @@ void FilePicker::start(const std::string &title,
     for (const std::string &filter : _filters) {
         _patterns.push_back(Text::lower(filter));
 
-        if (filter == "*" || filter == "*.*") {
+        if (anything(filter)) {
             _anything = true;
         } else if (filter.starts_with('*')) {
             _suffixes.push_back(Text::lower(filter.substr(1)));
@@ -335,12 +335,26 @@ bool FilePicker::matches(const std::string_view pattern, const std::string_view 
     return at == pattern.size();
 }
 
-bool FilePicker::wanted(const std::string &name) const {
-    if (_anything) {
-        return true;
+bool FilePicker::any_matches(const std::vector<std::string> &patterns, const std::string_view name) {
+    return std::ranges::any_of(patterns, [name](const std::string &pattern) { return matches(pattern, name); });
+}
+
+bool FilePicker::passes(const std::vector<std::string> &filters, const std::string_view name) {
+    std::vector<std::string> patterns;
+
+    for (const std::string &filter : filters) {
+        if (anything(filter)) {
+            return true;
+        }
+
+        patterns.push_back(Text::lower(filter));
     }
 
-    return std::ranges::any_of(_patterns, [&name](const std::string &pattern) { return matches(pattern, name); });
+    return filters.empty() || any_matches(patterns, Text::lower(name));
+}
+
+bool FilePicker::wanted(const std::string &name) const {
+    return _anything || any_matches(_patterns, name);
 }
 
 void FilePicker::walk() {

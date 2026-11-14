@@ -172,6 +172,20 @@ public:
     //! Handles the pointer leaving the window by clearing the hover. Ignored while a widget holds the press.
     void leave();
 
+    //! Handles files from another program dragged over the window at `[x, y]`, once per position. The widget
+    //! there and then its ancestors are asked through \ref Widget::drag_files() until one would take them.
+    //! When another widget takes over, or none does, the last taker hears \ref Widget::drag_files_ended().
+    void drag_files(double x, double y);
+    //! Ends a file drag that left the window without a drop. Pointer motion ends one too, as no drag from
+    //! another program moves the pointer of this window.
+    void drag_files_ended();
+    //! Closes an open popup and ends the drag, then offers `paths` let go at `[x, y]` to the widget there and
+    //! then its ancestors until one takes them. A drop may come with no drag before it. Returns true when a
+    //! widget took the files.
+    bool drop_files(const std::vector<std::string> &paths, double x, double y);
+    //! Returns the widget that would take the files dragged over the window, or null.
+    [[nodiscard]] Widget *drag_target() const { return _dragTarget; }
+
     //! Returns the widget under the pointer, or null when there is none.
     Widget *hovered() const { return _hovered; }
     //! Returns the widget holding the press, or null when no press is held.
@@ -379,6 +393,7 @@ private:
 
     Widget *_hovered = nullptr;
     Widget *_grabbed = nullptr;
+    Widget *_dragTarget = nullptr;
     Widget *_focused = nullptr;
     bool _focusShown = false;
     bool _active = true;

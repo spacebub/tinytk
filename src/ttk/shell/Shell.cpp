@@ -705,6 +705,39 @@ void Shell::handle(const SDL_Event &event) {
 
             break;
 
+        case SDL_EVENT_DROP_BEGIN:
+            _dropping.clear();
+
+            break;
+
+        case SDL_EVENT_DROP_POSITION:
+            _root->drag_files(event.drop.x, event.drop.y);
+
+            break;
+
+        case SDL_EVENT_DROP_FILE:
+            if (event.drop.data != nullptr) {
+                _dropping.emplace_back(event.drop.data);
+            }
+
+            break;
+
+        // Also sent with no files when the drag leaves the window. A drop SDL gives no position, such as
+        // one on the macOS Dock icon, arrives at [0, 0].
+        case SDL_EVENT_DROP_COMPLETE: {
+            const std::vector<std::string> paths = std::move(_dropping);
+
+            _dropping.clear();
+
+            if (paths.empty()) {
+                _root->drag_files_ended();
+            } else {
+                _root->drop_files(paths, event.drop.x, event.drop.y);
+            }
+
+            break;
+        }
+
         default:
             break;
     }
