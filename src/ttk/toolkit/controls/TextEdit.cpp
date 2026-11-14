@@ -1281,6 +1281,18 @@ bool TextEdit::wheel_sideways(const double steps, const Pointer & /*at*/) {
 }
 
 bool TextEdit::key(const Key &pressed) {
+    // Keys bubble up from the cog too, and those belong to the cog.
+    if (_cog != nullptr && _cog->focused()) {
+        return false;
+    }
+
+    // An open settings menu closes first, since the root never sees the Escape that would close it.
+    if (pressed.code == Code::Escape && root() != nullptr && root()->has_dismiss()) {
+        root()->dismiss();
+
+        return true;
+    }
+
     size_t from = 0;
     size_t to = 0;
 
@@ -1363,25 +1375,12 @@ bool TextEdit::key(const Key &pressed) {
             move_to(offset_at(std::min(row_count() - 1, row + page), _goal), pressed.shift, true);
             return true;
 
-        case Code::Home: {
-            if (pressed.ctrl) {
-                move_to(0, pressed.shift);
-                return true;
-            }
-
-            // First to the text on the row, then to its very start.
-            size_t text = _rowStarts[row];
-
-            while (text < row_end(row) && (_text[text] == ' ' || _text[text] == '\t')) {
-                ++text;
-            }
-
-            move_to(_caret == text ? _rowStarts[row] : text, pressed.shift);
+        case Code::Home:
+            move_to(pressed.ctrl ? 0 : _starts[line], pressed.shift);
             return true;
-        }
 
         case Code::End:
-            move_to(pressed.ctrl ? _text.size() : row_end(row), pressed.shift);
+            move_to(pressed.ctrl ? _text.size() : line_end(line), pressed.shift);
             return true;
 
         case Code::Backspace:
@@ -1402,7 +1401,7 @@ bool TextEdit::key(const Key &pressed) {
 
         case Code::Return: {
             if (_readOnly) {
-                return false;
+                return true;
             }
 
             // The new line keeps the indent of the one it came from.
@@ -1416,16 +1415,17 @@ bool TextEdit::key(const Key &pressed) {
             return true;
         }
 
+        // Alt+Tab can arrive on the way to another window, so it types nothing.
         case Code::Tab:
-            if (_readOnly || pressed.ctrl || pressed.shift || pressed.alt) {
-                return false;
+            if (!_readOnly && !pressed.alt) {
+                put(std::string(TAB - (column_of(from) % TAB), ' '));
             }
 
-            put(std::string(TAB - (column_of(from) % TAB), ' '));
             return true;
 
+        // The editor owns the keyboard while it has focus, so nothing around it acts on a key typed into it.
         default:
-            return false;
+            return true;
     }
 }
 

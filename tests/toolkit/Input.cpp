@@ -944,6 +944,18 @@ TEST_F(Routed, SpaceActivatesTheFocusedControl) {
     EXPECT_EQ(button->releasedAt.size(), 1U);
 }
 
+TEST_F(Routed, ReturnAndSpacePassAWidgetThatDoesNotActivate) {
+    tests::Probe *editor = popup({10, 20, 40, 30}, "editor");
+
+    editor->activatesOnKeys = false;
+    root.focus(editor);
+
+    EXPECT_FALSE(root.key({.code = ttk::Code::Return}));
+    EXPECT_FALSE(root.key({.code = ttk::Code::Space}));
+    EXPECT_FALSE(root.key({.code = ttk::Code::Space, .ctrl = true}));
+    EXPECT_TRUE(editor->pressedAt.empty());
+}
+
 TEST_F(Routed, HeldReturnActsOnce) {
     tests::Probe *button = popup({10, 20, 40, 30}, "button");
 

@@ -442,6 +442,10 @@ bool TextBox::key(const Key &pressed) {
 
             return false;
 
+        // The space itself arrives as text. Taken here so a typed space never reaches a shortcut.
+        case Code::Space:
+            return true;
+
         default:
             break;
     }

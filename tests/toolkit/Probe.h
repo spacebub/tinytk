@@ -36,6 +36,7 @@ public:
     bool takesKey = false;
     bool takesWheel = false;
     bool focusPainted = false;
+    bool activatesOnKeys = true;
 
     bool clipping = false;
     BLRect clipRegion{};
@@ -65,6 +66,8 @@ public:
     int moves = 0;
     int arranged = 0;
     int painted = 0;
+
+    [[nodiscard]] bool activates() const override { return activatesOnKeys; }
 
     bool press(const ttk::Pointer &at) override {
         note("press");

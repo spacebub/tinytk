@@ -332,7 +332,8 @@ bool TextView::key(const Key &pressed) {
         return true;
     }
 
-    return false;
+    // Taken so a selection never doubles as a press of whatever the app binds to them.
+    return pressed.code == Code::Return || pressed.code == Code::Space;
 }
 
 void TextView::lost_focus() {

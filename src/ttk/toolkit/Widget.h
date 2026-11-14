@@ -255,6 +255,12 @@ public:
     //! or a scrim, returns false.
     [[nodiscard]] virtual bool takes_focus() const { return _takesPointer && _enabled; }
 
+    //! Tests whether Return and Space press the widget at its centre when it has focus and lets them pass.
+    //!
+    //! The default implementation returns true, so any control activates from the keyboard. A widget that
+    //! edits or selects text returns false, since a press would move its caret or drop its selection.
+    [[nodiscard]] virtual bool activates() const { return true; }
+
     //! Called when the widget receives keyboard focus. The default implementation repaints it.
     virtual void gained_focus();
 

@@ -260,17 +260,22 @@ public:
     //! Returns false, leaving the scroll to the parent, when there is nothing to the side, as in a wrapped editor.
     bool wheel_sideways(double steps, const Pointer &at) override;
 
-    //! Handles editing and caret keys and returns true when the key was consumed.
+    //! Handles editing and caret keys, and consumes every key while the editor itself has focus, so nothing
+    //! around it acts on a key typed into it and only the pointer moves focus out of it. A key from the settings
+    //! button passes on. Escape closes an open popup, such as the settings menu, and otherwise does nothing.
     //!
     //! Arrows move by a character or a row, Ctrl+Left and Ctrl+Right by a word, PageUp and PageDown by a view
-    //! less one row. Home goes to the first non-blank character of the row, then to the row's start. End goes
-    //! to the row's end. Ctrl+Home and Ctrl+End go to either end of the text. Shift extends the selection.
+    //! less one row. Home and End go to the start and the end of the line, wrapped or not. Ctrl+Home and
+    //! Ctrl+End go to either end of the text. Shift extends the selection.
     //! Backspace and Delete remove the selection, or else a character, or a word with Ctrl. Return inserts a line
-    //! break that keeps the current line's indent. Tab inserts spaces up to the next tab stop. Ctrl+A,
-    //! Ctrl+C, Ctrl+X and Ctrl+V select all, copy, cut and paste. Ctrl+Z undoes, and Ctrl+Shift+Z and Ctrl+Y
-    //! redo. A run of typing undoes as one step, and up to 256 steps are kept. Tab with any modifier, and Return
-    //! and Tab while read-only, are not consumed, so Shift+Tab and Ctrl+Tab leave the editor.
+    //! break that keeps the current line's indent. Tab, with or without Shift or Ctrl, inserts spaces up to the
+    //! next tab stop, and Alt+Tab types nothing. Ctrl+A, Ctrl+C, Ctrl+X and Ctrl+V select all, copy, cut and paste. Ctrl+Z undoes, and
+    //! Ctrl+Shift+Z and Ctrl+Y redo. A run of typing undoes as one step, and up to 256 steps are kept. While
+    //! read-only the keys that edit do nothing.
     bool key(const Key &pressed) override;
+
+    //! Returns false, so Return and Space never press the editor and move its caret or drop its selection.
+    [[nodiscard]] bool activates() const override { return false; }
 
     //! Replaces the selection with `text`, in UTF-8, or inserts it at the caret. Ignored when read-only.
     void wrote(const std::string &text) override;

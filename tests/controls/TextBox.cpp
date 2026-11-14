@@ -70,6 +70,29 @@ protected:
     }
 };
 
+// A real press sends the key first, then the text. The key must not reach the root as a click.
+TEST_F(TextBoxTest, ASpacePressedPastTheMiddleLandsAtTheCaret) {
+    ttk::TextBox *box = focused("a run of text long enough to pass the middle of the box");
+
+    box->key(key(Code::End));
+
+    for (int press = 0; press < 3; ++press) {
+        EXPECT_TRUE(canvas.root().key(key(Code::Space)));
+        canvas.root().wrote(" ");
+    }
+
+    EXPECT_EQ(box->text(), "a run of text long enough to pass the middle of the box   ");
+}
+
+TEST_F(TextBoxTest, CtrlSpaceLeavesTheCaretWhereItIs) {
+    ttk::TextBox *box = focused("a run of text long enough to pass the middle of the box");
+
+    box->key(key(Code::End));
+
+    EXPECT_TRUE(canvas.root().key(key(Code::Space, true)));
+    EXPECT_EQ(probe(box), "a run of text long enough to pass the middle of the box|");
+}
+
 TEST_F(TextBoxTest, StartsEmpty) {
     const ttk::TextBox *box = make();
 

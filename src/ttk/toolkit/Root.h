@@ -201,7 +201,8 @@ public:
     //! counts as consumed, though a held key moves it once. Alt+Tab is left alone. Return and Space that no
     //! widget consumed press and release the focused control at its centre, so any control activates from the
     //! keyboard, and count as consumed, though a held key acts once. Held with Ctrl or Alt they do the same
-    //! unless \ref set_modified_activation() turned that off. Returns false for any other key nothing consumed.
+    //! unless \ref set_modified_activation() turned that off. A focused widget whose \ref Widget::activates()
+    //! is false is never pressed this way. Returns false for any other key nothing consumed.
     bool key(const Key &pressed);
 
     //! Sets whether Return and Space held with Ctrl or Alt activate the focused control, as they do by default.

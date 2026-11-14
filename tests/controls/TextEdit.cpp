@@ -126,6 +126,58 @@ protected:
     }
 };
 
+// A real press sends the key first, then the text. The key must not reach the root as a click.
+TEST_F(TextEditTest, ASpacePressedLandsAtTheCaret) {
+    ttk::TextEdit *edit = focused("first line\nsecond");
+
+    edit->select(0, 0);
+
+    EXPECT_TRUE(canvas.root().key(controls::key(ttk::Code::Space)));
+    canvas.root().wrote(" ");
+
+    EXPECT_EQ(edit->text(), " first line\nsecond");
+}
+
+TEST_F(TextEditTest, CtrlSpaceLeavesTheCaretWhereItIs) {
+    ttk::TextEdit *edit = focused("first line\nsecond");
+
+    edit->select(0, 0);
+
+    EXPECT_TRUE(canvas.root().key(controls::key(ttk::Code::Space, true)));
+    EXPECT_EQ(edit->caret(), 0U);
+}
+
+TEST_F(TextEditTest, AltTabTypesNothing) {
+    ttk::TextEdit *edit = focused("ab");
+
+    EXPECT_TRUE(edit->key(ttk::Key{.code = Code::Tab, .alt = true}));
+    EXPECT_EQ(edit->text(), "ab");
+}
+
+TEST_F(TextEditTest, AKeyOnTheCogReachesTheCog) {
+    ttk::TextEdit *edit = make("abc", BOX, ttk::TextEdit::Cog::Shown);
+    ttk::Widget *cog = edit->children().front().get();
+
+    canvas.root().focus(cog);
+
+    EXPECT_TRUE(canvas.root().key(controls::key(ttk::Code::Space)));
+    EXPECT_TRUE(canvas.root().has_dismiss()) << "the editor swallowed the key that opens its menu";
+    EXPECT_EQ(edit->text(), "abc");
+}
+
+TEST_F(TextEditTest, EscapeInTheEditorClosesItsMenu) {
+    ttk::TextEdit *edit = make("abc", BOX, ttk::TextEdit::Cog::Shown);
+    const BLRect cog = edit->children().front()->box();
+
+    controls::click(canvas.root(), cog.x + (cog.w / 2.0), cog.y + (cog.h / 2.0));
+    ASSERT_TRUE(canvas.root().has_dismiss());
+
+    canvas.root().focus(edit);
+
+    EXPECT_TRUE(canvas.root().key(controls::key(ttk::Code::Escape)));
+    EXPECT_FALSE(canvas.root().has_dismiss());
+}
+
 TEST_F(TextEditTest, StartsEmptyAndEditable) {
     const ttk::TextEdit *edit = make();
 
@@ -489,27 +541,27 @@ TEST_F(TextEditTest, UpAndDownExpandTabs) {
     EXPECT_EQ(probe(edit), "\tx\nabcde|f") << "a tab did not count as four columns";
 }
 
-TEST_F(TextEditTest, HomeGoesToTheFirstNonBlankThenToTheStart) {
-    ttk::TextEdit *edit = focused("    foo");
+TEST_F(TextEditTest, HomeGoesToTheStartOfTheLine) {
+    ttk::TextEdit *edit = focused("first\n    foo");
 
+    edit->key(key(Code::Down));
     edit->key(key(Code::End));
     edit->key(key(Code::Home));
 
-    EXPECT_EQ(probe(edit), "    |foo");
-
-    edit->key(key(Code::Left));
-    edit->key(key(Code::Home));
-
-    EXPECT_EQ(probe(edit), "|    |foo");
+    EXPECT_EQ(probe(edit), "first\n|    foo");
 }
 
-TEST_F(TextEditTest, HomeInsideTheIndentGoesToTheFirstNonBlank) {
-    ttk::TextEdit *edit = focused("\t  foo");
+TEST_F(TextEditTest, ShiftHomeAndShiftEndSelectToTheLineEdges) {
+    ttk::TextEdit *edit = focused("one two");
 
-    edit->key(key(Code::Right));
-    edit->key(key(Code::Home));
+    type_keys(edit, Code::Right, 3);
+    edit->key(key(Code::End, false, true));
 
-    EXPECT_EQ(probe(edit), "\t  |foo");
+    EXPECT_EQ(edit->selection(), " two");
+
+    edit->key(key(Code::Home, false, true));
+
+    EXPECT_EQ(edit->selection(), "one");
 }
 
 TEST_F(TextEditTest, EndGoesToTheEndOfTheLine) {
@@ -663,25 +715,25 @@ TEST_F(TextEditTest, TabCountsColumnsInCodePoints) {
     EXPECT_EQ(edit->text(), "ééé ");
 }
 
-TEST_F(TextEditTest, TabWithAModifierIsNotConsumed) {
+TEST_F(TextEditTest, TabWithAModifierInsertsLikeTab) {
     ttk::TextEdit *edit = focused("ab");
 
-    EXPECT_FALSE(edit->key(ttk::Key{.code = Code::Tab, .shift = true}));
-    EXPECT_FALSE(edit->key(ttk::Key{.code = Code::Tab, .ctrl = true}));
-    EXPECT_FALSE(edit->key(ttk::Key{.code = Code::Tab, .alt = true}));
-    EXPECT_EQ(edit->text(), "ab");
+    edit->select(0, 0);
+
+    EXPECT_TRUE(edit->key(ttk::Key{.code = Code::Tab, .shift = true}));
+    EXPECT_TRUE(edit->key(ttk::Key{.code = Code::Tab, .ctrl = true}));
+    EXPECT_EQ(edit->text(), "        ab");
 }
 
-TEST_F(TextEditTest, ShiftTabLeavesTheEditor) {
+TEST_F(TextEditTest, ShiftTabStaysInTheEditor) {
     auto other = std::make_unique<ttk::TextEdit>();
-    ttk::TextEdit *first = controls::mount(canvas, std::move(other), BLRect{20, 20, 100, 60});
+    controls::mount(canvas, std::move(other), BLRect{20, 20, 100, 60});
     ttk::TextEdit *edit = make("ab", BLRect{20, 100, 200, 100});
 
     canvas.root().focus(edit);
 
     EXPECT_TRUE(canvas.root().key(ttk::Key{.code = Code::Tab, .shift = true}));
-    EXPECT_EQ(canvas.root().focused(), first);
-    EXPECT_EQ(edit->text(), "ab");
+    EXPECT_EQ(canvas.root().focused(), edit);
 }
 
 TEST_F(TextEditTest, BackspaceJoinsALineWithTheOneAbove) {
@@ -828,13 +880,13 @@ TEST_F(TextEditTest, CtrlVIsConsumed) {
     EXPECT_TRUE(edit->key(key('v', true)));
 }
 
-TEST_F(TextEditTest, OtherKeysAreNotConsumed) {
+TEST_F(TextEditTest, EveryOtherKeyIsConsumedAndDoesNothing) {
     ttk::TextEdit *edit = focused("abc");
 
-    EXPECT_FALSE(edit->key(key('q')));
-    EXPECT_FALSE(edit->key(key(Code::F1)));
-    EXPECT_FALSE(edit->key(key(Code::Escape)));
-    EXPECT_FALSE(edit->key(key('q', true)));
+    EXPECT_TRUE(edit->key(key('q')));
+    EXPECT_TRUE(edit->key(key(Code::F1)));
+    EXPECT_TRUE(edit->key(key(Code::Escape)));
+    EXPECT_TRUE(edit->key(key('q', true)));
     EXPECT_EQ(edit->text(), "abc");
 }
 
@@ -1004,13 +1056,23 @@ TEST_F(TextEditTest, ReadOnlyIgnoresEveryEdit) {
     EXPECT_EQ(calls.texts.size(), 1U);
 }
 
-TEST_F(TextEditTest, ReadOnlyLetsReturnAndTabPass) {
+TEST_F(TextEditTest, ReturnWhileReadOnlyKeepsTheSelection) {
+    ttk::TextEdit *edit = focused("first line\nsecond");
+
+    edit->read_only();
+    edit->select(0, 5);
+
+    EXPECT_TRUE(canvas.root().key(key(Code::Return)));
+    EXPECT_EQ(edit->selection(), "first");
+}
+
+TEST_F(TextEditTest, ReadOnlyTakesReturnAndTabAndChangesNothing) {
     ttk::TextEdit *edit = focused("fixed");
 
     edit->read_only();
 
-    EXPECT_FALSE(edit->key(key(Code::Return)));
-    EXPECT_FALSE(edit->key(key(Code::Tab)));
+    EXPECT_TRUE(edit->key(key(Code::Return)));
+    EXPECT_TRUE(edit->key(key(Code::Tab)));
     EXPECT_EQ(edit->text(), "fixed");
 }
 
@@ -1502,7 +1564,7 @@ TEST_F(TextEditTest, WrappingCountsMultiByteCharacters) {
     EXPECT_EQ(probe(edit).find('|'), 20U) << "the break was not after ten characters";
 }
 
-TEST_F(TextEditTest, WrappedHomeAndEndKeepToTheRow) {
+TEST_F(TextEditTest, WrappedHomeAndEndGoToTheEdgesOfTheWholeLine) {
     ttk::TextEdit *edit = focused("aaaa bbbb cccc dddd", fitting(10));
 
     edit->wrapped();
@@ -1511,12 +1573,12 @@ TEST_F(TextEditTest, WrappedHomeAndEndKeepToTheRow) {
     type_keys(edit, Code::Right, 2);
     edit->key(key(Code::Home));
 
-    EXPECT_EQ(probe(edit), "aaaa bbbb |cccc dddd");
+    EXPECT_EQ(probe(edit), "|aaaa bbbb cccc dddd");
 
     edit->set_text("aaaa bbbb cccc dddd");
     edit->key(key(Code::End));
 
-    EXPECT_EQ(probe(edit), "aaaa bbbb |cccc dddd");
+    EXPECT_EQ(probe(edit), "aaaa bbbb cccc dddd|");
 }
 
 TEST_F(TextEditTest, TypingRewrapsTheLine) {

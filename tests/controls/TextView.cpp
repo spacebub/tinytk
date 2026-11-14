@@ -80,6 +80,19 @@ protected:
     }
 };
 
+TEST_F(TextViewTest, ReturnAndSpaceKeepTheSelection) {
+    ttk::TextView *view = make({"first row", "second row"});
+
+    canvas.root().focus(view);
+    view->select_all();
+
+    const std::string all = view->selection();
+
+    EXPECT_TRUE(canvas.root().key(controls::key(ttk::Code::Return)));
+    EXPECT_TRUE(canvas.root().key(controls::key(ttk::Code::Space)));
+    EXPECT_EQ(view->selection(), all);
+}
+
 TEST_F(TextViewTest, StartsEmpty) {
     const ttk::TextView view;
 
@@ -624,7 +637,6 @@ TEST_F(TextViewTest, OtherKeysAreNotConsumed) {
     EXPECT_FALSE(view->key(key('c')));
     EXPECT_FALSE(view->key(key('x', true)));
     EXPECT_FALSE(view->key(key(Code::Left)));
-    EXPECT_FALSE(view->key(key(Code::Return)));
     EXPECT_FALSE(view->key(key(Code::Escape)));
 }
 

@@ -455,7 +455,7 @@ bool Root::key(const Key &pressed) {
     const bool modified = pressed.ctrl || pressed.alt;
 
     if ((pressed.code == Code::Return || pressed.code == Code::Space) && (!modified || _modifiedActivation)
-        && _focused != nullptr && _focused->takes_focus()) {
+        && _focused != nullptr && _focused->takes_focus() && _focused->activates()) {
         if (!pressed.repeat) {
             const BLRect box = _focused->box();
             const Pointer at{.x = box.x + (box.w / 2.0), .y = box.y + (box.h / 2.0)};

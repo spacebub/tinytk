@@ -87,9 +87,13 @@ public:
     //! Left and Right move by a character, or by a word with Ctrl, and Home and End to either end. Shift
     //! extends the selection. Backspace and Delete remove the selection, or a character or a word with Ctrl.
     //! Ctrl+A selects all, Ctrl+C copies, Ctrl+X cuts and Ctrl+V pastes. Return calls \ref accepted and is
-    //! always consumed. Escape calls \ref cancelled when it is set. A word is a run of ASCII letters, digits,
-    //! underscores and non-ASCII characters.
+    //! always consumed. Space is always consumed too, since its text arrives through \ref wrote(), so a typed
+    //! space never reaches a shortcut. Escape calls \ref cancelled when it is set. A word is a run of ASCII
+    //! letters, digits, underscores and non-ASCII characters.
     bool key(const Key &pressed) override;
+
+    //! Returns false, so Return and Space never press the box and move its caret.
+    [[nodiscard]] bool activates() const override { return false; }
 
     //! Replaces the selection with `text`, in UTF-8, or inserts it at the caret. Ignored when read-only.
     void wrote(const std::string &text) override;

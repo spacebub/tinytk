@@ -111,8 +111,12 @@ public:
     //! Extends the selection to the character nearest `at`.
     void drag(const Pointer &at) override;
 
-    //! Handles Ctrl+A, which selects all, and Ctrl+C, which copies the selection. Returns false for other keys.
+    //! Handles Ctrl+A, which selects all, and Ctrl+C, which copies the selection. Return and Space are consumed
+    //! and do nothing, so they never act on what the application binds to them. Returns false for other keys.
     bool key(const Key &pressed) override;
+
+    //! Returns false, so Return and Space never press the view and drop its selection.
+    [[nodiscard]] bool activates() const override { return false; }
 
     //! Called when the view loses keyboard focus. Clears the selection.
     void lost_focus() override;
