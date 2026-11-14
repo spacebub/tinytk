@@ -404,4 +404,106 @@ TEST(Glyphs, SheetFailsWhereItCannotWrite) {
 
     EXPECT_FALSE(ttk::Glyphs::sheet(missing.string().c_str()));
 }
+
+constexpr const char *SCREEN = "M 3 2 L 11 2 L 11 10 L 3 10 Z M 7 10 L 7 12.4";
+
+TEST_F(Sheet, AnAddedOutlineInksWithinItsSquare) {
+    const Glyph added = ttk::Glyphs::add({.outline = SCREEN});
+    const BLPoint origin{20.0, 24.0};
+    constexpr float weight = 2.0F;
+    const double side = ttk::Glyphs::span(weight);
+
+    ASSERT_GT(static_cast<int>(added), static_cast<int>(Glyph::Count));
+
+    ttk::Glyphs::draw(context, added, origin, weight, BLRgba32(0xffffffff));
+
+    const tests::Ink found = settle();
+
+    ASSERT_TRUE(found.any());
+    EXPECT_GE(found.x0, static_cast<int>(origin.x) - 1);
+    EXPECT_GE(found.y0, static_cast<int>(origin.y) - 1);
+    EXPECT_LE(found.x1, static_cast<int>(std::ceil(origin.x + side)) + 1);
+    EXPECT_LE(found.y1, static_cast<int>(std::ceil(origin.y + side)) + 1);
+}
+
+TEST_F(Sheet, AnAddedSolidFills) {
+    const Glyph added = ttk::Glyphs::add({.solid = "M 2 2 L 10 2 L 10 10 L 2 10 Z", .solidBox = 12.0F});
+
+    ASSERT_NE(added, Glyph::Empty);
+
+    ttk::Glyphs::draw(context, added, {20.0, 20.0}, 2.0F, BLRgba32(0xffffffff));
+
+    // The middle of the square, which an outline of the same box would leave bare.
+    EXPECT_EQ(drawn()[(32 * SIDE) + 32], 0xffffffffU);
+}
+
+TEST_F(Sheet, AnAddedGlyphDrawsTheSameFromTheMask) {
+    const Glyph added = ttk::Glyphs::add({.outline = SCREEN, .pen = 1.4F});
+    constexpr float weight = 1.73F;
+    const BLPoint origin{20.0, 20.0};
+
+    ttk::Glyphs::draw(context, added, origin, weight, BLRgba32(0xffffffff));
+
+    const std::vector<std::uint32_t> stroked = drawn();
+
+    for (int again = 0; again < 2; ++again) {
+        wipe();
+        ttk::Glyphs::draw(context, added, origin, weight, BLRgba32(0xffffffff));
+
+        EXPECT_TRUE(near(drawn(), stroked, 2)) << "draw " << again + 2 << " differs";
+    }
+}
+
+TEST(Glyphs, AddedGlyphsAreNumberedApart) {
+    const Glyph one = ttk::Glyphs::add({.outline = SCREEN});
+    const Glyph two = ttk::Glyphs::add({.outline = SCREEN});
+
+    EXPECT_GT(static_cast<int>(one), static_cast<int>(Glyph::Count));
+    EXPECT_GT(static_cast<int>(two), static_cast<int>(one));
+}
+
+TEST(Glyphs, AShapeWithNothingToDrawIsNotAdded) {
+    EXPECT_EQ(ttk::Glyphs::add({}), Glyph::Empty);
+    EXPECT_EQ(ttk::Glyphs::add({.outline = SCREEN, .pen = 0.0F}), Glyph::Empty);
+    EXPECT_EQ(ttk::Glyphs::add({.outline = SCREEN, .box = 0.0F}), Glyph::Empty);
+    EXPECT_EQ(ttk::Glyphs::add({.solid = SCREEN, .solidBox = -1.0F}), Glyph::Empty);
+}
+
+TEST(Glyphs, APathThatDoesNotParseIsNotAdded) {
+    EXPECT_EQ(ttk::Glyphs::add({.outline = "M 1 1 L 5 5 X 9"}), Glyph::Empty);
+    EXPECT_EQ(ttk::Glyphs::add({.outline = SCREEN, .solid = "M 1 1 L"}), Glyph::Empty);
+}
+
+TEST(Glyphs, TheSheetLeavesAddedGlyphsOut) {
+    // Enough to need another row of the sheet if they were drawn on it.
+    for (int added = 0; added < 8; ++added) {
+        ttk::Glyphs::add({.outline = SCREEN});
+    }
+
+    const std::filesystem::path file = tests::Sandbox::scratch("glyph-sheet-added") / "sheet.png";
+
+    ASSERT_TRUE(ttk::Glyphs::sheet(file.string().c_str()));
+
+    const int glyphs = static_cast<int>(Glyph::Count) - 1;
+
+    EXPECT_EQ(ttk::Paint::load(file.string()).height(), 64 * ((glyphs + 7) / 8));
+}
+
+// A suite of its own, registered last, so it runs after every other add: it leaves no room for another.
+TEST(GlyphsFilled, AFullSetTakesNoMore) {
+    Glyph last = Glyph::Empty;
+
+    for (int tried = 0; tried < 300; ++tried) {
+        const Glyph added = ttk::Glyphs::add({.outline = SCREEN});
+
+        if (added == Glyph::Empty) {
+            break;
+        }
+
+        last = added;
+    }
+
+    EXPECT_EQ(static_cast<int>(last), 255);
+    EXPECT_EQ(ttk::Glyphs::add({.outline = SCREEN}), Glyph::Empty);
+}
 }

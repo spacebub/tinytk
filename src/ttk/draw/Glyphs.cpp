@@ -12,9 +12,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
+#include <limits>
 #include <map>
 #include <numbers>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ttk/draw/Glyphs.h"
@@ -177,6 +180,15 @@ const BLPath &cached(const char *commands) {
     return paths.emplace(commands, std::move(path)).first->second;
 }
 
+// A deque never moves what it holds, and cached() keys each path by its address.
+std::deque<Glyphs::Custom> &customs() {
+    static std::deque<Glyphs::Custom> added;
+
+    return added;
+}
+
+constexpr size_t FIRST_CUSTOM = static_cast<size_t>(Glyphs::Glyph::Count) + 1;
+
 // The rounded bar, which is a shape rather than a path.
 void bar(BLContext &context, const BLRect &rect, const double radius, const BLRgba32 tone) {
     context.fill_round_rect(rect, radius, radius, tone);
@@ -194,7 +206,31 @@ float Glyphs::span(const float weight) {
     return element * weight;
 }
 
+Glyphs::Glyph Glyphs::add(Custom shape) {
+    const bool outlined = !shape.outline.empty();
+    const bool filled = !shape.solid.empty();
+
+    // Drawn, a bad path would show whatever parsed before the fault.
+    const auto parses = [](const std::string &commands) {
+        BLPath path;
+
+        return Svg::parse(commands.c_str(), path);
+    };
+
+    if ((!outlined && !filled) || (outlined && (shape.box <= 0.0F || shape.pen <= 0.0F || !parses(shape.outline)))
+        || (filled && (shape.solidBox <= 0.0F || !parses(shape.solid)))
+        || FIRST_CUSTOM + customs().size() > std::numeric_limits<std::uint8_t>::max()) {
+        return Glyph::Empty;
+    }
+
+    customs().push_back(std::move(shape));
+
+    return static_cast<Glyph>(FIRST_CUSTOM + customs().size() - 1);
+}
+
 namespace {
+
+void trace(BLContext &context, const Shape &shape, BLPoint origin, float weight, BLRgba32 tone);
 
 // The glyph stroked from its path, which is what a mask is rendered from and what
 // a rotated or off-grid draw falls back to.
@@ -297,11 +333,26 @@ void stroke(
 
     const auto at = static_cast<size_t>(glyph);
 
-    if (at >= SHAPES.size()) {
-        return;
-    }
+    if (at < SHAPES.size()) {
+        trace(context, SHAPES[at], origin, weight, tone);
+    } else if (at >= FIRST_CUSTOM && at - FIRST_CUSTOM < customs().size()) {
+        const Glyphs::Custom &added = customs()[at - FIRST_CUSTOM];
 
-    const Shape &shape = SHAPES[at];
+        trace(context,
+              Shape{.outline = added.outline.empty() ? nullptr : added.outline.c_str(),
+                    .solid = added.solid.empty() ? nullptr : added.solid.c_str(),
+                    .box = added.box,
+                    .solidBox = added.solidBox,
+                    .pen = added.pen},
+              origin,
+              weight,
+              tone);
+    }
+}
+
+// A glyph of the table, or one an application added, from its paths.
+void trace(BLContext &context, const Shape &shape, const BLPoint origin, const float weight, const BLRgba32 tone) {
+    const double side = Glyphs::element * weight;
 
     if (shape.outline == nullptr && shape.solid == nullptr) {
         return;

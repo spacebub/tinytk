@@ -11,13 +11,14 @@
 
 
 #include <cstdint>
+#include <string>
 
 #include <blend2d/blend2d.h>
 
-//! Built-in icon set drawn from vector paths.
+//! Icon set drawn from vector paths: the built-in glyphs, and any an application adds.
 namespace ttk::Glyphs {
 
-//! Icon of the built-in set.
+//! Icon of the built-in set, or one returned by \ref add().
 enum class Glyph : std::uint8_t {
     //! Draws nothing.
     Empty,
@@ -79,12 +80,37 @@ enum class Glyph : std::uint8_t {
     Maximize,
     //! Two overlapping squares of a window's restore button.
     Restore,
-    //! Number of glyphs. Not a glyph.
+    //! Number of built-in glyphs. Not a glyph.
     Count,
 };
 
 //! Side of the square a glyph is laid out in at weight 1, in pixels. A glyph is centred on it.
 constexpr float element = 12.0F;
+
+//! Shape of a glyph an application adds with \ref add(), in the terms the built-in set is drawn in.
+//!
+//! Each path is SVG path data in a square viewbox of its own, drawn at one pixel per unit times the weight with
+//! the viewbox centred on the glyph's square. A viewbox of \ref element matches the square. Most built-in glyphs
+//! use one of 14, which reaches a unit past each side, and keep their ink near the middle of it.
+struct Custom {
+    //! Path stroked at \ref pen with round caps and joins. Empty for none.
+    std::string outline{};
+    //! Path filled under the outline. Empty for none.
+    std::string solid{};
+    //! Side of the viewbox `outline` is laid out in.
+    float box = 14.0F;
+    //! Side of the viewbox `solid` is laid out in.
+    float solidBox = 14.0F;
+    //! Stroke width of `outline`, in viewbox units.
+    float pen = 1.5F;
+};
+
+//! Adds `shape` to the set and returns the glyph that draws it, which anything taking a \ref Glyph accepts.
+//!
+//! Added glyphs are numbered from one past \ref Glyph::Count up to 255, so the set takes 255 minus that many.
+//! Returns \ref Glyph::Empty when both paths are empty, a path given does not parse, its viewbox or the pen is
+//! not positive, or the set is full. Call it from the thread that draws.
+Glyph add(Custom shape);
 
 //! Draws `glyph` in `tone` centred on a square \ref span() of `weight` across, with its top-left corner at `origin`.
 //!
@@ -100,7 +126,7 @@ void draw(BLContext &context, Glyph glyph, BLPoint origin, float weight, BLRgba3
 //! Returns the side of the square \ref draw() lays a glyph out in at `weight`, which is \ref element times `weight`.
 float span(float weight);
 
-//! Draws every glyph except \ref Glyph::Empty onto one sheet and writes it to the image file at `path`.
+//! Draws every built-in glyph except \ref Glyph::Empty onto one sheet and writes it to the image file at `path`.
 //!
 //! The glyphs are drawn at weight 2.6 in 64 pixel cells, eight to a row, light on a dark background. The file
 //! format follows the extension of `path`. Returns false when the sheet cannot be created or written.
