@@ -164,6 +164,18 @@ TEST_F(CheckTest, ADisabledBoxIsNoTabStop) {
     EXPECT_FALSE(check->takes_focus());
 }
 
+TEST_F(CheckTest, AStateSetBeforeMountingIsDrawnAtOnce) {
+    auto made = std::make_unique<ttk::Check>(nullptr);
+
+    made->set_checked(true);
+    check = controls::mount(canvas, std::move(made), BOX);
+    canvas.full();
+
+    EXPECT_TRUE(check->checked());
+    EXPECT_EQ(body(), ttk::Theme::palette().accent.value) << "the box stayed empty";
+    EXPECT_FALSE(canvas.root().busy());
+}
+
 TEST_F(CheckTest, TheBoxIsFieldColouredOffAndAccentOn) {
     make();
     canvas.full();

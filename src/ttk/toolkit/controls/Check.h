@@ -35,7 +35,8 @@ public:
     //! Tests whether the box is checked.
     [[nodiscard]] bool checked() const { return _checked; }
 
-    //! Sets the checked state to `value` and animates the box towards it. Does not call the toggle callback.
+    //! Sets the checked state to `value` and animates the box towards it, or jumps to it while the box is in no
+    //! root. Does not call the toggle callback.
     void set_checked(bool value);
 
     //! Replaces the text beside the square and repaints. The box keeps its size until the next layout.

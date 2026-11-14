@@ -116,6 +116,15 @@ void Check::set_checked(const bool value) {
     }
 
     _checked = value;
+
+    // Nothing advances a tween started before the box is in a root, so a state set while it is built has to jump.
+    if (root() == nullptr) {
+        _on.set(value ? 1.0F : 0.0F);
+        invalidate();
+
+        return;
+    }
+
     _on.toward(value ? 1.0F : 0.0F, now(), 0.14, Anim::Curve::CubicOut);
     wake();
 }
