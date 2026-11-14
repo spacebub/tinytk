@@ -8,6 +8,7 @@
  */
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -15,6 +16,7 @@
 #include "Mount.h"
 #include "support/Canvas.h"
 #include "ttk/draw/Theme.h"
+#include "ttk/draw/Typeface.h"
 #include "ttk/toolkit/Event.h"
 #include "ttk/toolkit/controls/Check.h"
 
@@ -264,5 +266,99 @@ TEST_F(CheckTest, PartialRepaintsMatchAFullOne) {
     canvas.frame_at(0.3);
 
     EXPECT_TRUE(canvas.matches_full());
+}
+}
+
+namespace {
+constexpr BLRect ROW{20, 20, 360, 24};
+constexpr double GAP = 10.0;
+
+double text_width(const std::string &text) {
+    ttk::Typeface &type = tests::fonts();
+
+    return type.width(type.at(400, ttk::Theme::fontBody), text);
+}
+
+class TextCheckTest : public controls::Painted {
+protected:
+    tests::Canvas canvas;
+    std::vector<bool> toggled;
+    ttk::Check *check = nullptr;
+
+    ttk::Check *make(std::string text = "Weapons stay") {
+        check = controls::mount(canvas,
+                                std::make_unique<ttk::Check>(std::move(text),
+                                                             [this](const bool value) { toggled.push_back(value); }),
+                                ROW);
+
+        return check;
+    }
+};
+
+TEST_F(TextCheckTest, NaturalWidthIsTheSquareTheGapAndTheText) {
+    ttk::Check made("Weapons stay", nullptr);
+
+    EXPECT_NEAR(made.natural_width(tests::fonts()), SIDE + GAP + text_width("Weapons stay"), 1e-3);
+    EXPECT_DOUBLE_EQ(made.natural_height(tests::fonts(), 100.0), 24.0);
+
+    made.fixedWidth = 200.0;
+    made.fixedHeight = 30.0;
+
+    EXPECT_DOUBLE_EQ(made.natural_width(tests::fonts()), 200.0);
+    EXPECT_DOUBLE_EQ(made.natural_height(tests::fonts(), 100.0), 30.0);
+}
+
+TEST_F(TextCheckTest, AnEmptyTextIsTheBareSquare) {
+    ttk::Check made("", nullptr);
+
+    made.fixedWidth = 200.0;
+
+    EXPECT_DOUBLE_EQ(made.natural_width(tests::fonts()), SIDE);
+    EXPECT_DOUBLE_EQ(made.natural_height(tests::fonts(), 100.0), SIDE);
+}
+
+TEST_F(TextCheckTest, AClickOnTheTextToggles) {
+    make();
+    controls::click(canvas.root(), ROW.x + SIDE + GAP + (text_width("Weapons stay") / 2.0), ROW.y + 12.0);
+
+    EXPECT_EQ(toggled, (std::vector<bool>{true}));
+}
+
+TEST_F(TextCheckTest, AClickPastTheTextDoesNothing) {
+    make();
+    controls::click(canvas.root(), ROW.x + SIDE + GAP + text_width("Weapons stay") + 20.0, ROW.y + 12.0);
+
+    EXPECT_TRUE(toggled.empty());
+}
+
+TEST_F(TextCheckTest, ReturnTogglesThoughTheCentreIsPastTheText) {
+    make();
+    canvas.root().focus(check);
+
+    EXPECT_TRUE(canvas.root().key(key(Code::Return)));
+    EXPECT_EQ(toggled, (std::vector<bool>{true}));
+}
+
+TEST_F(TextCheckTest, TheSquareSitsAtTheLeftEdge) {
+    make();
+    canvas.full();
+
+    const int middle = static_cast<int>(ROW.y + (ROW.h / 2.0));
+
+    EXPECT_NE(canvas.at(static_cast<int>(ROW.x) + 1, middle), ttk::Theme::palette().background.value);
+    EXPECT_EQ(canvas.at(static_cast<int>(ROW.x + SIDE) + 2, middle), ttk::Theme::palette().background.value);
+}
+
+TEST_F(TextCheckTest, SetTextRepaintsOnlyOnAChange) {
+    make();
+    canvas.frame();
+    check->set_text("Weapons stay");
+
+    EXPECT_FALSE(canvas.root().dirty());
+
+    check->set_text("Barrels respawn");
+
+    EXPECT_TRUE(canvas.root().dirty());
+    EXPECT_EQ(check->text(), "Barrels respawn");
 }
 }
