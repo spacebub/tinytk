@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.1 - 2026-11-14
+
+### Added
+
+- `Check` takes an optional text, drawn to the right of the box. A click on the text toggles it as a
+  click on the box does, and a click past the end of the text misses. `set_text()` and `text()`
+  change and read it
+
 ## 1.14.0 - 2026-11-14
 
 ### Added
