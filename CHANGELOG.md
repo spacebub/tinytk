@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.13.0 - 2026-11-14
+
+### Added
+
+- `Placement::fit()` moves a window position onto the connected displays. A window keeps its
+  position when the strip along its top can be reached on one of them. Any other window moves the
+  shortest way onto the nearest display
+
+### Changed
+
+- `Shell::set_geometry()` takes the position as an optional point. A position can be negative, as
+  on a display left of or above the primary one, and an empty one leaves the placement to the
+  desktop. The position is fitted onto the connected displays with `Placement::fit()`, so a window
+  saved on a display that is gone opens where it can be reached. A new `maximized` argument shows
+  the window maximized, and a restore then returns to the size and position given
+- `Shell::geometry()` reports the position and size a restore returns to while the window is
+  maximized, minimized or fullscreen
+
 ## 1.12.0 - 2026-11-14
 
 ### Added
