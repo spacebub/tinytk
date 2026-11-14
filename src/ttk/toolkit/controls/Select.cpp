@@ -24,6 +24,10 @@ namespace {
 constexpr double ROW = 32.0;
 constexpr int SHOWN = 9;
 
+bool disabled_at(const std::vector<bool> &disabled, const int at) {
+    return at >= 0 && std::cmp_less(at, disabled.size()) && disabled[static_cast<size_t>(at)];
+}
+
 }
 
 
@@ -50,12 +54,14 @@ class Options : public Widget {
 public:
     Options(std::vector<std::string> options,
             std::vector<std::string> badges,
+            std::vector<bool> disabled,
             std::string placeholder,
             const int current,
             const bool clearable,
             std::function<void(int)> chose)
         : _options(std::move(options)),
           _badges(std::move(badges)),
+          _disabled(std::move(disabled)),
           _placeholder(std::move(placeholder)),
           _current(current),
           _clearable(clearable),
@@ -104,11 +110,13 @@ public:
 
             const int at = static_cast<int>(row) - shift;
             const bool picked = at == _current;
+            const bool disabled = disabled_at(_disabled, at);
+            const bool lit = picked && !disabled;
             const std::string &option = at < 0 ? _placeholder : _options[static_cast<size_t>(at)];
 
-            if (picked) {
+            if (lit) {
                 painter.round(line, Theme::radiusSmall, palette.accentSoft);
-            } else if (std::cmp_equal(row, _over)) {
+            } else if (std::cmp_equal(row, _over) && !disabled) {
                 painter.round(line, Theme::radiusSmall, palette.hover);
             }
 
@@ -126,18 +134,18 @@ public:
                               BLRect{line.x + line.w - 10.0 - taken, line.y, taken + 2.0, line.h},
                               Align::Start,
                               badge,
-                              picked ? palette.accent : palette.faint);
+                              lit ? palette.accent : palette.faint);
 
                 room -= taken + 10.0;
             }
 
-            painter.label(painter.font(picked ? 600 : 400, Theme::fontBody),
+            painter.label(painter.font(lit ? 600 : 400, Theme::fontBody),
                           BLRect{line.x + 10.0, line.y, room, line.h},
                           Align::Start,
                           option,
-                          picked   ? palette.accent
-                          : at < 0 ? palette.faint
-                                   : palette.text);
+                          lit                   ? palette.accent
+                          : disabled || at < 0 ? palette.faint
+                                               : palette.text);
         }
 
         painter.pop();
@@ -177,17 +185,24 @@ public:
 
     bool press(const Pointer &at) override { return holds(at.x, at.y) && at.x < _box.x + _box.w - Theme::lane; }
 
+    [[nodiscard]] Cursor cursor_at(double /*x*/, const double y) const override {
+        const int row = row_at(y);
+
+        return row >= 0 && disabled_at(_disabled, row - (_clearable ? 1 : 0)) ? Cursor::Default : cursor;
+    }
+
     void release(const Pointer &at) override {
         const int row = row_at(at.y);
+        const int shift = _clearable ? 1 : 0;
 
-        if (row < 0 || !_chose) {
+        if (row < 0 || !_chose || disabled_at(_disabled, row - shift)) {
             return;
         }
 
         // Copied out: choosing closes the list, which frees the callable.
         const std::function<void(int)> fire = _chose;
 
-        fire(row - (_clearable ? 1 : 0));
+        fire(row - shift);
     }
 
     // How tall the whole list wants to be.
@@ -207,6 +222,7 @@ private:
 
     std::vector<std::string> _options;
     std::vector<std::string> _badges;
+    std::vector<bool> _disabled;
     std::string _placeholder;
 
     int _current = -1;
@@ -260,6 +276,16 @@ void Select::set_badges(std::vector<std::string> &&badges) {
     invalidate();
 }
 
+void Select::set_disabled(std::vector<bool> disabled) {
+    if (_disabled == disabled) {
+        return;
+    }
+
+    _disabled = std::move(disabled);
+
+    invalidate();
+}
+
 void Select::set_current(const int index) {
     if (_current == index) {
         return;
@@ -308,13 +334,14 @@ void Select::show() {
     const bool below = _frame.y + _frame.h + 4.0 + tall <= root()->height();
 
     auto made =
-            std::make_unique<Options>(_options, _badges, _placeholder, _current, _clearable, [this](const int index) {
-                close();
+            std::make_unique<Options>(
+                    _options, _badges, _disabled, _placeholder, _current, _clearable, [this](const int index) {
+                        close();
 
-                if (_selected) {
-                    _selected(index);
-                }
-            });
+                        if (_selected) {
+                            _selected(index);
+                        }
+                    });
 
     const Options *raw = made.get();
 
@@ -398,23 +425,32 @@ bool Select::key(const Key &pressed) {
         return true;
     }
 
-    if (pressed.code == Code::Down && _current + 1 < static_cast<int>(_options.size())) {
-        if (_selected) {
-            _selected(_current + 1);
-        }
+    int step = 0;
 
-        return true;
+    if (pressed.code == Code::Down) {
+        step = 1;
+    } else if (pressed.code == Code::Up) {
+        step = -1;
+    } else {
+        return false;
     }
 
-    if (pressed.code == Code::Up && _current > (_clearable ? -1 : 0)) {
-        if (_selected) {
-            _selected(_current - 1);
-        }
+    const int lowest = _clearable ? -1 : 0;
+    int next = std::clamp(_current, -1, static_cast<int>(_options.size())) + step;
 
-        return true;
+    while (next >= lowest && std::cmp_less(next, _options.size()) && disabled_at(_disabled, next)) {
+        next += step;
     }
 
-    return false;
+    if (next < lowest || !std::cmp_less(next, _options.size())) {
+        return false;
+    }
+
+    if (_selected) {
+        _selected(next);
+    }
+
+    return true;
 }
 
 bool Select::advance(const double now) {
@@ -468,7 +504,7 @@ void Select::paint(const Painter &painter) {
                   BLRect{_frame.x + 12.0, _frame.y, room, _frame.h},
                   Align::Start,
                   shown.empty() ? std::string_view(_placeholder) : shown,
-                  Theme::alpha(shown.empty() ? palette.faint : palette.text, dim));
+                  Theme::alpha(shown.empty() || disabled_at(_disabled, _current) ? palette.faint : palette.text, dim));
 
     constexpr float weight = 1.0F;
     const double side = Glyphs::span(weight);

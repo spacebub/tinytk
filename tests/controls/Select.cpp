@@ -612,4 +612,200 @@ TEST_F(SelectTest, PartialRepaintsMatchAFullOne) {
 
     EXPECT_TRUE(canvas.matches_full());
 }
+
+TEST_F(SelectTest, ThePickedPlaceholderRowIsDrawnAsAPickedOption) {
+    std::vector<std::string> named{"(Default)", "Other"};
+
+    make();
+    select->set_options(named);
+    select->clearable();
+    click_frame();
+    canvas.full();
+
+    const BLRect box = list()->box();
+    const auto row = [&box](const int at) {
+        return BLRectI{static_cast<int>(box.x + 5.0),
+                       static_cast<int>(box.y + 5.0 + (at * ROW)),
+                       static_cast<int>(box.w - 10.0),
+                       static_cast<int>(ROW)};
+    };
+    const std::vector<std::uint32_t> placeholder = controls::pixels_in(canvas, row(0));
+
+    click_frame();
+    select->set_current(0);
+    click_frame();
+    canvas.full();
+
+    EXPECT_EQ(controls::pixels_in(canvas, row(1)), placeholder);
+}
+
+TEST_F(SelectTest, APickedDisabledRowIsDrawnAsAnyDisabledRow) {
+    make();
+    select->set_options(std::vector<std::string>{"Same", "Same"});
+    select->set_disabled({true, true});
+    select->set_current(0);
+    click_frame();
+    canvas.root().motion(390.0, 230.0);
+    settle_animations();
+    canvas.full();
+
+    const BLRect box = list()->box();
+    const auto row = [&box](const int at) {
+        return BLRectI{static_cast<int>(box.x + 5.0),
+                       static_cast<int>(box.y + 5.0 + (at * ROW)),
+                       static_cast<int>(box.w - 10.0),
+                       static_cast<int>(ROW)};
+    };
+
+    EXPECT_EQ(controls::pixels_in(canvas, row(0)), controls::pixels_in(canvas, row(1)));
+}
+
+TEST_F(SelectTest, AnOutOfRangeCurrentStepsFromTheNearerEnd) {
+    make();
+    select->set_current(7);
+
+    EXPECT_TRUE(select->key(key(Code::Up)));
+    EXPECT_FALSE(select->key(key(Code::Down)));
+
+    select->set_current(-5);
+
+    EXPECT_TRUE(select->key(key(Code::Down)));
+    EXPECT_FALSE(select->key(key(Code::Up)));
+    EXPECT_EQ(picked, (std::vector<int>{2, 0}));
+}
+
+TEST_F(SelectTest, ADisabledRowShowsNoHandCursor) {
+    make();
+    select->set_disabled({false, true});
+    click_frame();
+
+    const BLRect box = list()->box();
+    const double x = box.x + 40.0;
+
+    EXPECT_EQ(list()->cursor_at(x, box.y + 5.0 + (ROW / 2.0)), ttk::Cursor::Pointer);
+    EXPECT_EQ(list()->cursor_at(x, box.y + 5.0 + ROW + (ROW / 2.0)), ttk::Cursor::Default);
+}
+
+TEST_F(SelectTest, ADisabledRowIgnoresAClick) {
+    make();
+    select->set_disabled({false, true});
+    click_frame();
+    click_row(1);
+
+    EXPECT_TRUE(picked.empty());
+    EXPECT_TRUE(select->open()) << "a click on a disabled row closed the list";
+
+    click_row(2);
+
+    EXPECT_EQ(picked, (std::vector<int>{2}));
+}
+
+TEST_F(SelectTest, AClearableRowShiftsTheDisabledFlags) {
+    make();
+    select->clearable();
+    select->set_disabled({true});
+    click_frame();
+    click_row(1);
+
+    EXPECT_TRUE(picked.empty());
+
+    click_row(0);
+
+    EXPECT_EQ(picked, (std::vector<int>{-1})) << "the placeholder row took the first option's flag";
+}
+
+TEST_F(SelectTest, DownStepsOverDisabledOptions) {
+    make(4);
+    select->set_current(0);
+    select->set_disabled({false, true, true});
+
+    EXPECT_TRUE(select->key(key(Code::Down)));
+    EXPECT_EQ(picked, (std::vector<int>{3}));
+}
+
+TEST_F(SelectTest, UpStepsOverDisabledOptions) {
+    make(4);
+    select->set_current(3);
+    select->set_disabled({false, true, true});
+
+    EXPECT_TRUE(select->key(key(Code::Up)));
+    EXPECT_EQ(picked, (std::vector<int>{0}));
+}
+
+TEST_F(SelectTest, OnlyDisabledOptionsLeftIsNotConsumed) {
+    make();
+    select->set_current(0);
+    select->set_disabled({false, true, true});
+
+    EXPECT_FALSE(select->key(key(Code::Down)));
+
+    select->set_current(2);
+    select->set_disabled({true, true, false});
+
+    EXPECT_FALSE(select->key(key(Code::Up)));
+    EXPECT_TRUE(picked.empty());
+}
+
+TEST_F(SelectTest, UpOverDisabledOptionsReachesThePlaceholder) {
+    make();
+    select->clearable();
+    select->set_current(1);
+    select->set_disabled({true});
+
+    EXPECT_TRUE(select->key(key(Code::Up)));
+    EXPECT_EQ(picked, (std::vector<int>{-1}));
+}
+
+TEST_F(SelectTest, ADisabledCurrentOptionIsDrawnFaint) {
+    make();
+    select->set_current(0);
+
+    const std::vector<std::uint32_t> plain = field_pixels();
+
+    select->set_disabled({false, true});
+
+    EXPECT_EQ(field_pixels(), plain) << "another option's flag reached the field";
+
+    select->set_disabled({true});
+
+    EXPECT_NE(field_pixels(), plain);
+}
+
+TEST_F(SelectTest, SetDisabledWithTheSameFlagsRepaintsNothing) {
+    make();
+    select->set_disabled({false, true});
+    canvas.frame();
+    select->set_disabled({false, true});
+
+    EXPECT_FALSE(canvas.root().dirty());
+}
+
+TEST_F(SelectTest, ADisabledRowTakesNoHoverTint) {
+    make();
+    select->set_disabled({false, true});
+    click_frame();
+    canvas.root().motion(390.0, 230.0);
+    settle_animations();
+    canvas.full();
+
+    const BLRect box = list()->box();
+    const BLRectI row{static_cast<int>(box.x + 5.0),
+                      static_cast<int>(box.y + 5.0 + ROW),
+                      static_cast<int>(box.w - 10.0),
+                      static_cast<int>(ROW)};
+    const std::vector<std::uint32_t> still = controls::pixels_in(canvas, row);
+
+    canvas.root().motion(box.x + 40.0, box.y + 5.0 + ROW + (ROW / 2.0));
+    canvas.full();
+
+    EXPECT_EQ(controls::pixels_in(canvas, row), still);
+
+    const BLRectI below{row.x, row.y + static_cast<int>(ROW), row.w, row.h};
+    const std::vector<std::uint32_t> idle = controls::pixels_in(canvas, below);
+
+    canvas.root().motion(box.x + 40.0, box.y + 5.0 + (2 * ROW) + (ROW / 2.0));
+    canvas.full();
+
+    EXPECT_NE(controls::pixels_in(canvas, below), idle) << "an enabled row took no tint either";
+}
 }

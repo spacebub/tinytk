@@ -53,6 +53,14 @@ public:
     //! As above, taking `badges` over instead of copying them when they differ.
     void set_badges(std::vector<std::string> &&badges);
 
+    //! Sets which options cannot be picked, matched to the options by index.
+    //!
+    //! A disabled option is drawn faint, in the list and in the field. In the list it takes no hover tint
+    //! and ignores a click, and the arrow keys step over it. \ref set_current() still accepts it. An option
+    //! with no entry, because `disabled` is shorter than the options, can be picked. The placeholder row of a
+    //! \ref clearable() select is never disabled. A list already open keeps the flags it was opened with.
+    void set_disabled(std::vector<bool> disabled);
+
     //! Sets the index of the option shown in the field without calling the `selected` callback.
     //!
     //! A negative or out of range `index` shows the placeholder.
@@ -104,8 +112,9 @@ public:
     void leave() override;
 
     //! Handles Return and Space, which open or close the list, and Down and Up, which call the `selected`
-    //! callback with the next or previous index. Returns false for other keys and at either end of the
-    //! options, where the top end is the placeholder row of a \ref clearable() select.
+    //! callback with the next or previous index that is not disabled. An out of range current steps from the
+    //! nearer end. Returns false for other keys and when no enabled index is left in that direction. The top
+    //! end of a \ref clearable() select is the placeholder row.
     bool key(const Key &pressed) override;
 
     //! Steps the hover and chevron animations and returns whether either is still running.
@@ -124,6 +133,7 @@ private:
 
     std::vector<std::string> _options;
     std::vector<std::string> _badges;
+    std::vector<bool> _disabled;
 
     std::string _placeholder = "(Default)";
 
