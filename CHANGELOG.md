@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.11.0 - 2026-11-14
+
+### Added
+
+- `Widget::activates()` says whether Return and Space press the focused widget at its centre. It is
+  true by default and false for `TextBox`, `TextEdit` and `TextView`, so the root never clicks a widget
+  that edits or selects text
+
+### Changed
+
+- A focused `TextEdit` consumes every key, so nothing around it acts on a key typed into it, and only
+  the pointer moves focus out. Tab with Shift or Ctrl inserts spaces as Tab does instead of moving
+  focus, and Alt+Tab types nothing. Return and Tab in a read-only editor do nothing instead of passing
+  on. Escape closes an open popup, such as the settings menu, and otherwise does nothing
+- `TextBox` consumes Space with any modifier, and `TextView` consumes Return and Space, so none of them
+  reach an application shortcut
+- Home and End in a `TextEdit` go to the start and the end of the line, even when it wraps over
+  several rows. Home no longer stops at the first non-blank character first
+
+### Fixed
+
+- A space typed into a `TextBox` or `TextEdit` could land in the middle of the editor. The root took
+  the Space key, with or without Ctrl or Alt, as a click on the focused editor, which moved the caret
+  before the space arrived. Quick spaces in a `TextEdit` could also select and replace a word or a line
+- Return or Space in a `TextView` or a read-only `TextEdit` dropped the selection the same way
+
 ## 1.10.0 - 2026-11-14
 
 ### Added
