@@ -131,7 +131,16 @@ void Button::set_text(const std::string_view text) {
         return;
     }
 
+    // Showing the button lays it out anyway.
+    Root *at = fixedWidth < 0.0 && visible() ? root() : nullptr;
+    const double was = at != nullptr ? wanted_width(at->type()) : 0.0;
+
     _text = text;
+
+    // The row sizes the button, so a wider label needs a new layout to show whole.
+    if (at != nullptr && wanted_width(at->type()) != was) {
+        at->relayout();
+    }
 
     invalidate();
 }

@@ -20,6 +20,8 @@
 #include "ttk/draw/Glyphs.h"
 #include "ttk/draw/Theme.h"
 #include "ttk/toolkit/controls/Button.h"
+#include "ttk/toolkit/layout/Box.h"
+#include "ttk/toolkit/layout/Spacer.h"
 
 namespace {
 using widgets::Painted;
@@ -704,9 +706,10 @@ TEST_F(Painted, ButtonSetTextToTheSameTextDamagesNothing) {
     EXPECT_FALSE(mounted.canvas.root().dirty());
 }
 
-TEST_F(Painted, ButtonSetTextKeepsTheBox) {
+TEST_F(Painted, ButtonOfFixedWidthKeepsItOnSetText) {
     Mounted mounted;
 
+    mounted.button->fixedWidth = BOX.w;
     mounted.button->set_text("A label much longer than the button it sits on, far too long");
 
     EXPECT_FALSE(mounted.canvas.root().settle()) << "set_text asked for a new layout";
@@ -714,9 +717,39 @@ TEST_F(Painted, ButtonSetTextKeepsTheBox) {
     EXPECT_DOUBLE_EQ(mounted.button->box().w, BOX.w);
 }
 
+TEST_F(Painted, ButtonSizedByItsRowWidensForALongerText) {
+    tests::Canvas canvas;
+    auto row = ttk::Box::row();
+    ttk::Button *button = row->append(std::make_unique<ttk::Button>("Environment", [] {}));
+
+    row->append(std::make_unique<ttk::Spacer>());
+    widgets::mount(canvas, std::move(row), BLRect{40, 40, 500, ttk::Theme::control});
+
+    button->set_text("Environment variables (12)");
+    canvas.frame();
+
+    EXPECT_DOUBLE_EQ(button->box().w, button->natural_width(tests::fonts()));
+
+    button->set_text("Environment");
+    canvas.frame();
+
+    EXPECT_DOUBLE_EQ(button->box().w, button->natural_width(tests::fonts())) << "a shorter text left it wide";
+}
+
+TEST_F(Painted, AHiddenButtonAsksForNoLayoutOnSetText) {
+    Mounted mounted;
+
+    mounted.button->set_visible(false);
+    mounted.canvas.frame();
+    mounted.button->set_text("A label much longer than the button it sits on, far too long");
+
+    EXPECT_FALSE(mounted.canvas.root().settle()) << "a hidden button asked for a new layout";
+}
+
 TEST_F(Painted, ButtonLabelTooLongForTheBoxIsElidedInside) {
     Mounted mounted;
 
+    mounted.button->fixedWidth = BOX.w;
     mounted.button->set_text("A label much longer than the button it sits on, far too long");
     mounted.canvas.frame();
 

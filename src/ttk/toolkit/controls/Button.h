@@ -76,7 +76,8 @@ public:
     //! Creates a button showing `text` that calls `clicked` on each click. `clicked` may be empty.
     Button(std::string text, std::function<void()> clicked);
 
-    //! Sets the label to `text` and repaints. The layout is not redone, so the width stays as it was.
+    //! Sets the label to `text` and repaints. A visible button without a fixed width that wants a new width
+    //! asks for a new layout, so its row sizes it again. A button placed by hand should set `fixedWidth`.
     void set_text(std::string_view text);
 
     //! Sets the visual style to `value`, derives its look from the palette on screen and returns this button.
