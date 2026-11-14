@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.10.0 - 2026-11-14
+
+### Added
+
+- `Select::set_disabled` marks options that cannot be picked. They draw faint, take no click or
+  hover tint, and the arrow keys step over them
+
+### Changed
+
+- `Button::set_text` asks for a layout when a visible button without a fixed width wants a
+  different width, so a button sized by its row shows a longer label whole at once. A button
+  placed by hand should set `fixedWidth`
+
+### Fixed
+
+- Up and Down on a `Select` whose current index is out of range step from the nearer end instead of
+  reporting an index past the options
+
 ## 1.9.0 - 2026-11-14
 
 ### Changed
