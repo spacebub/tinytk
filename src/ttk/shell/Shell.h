@@ -13,6 +13,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -164,14 +165,27 @@ public:
     //! created on first use and kept for the life of the shell.
     void set_cursor(ttk::Cursor wanted);
 
-    //! Stores the window's position in `x` and `y` and its size in `width` and `height`, all in logical pixels.
+    //! Stores the position of the window in `x` and `y` and its size in `width` and `height`, all in logical
+    //! pixels.
+    //!
+    //! While the window is maximized, minimized or fullscreen this is the last position and size it had
+    //! outside those states, the ones a restore returns to. Test \ref maximized() for the state itself.
+    //! Positions can be negative on a display left of or above the primary one. A Wayland compositor does not
+    //! report where the window is, and the position stored there is `[0, 0]`.
     void geometry(int &x, int &y, int &width, int &height) const;
 
-    //! Moves the window to `[x, y]` and resizes it to `width` by `height`, in logical pixels.
+    //! Resizes the window to `width` by `height`, moves it to `at` and maximizes it when `maximized` is true, in
+    //! logical pixels. Call it after \ref start() and before \ref run().
     //!
-    //! The size is kept unless both `width` and `height` are positive, and the position is kept unless both
-    //! `x` and `y` are non-negative.
-    void set_geometry(int x, int y, int width, int height) const;
+    //! The size is kept unless both `width` and `height` are positive. The position is kept when `at` is empty,
+    //! which leaves it to the desktop. A position can be negative. It is moved with \ref Placement::fit() onto
+    //! the usable areas of the connected displays, the primary one first, so a window saved on a display that
+    //! is gone still opens where it can be reached. A Wayland compositor does not let a client place its
+    //! window, and there `at` is ignored.
+    //!
+    //! With `maximized` true, \ref run() shows the window maximized. When the desktop restores it, it returns
+    //! to the size and position given here.
+    void set_geometry(std::optional<SDL_Point> at, int width, int height, bool maximized);
 
     //! Returns the time in seconds since SDL was initialised, the clock that frame times are measured on.
     [[nodiscard]] static double now();
@@ -185,6 +199,7 @@ private:
     };
 
     void handle(const SDL_Event &event);
+    void keep_normal();
     void draw();
     bool relayout();
 
@@ -230,6 +245,9 @@ private:
 
     double _width = 0.0;
     double _height = 0.0;
+
+    // Position and size outside maximized, minimized and fullscreen, which SDL does not report in those states.
+    SDL_Rect _normal{};
 
     int _minWidth = 720;
     int _minHeight = 520;

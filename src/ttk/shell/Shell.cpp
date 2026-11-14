@@ -13,10 +13,12 @@
 #include <memory>
 #include <mutex>
 #include <ranges>
+#include <span>
 #include <vector>
 
 #include "ttk/draw/Chrome.h"
 #include "ttk/draw/Theme.h"
+#include "ttk/shell/Placement.h"
 #include "ttk/shell/Shell.h"
 #include "ttk/toolkit/Compose.h"
 
@@ -35,6 +37,40 @@ bool system_dark() {
 
 // How close to an edge a press starts a resize.
 constexpr double EDGE = 6.0;
+
+// In the other states SDL reports the rectangle the window fills, not the one a restore returns to.
+bool floating(SDL_Window *window) {
+    return (SDL_GetWindowFlags(window) & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_MINIMIZED | SDL_WINDOW_FULLSCREEN)) == 0;
+}
+
+std::vector<SDL_Rect> usable_displays() {
+    std::vector<SDL_Rect> areas;
+
+    int count = 0;
+
+    SDL_DisplayID *ids = SDL_GetDisplays(&count);
+
+    if (ids == nullptr) {
+        return areas;
+    }
+
+    const SDL_DisplayID primary = SDL_GetPrimaryDisplay();
+
+    std::ranges::stable_partition(std::span(ids, static_cast<size_t>(count)),
+                                  [primary](const SDL_DisplayID id) { return id == primary; });
+
+    for (int i = 0; i < count; ++i) {
+        SDL_Rect area{};
+
+        if (SDL_GetDisplayUsableBounds(ids[i], &area)) {
+            areas.push_back(area);
+        }
+    }
+
+    SDL_free(ids);
+
+    return areas;
+}
 
 // Blend2D decodes to premultiplied alpha and SDL wants it straight.
 void dress_window(SDL_Window *window, const BLImage &mark) {
@@ -156,6 +192,8 @@ bool Shell::start(const std::string &title, const int width, const int height) {
     Chrome::apply(_window);
 
     SDL_SetWindowHitTest(_window, ShellHooks::hit_test, this);
+
+    keep_normal();
 
     _wakeEvent = SDL_RegisterEvents(1);
     _ready = true;
@@ -567,6 +605,10 @@ void Shell::handle(const SDL_Event &event) {
         // them again. Off the direct path only the damaged rectangles are handed
         // over, so a fresh block has to be filled whole.
         case SDL_EVENT_WINDOW_RESIZED:
+            keep_normal();
+
+            [[fallthrough]];
+
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
         case SDL_EVENT_WINDOW_SHOWN:
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
@@ -576,6 +618,11 @@ void Shell::handle(const SDL_Event &event) {
 
             _surface.damage_all();
             _root->damage_all();
+
+            break;
+
+        case SDL_EVENT_WINDOW_MOVED:
+            keep_normal();
 
             break;
 
@@ -822,17 +869,46 @@ void Shell::run() {
 }
 
 void Shell::geometry(int &x, int &y, int &width, int &height) const {
-    SDL_GetWindowPosition(_window, &x, &y);
-    SDL_GetWindowSize(_window, &width, &height);
-}
+    if (floating(_window)) {
+        SDL_GetWindowPosition(_window, &x, &y);
+        SDL_GetWindowSize(_window, &width, &height);
 
-void Shell::set_geometry(const int x, const int y, const int width, const int height) const {
-    if (width > 0 && height > 0) {
-        SDL_SetWindowSize(_window, width, height);
+        return;
     }
 
-    if (x >= 0 && y >= 0) {
-        SDL_SetWindowPosition(_window, x, y);
+    x = _normal.x;
+    y = _normal.y;
+    width = _normal.w;
+    height = _normal.h;
+}
+
+void Shell::set_geometry(const std::optional<SDL_Point> at, const int width, const int height, const bool maximized) {
+    if (width > 0 && height > 0) {
+        SDL_SetWindowSize(_window, width, height);
+        _normal.w = width;
+        _normal.h = height;
+    } else {
+        SDL_GetWindowSize(_window, &_normal.w, &_normal.h);
+    }
+
+    if (at) {
+        const std::vector<SDL_Rect> displays = usable_displays();
+        const SDL_Point put = Placement::fit(SDL_Rect{at->x, at->y, _normal.w, _normal.h}, displays);
+
+        SDL_SetWindowPosition(_window, put.x, put.y);
+    }
+
+    SDL_GetWindowPosition(_window, &_normal.x, &_normal.y);
+
+    if (maximized) {
+        SDL_MaximizeWindow(_window);
+    }
+}
+
+void Shell::keep_normal() {
+    if (floating(_window)) {
+        SDL_GetWindowPosition(_window, &_normal.x, &_normal.y);
+        SDL_GetWindowSize(_window, &_normal.w, &_normal.h);
     }
 }
 }

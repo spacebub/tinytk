@@ -265,6 +265,8 @@ add_library(ttk_ui STATIC
         ttk/util/Window.h
 
         # shell: the window and the frame loop
+        ttk/shell/Placement.cpp
+        ttk/shell/Placement.h
         ttk/shell/Shell.cpp
         ttk/shell/Shell.h
 
