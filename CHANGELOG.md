@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.2 - 2026-11-14
+
+### Fixed
+
+- A `Check` ticked before it is in a root, such as while a dialog is built, is drawn ticked. It used
+  to start its animation with nothing to advance it, so the box looked empty
+
 ## 1.14.1 - 2026-11-14
 
 ### Added
