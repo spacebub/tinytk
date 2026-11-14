@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.12.0 - 2026-11-14
+
+### Added
+
+- Files dragged in from another program reach the widgets. `Widget::drag_files()` is asked at each
+  position whether the widget would take them there, `Widget::drag_files_ended()` tells the taker the
+  drag moved on or ended, and `Widget::drop_files()` hands over the paths let go. Each goes to the
+  widget under the pointer first and then up through its parents
+- `Root::drag_files()`, `Root::drag_files_ended()` and `Root::drop_files()` route them, and
+  `Root::drag_target()` names the widget that would take the files. `Shell` feeds them from the SDL
+  drop events. A drop closes an open popup first, as a press does
+- `FilePicker::passes()` tests a file name against picker filters, so files that arrive another way,
+  such as a drop, can be held to the same kinds
+
 ## 1.11.0 - 2026-11-14
 
 ### Added
